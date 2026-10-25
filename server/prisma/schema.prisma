@@ -16,7 +16,7 @@ enum Role {
   ADMIN
   LANDLORD
   TENANT
-  AGENT      // Người dẫn đi xem / Môi giới / Cộng tác viên
+  AGENT // Người dẫn đi xem / Môi giới / Cộng tác viên
 }
 
 enum RoomStatus {
@@ -26,8 +26,8 @@ enum RoomStatus {
 }
 
 enum PostType {
-  RENT_OUT      // Cho thuê phòng
-  FIND_ROOM     // Tìm phòng
+  RENT_OUT // Cho thuê phòng
+  FIND_ROOM // Tìm phòng
   FIND_ROOMMATE // Tìm bạn ở ghép
 }
 
@@ -63,6 +63,33 @@ enum CommissionStatus {
   CANCELLED
 }
 
+// 🆕 Enum cho loại tin nhắn
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+// 🆕 Enum cho loại thông báo
+enum NotificationType {
+  APPOINTMENT
+  POST_APPROVED
+  POST_REJECTED
+  INVOICE
+  MESSAGE
+  CONTRACT
+  COMMISSION
+  SYSTEM
+}
+
+// 🆕 Enum cho đối tượng được đánh giá
+enum ReviewTargetType {
+  POST
+  USER // chủ trọ / người ở ghép
+  ROOM
+}
+
 // ==========================================
 // 2. NGƯỜI DÙNG & HỒ SƠ
 // ==========================================
@@ -81,19 +108,23 @@ model User {
 
   // Quan hệ
   profile              UserProfile?
-  properties           Property[]           // Dành cho Chủ trọ
-  posts                Post[]               // Bài đăng của user
+  roommatePreference   RoommatePreference? // 🆕 Tiêu chí tìm bạn ở ghép
+  properties           Property[] // Dành cho Chủ trọ
+  posts                Post[] // Bài đăng của user
   lifestyleAnswers     UserLifestyleAnswer[]
-  tenantAppointments   Appointment[]        @relation("TenantAppointments")
-  landlordAppointments Appointment[]       @relation("LandlordAppointments")
-  agentAppointments    Appointment[]        @relation("AgentAppointments")
-  contractsAsTenant    Contract[]           @relation("TenantContracts")
-  contractsAsAgent     Contract[]           @relation("AgentContracts")
-  commissions          Commission[]         // Hoa hồng dành cho AGENT
-  invoices             Invoice[]            // Hóa đơn của khách thuê
-  sentMessages         Message[]            @relation("SentMessages")
+  tenantAppointments   Appointment[]         @relation("TenantAppointments")
+  landlordAppointments Appointment[]         @relation("LandlordAppointments")
+  agentAppointments    Appointment[]         @relation("AgentAppointments")
+  contractsAsTenant    Contract[]            @relation("TenantContracts")
+  contractsAsAgent     Contract[]            @relation("AgentContracts")
+  commissions          Commission[] // Hoa hồng dành cho AGENT
+  invoices             Invoice[] // Hóa đơn của khách thuê
+  sentMessages         Message[]             @relation("SentMessages")
   conversationMembers  ConversationMember[]
   reports              Report[]
+  notifications        Notification[] // 🆕 Thông báo
+  reviews              Review[] // 🆕 Đánh giá của user
+  favorites            Favorite[] // 🆕 Tin đăng yêu thích
 
   @@map("users")
 }
@@ -120,20 +151,35 @@ model UserProfile {
 model Property {
   id          String   @id @default(uuid())
   landlordId  String   @map("landlord_id")
-  name        String   // Tên dãy trọ / Tòa nhà
-  address     String   // Địa chỉ chi tiết
-  province    String   // Tỉnh/Thành phố
-  district    String   // Quận/Huyện
-  ward        String   // Phường/Xã
+  name        String // Tên dãy trọ / Tòa nhà
+  address     String // Địa chỉ chi tiết
+  province    String // Tỉnh/Thành phố
+  district    String // Quận/Huyện
+  ward        String // Phường/Xã
   description String?
-  rules       String?  // Nội quy nhà trọ
+  rules       String? // Nội quy nhà trọ
+  latitude    Float? // 🆕 Toạ độ cho Map View
+  longitude   Float? // 🆕 Toạ độ cho Map View
   createdAt   DateTime @default(now()) @map("created_at")
 
-  landlord User   @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  landlord User            @relation(fields: [landlordId], references: [id], onDelete: Cascade)
   rooms    Room[]
   posts    Post[]
+  images   PropertyImage[] // 🆕 Ảnh cụm trọ
 
   @@map("properties")
+}
+
+// 🆕 Ảnh của cụm nhà trọ (tách riêng khỏi ảnh bài đăng)
+model PropertyImage {
+  id         String  @id @default(uuid())
+  propertyId String  @map("property_id")
+  imageUrl   String  @map("image_url")
+  isPrimary  Boolean @default(false) @map("is_primary")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_images")
 }
 
 model Room {
@@ -141,9 +187,9 @@ model Room {
   propertyId    String     @map("property_id")
   roomNumber    String     @map("room_number") // Số phòng (Ví dụ: P.101)
   priceMonthly  Decimal    @map("price_monthly") @db.Decimal(10, 2) // Giá thuê theo tháng
-  priceYearly   Decimal?   @map("price_yearly") @db.Decimal(10, 2)  // Giá ưu đãi thuê dài hạn (nếu hợp đồng 1 năm)
+  priceYearly   Decimal?   @map("price_yearly") @db.Decimal(10, 2) // Giá ưu đãi thuê dài hạn (nếu hợp đồng 1 năm)
   depositAmount Decimal    @default(0) @map("deposit_amount") @db.Decimal(10, 2) // Tiền cọc bắt buộc
-  area          Float      // Diện tích (m2)
+  area          Float // Diện tích (m2)
   maxOccupants  Int        @default(2) @map("max_occupants")
   status        RoomStatus @default(AVAILABLE)
   createdAt     DateTime   @default(now()) @map("created_at")
@@ -193,13 +239,17 @@ model Post {
   price       Decimal?   @db.Decimal(10, 2)
   postType    PostType   @map("post_type")
   status      PostStatus @default(PENDING)
+  viewCount   Int        @default(0) @map("view_count") // 🆕 Lượt xem
+  expiredAt   DateTime?  @map("expired_at") // 🆕 Hạn đăng
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  author   User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  property Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  room     Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  images   PostImage[]
+  author       User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  property     Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  room         Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  images       PostImage[]
+  appointments Appointment[] // 🆕 Lịch hẹn phát sinh từ bài đăng
+  favorites    Favorite[] // 🆕 Được yêu thích bởi ai
 
   @@map("posts")
 }
@@ -215,14 +265,28 @@ model PostImage {
   @@map("post_images")
 }
 
+// 🆕 Tin đăng yêu thích (bookmark)
+model Favorite {
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+  @@map("favorites")
+}
+
 // ==========================================
 // 5. KHẢO SÁT & MATCHING Ở GHÉP
 // ==========================================
 
 model LifestyleQuestion {
-  id           String              @id @default(uuid())
-  questionText String              @map("question_text")
-  category     String              // Giờ giấc, Vệ sinh, Thú cưng...
+  id           String                @id @default(uuid())
+  questionText String                @map("question_text")
+  category     String // Giờ giấc, Vệ sinh, Thú cưng...
+  weight       Int                   @default(1) // 🆕 Trọng số khi tính điểm matching
   options      LifestyleOption[]
   answers      UserLifestyleAnswer[]
 
@@ -255,6 +319,30 @@ model UserLifestyleAnswer {
   @@map("user_lifestyle_answers")
 }
 
+// 🆕 Tiêu chí mong muốn về bạn ở ghép (dùng cho matching)
+model RoommatePreference {
+  id                   String   @id @default(uuid())
+  userId               String   @unique @map("user_id")
+  budgetMin            Decimal? @map("budget_min") @db.Decimal(10, 2)
+  budgetMax            Decimal? @map("budget_max") @db.Decimal(10, 2)
+  preferredGender      String?  @map("preferred_gender") // MALE / FEMALE / ANY
+  preferredProvince    String?  @map("preferred_province")
+  preferredDistrict    String?  @map("preferred_district")
+  preferredWard        String?  @map("preferred_ward")
+  smokingAllowed       Boolean? @map("smoking_allowed")
+  petAllowed           Boolean? @map("pet_allowed")
+  cleanlinessLevel     Int?     @map("cleanliness_level") // 1-5
+  sleepSchedule        String?  @map("sleep_schedule") // EARLY / LATE / FLEXIBLE
+  occupationPreference String?  @map("occupation_preference")
+  note                 String?
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("roommate_preferences")
+}
+
 // ==========================================
 // 6. ĐẶT LỊCH HẸN, HỢP ĐỒNG & HOA HỒNG AGENT
 // ==========================================
@@ -263,8 +351,9 @@ model Appointment {
   id              String            @id @default(uuid())
   tenantId        String            @map("tenant_id")
   landlordId      String            @map("landlord_id")
-  agentId         String?           @map("agent_id")     // Người dẫn đi xem (nếu có)
+  agentId         String?           @map("agent_id") // Người dẫn đi xem (nếu có)
   roomId          String?           @map("room_id")
+  postId          String?           @map("post_id") // 🆕 Lịch hẹn đến từ bài đăng nào
   appointmentTime DateTime          @map("appointment_time")
   note            String?
   status          AppointmentStatus @default(PENDING)
@@ -274,22 +363,23 @@ model Appointment {
   landlord User  @relation("LandlordAppointments", fields: [landlordId], references: [id], onDelete: Cascade)
   agent    User? @relation("AgentAppointments", fields: [agentId], references: [id], onDelete: SetNull)
   room     Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  post     Post? @relation(fields: [postId], references: [id], onDelete: SetNull) // 🆕
 
   @@map("appointments")
 }
 
 model Contract {
-  id            String         @id @default(uuid())
-  roomId        String         @map("room_id")
-  tenantId      String         @map("tenant_id")
-  agentId       String?        @map("agent_id")      // Agent chốt được hợp đồng này
-  startDate     DateTime       @map("start_date")
-  endDate       DateTime?      @map("end_date")
-  depositPaid   Decimal        @map("deposit_paid") @db.Decimal(10, 2) // Tiền cọc thực tế đã thu
-  monthlyRent   Decimal        @map("monthly_rent") @db.Decimal(10, 2) // Giá chốt thuê hàng tháng
-  terms         String?        // Điều khoản hợp đồng
-  status        ContractStatus @default(ACTIVE)
-  createdAt     DateTime       @default(now()) @map("created_at")
+  id          String         @id @default(uuid())
+  roomId      String         @map("room_id")
+  tenantId    String         @map("tenant_id")
+  agentId     String?        @map("agent_id") // Agent chốt được hợp đồng này
+  startDate   DateTime       @map("start_date")
+  endDate     DateTime?      @map("end_date")
+  depositPaid Decimal        @map("deposit_paid") @db.Decimal(10, 2) // Tiền cọc thực tế đã thu
+  monthlyRent Decimal        @map("monthly_rent") @db.Decimal(10, 2) // Giá chốt thuê hàng tháng
+  terms       String? // Điều khoản hợp đồng
+  status      ContractStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now()) @map("created_at")
 
   room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
   tenant      User         @relation("TenantContracts", fields: [tenantId], references: [id], onDelete: Cascade)
@@ -300,13 +390,13 @@ model Contract {
 }
 
 model Commission {
-  id          String           @id @default(uuid())
-  contractId  String           @map("contract_id")
-  agentId     String           @map("agent_id")
-  amount      Decimal          @db.Decimal(10, 2) // Số tiền hoa hồng được hưởng
-  note        String?          // Phí môi giới / Dẫn khách chốt phòng
-  status      CommissionStatus @default(PENDING)
-  createdAt   DateTime         @default(now()) @map("created_at")
+  id         String           @id @default(uuid())
+  contractId String           @map("contract_id")
+  agentId    String           @map("agent_id")
+  amount     Decimal          @db.Decimal(10, 2) // Số tiền hoa hồng được hưởng
+  note       String? // Phí môi giới / Dẫn khách chốt phòng
+  status     CommissionStatus @default(PENDING)
+  createdAt  DateTime         @default(now()) @map("created_at")
 
   contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   agent    User     @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -321,8 +411,8 @@ model Commission {
 model MeterReading {
   id               String   @id @default(uuid())
   roomId           String   @map("room_id")
-  month            Int      // Tháng (1-12)
-  year             Int      // Năm
+  month            Int // Tháng (1-12)
+  year             Int // Năm
   electricityStart Int      @map("electricity_start")
   electricityEnd   Int      @map("electricity_end")
   waterStart       Int      @map("water_start")
@@ -354,6 +444,7 @@ model Invoice {
   room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
   tenant User @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([roomId, month, year]) // 🆕 Tránh tạo trùng hóa đơn cho cùng phòng/tháng/năm
   @@map("invoices")
 }
 
@@ -384,12 +475,13 @@ model ConversationMember {
 }
 
 model Message {
-  id             String   @id @default(uuid())
-  conversationId String   @map("conversation_id")
-  senderId       String   @map("sender_id")
+  id             String      @id @default(uuid())
+  conversationId String      @map("conversation_id")
+  senderId       String      @map("sender_id")
+  messageType    MessageType @default(TEXT) @map("message_type") // 🆕 Loại tin nhắn
   content        String
-  isRead         Boolean  @default(false) @map("is_read")
-  createdAt      DateTime @default(now()) @map("created_at")
+  isRead         Boolean     @default(false) @map("is_read")
+  createdAt      DateTime    @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
@@ -409,4 +501,41 @@ model Report {
   reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@map("reports")
+}
+
+// ==========================================
+// 9. THÔNG BÁO & ĐÁNH GIÁ  (🆕)
+// ==========================================
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  title       String
+  content     String
+  type        NotificationType
+  isRead      Boolean          @default(false) @map("is_read")
+  referenceId String?          @map("reference_id") // id của post/appointment/invoice...
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model Review {
+  id         String           @id @default(uuid())
+  reviewerId String           @map("reviewer_id")
+  targetType ReviewTargetType @map("target_type")
+  targetId   String           @map("target_id")
+  rating     Int // 1-5
+  comment    String?
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  reviewer User @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, targetType, targetId]) // Mỗi user chỉ review 1 lần cho 1 target
+  @@index([targetType, targetId])
+  @@map("reviews")
 }
