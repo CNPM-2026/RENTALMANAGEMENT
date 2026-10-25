@@ -1,0 +1,412 @@
+// datasource và generator cấu hình kết nối PostgreSQL
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// 1. ENUMS (Các kiểu dữ liệu cố định)
+// ==========================================
+
+enum Role {
+  ADMIN
+  LANDLORD
+  TENANT
+  AGENT      // Người dẫn đi xem / Môi giới / Cộng tác viên
+}
+
+enum RoomStatus {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+}
+
+enum PostType {
+  RENT_OUT      // Cho thuê phòng
+  FIND_ROOM     // Tìm phòng
+  FIND_ROOMMATE // Tìm bạn ở ghép
+}
+
+enum PostStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum ContractStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PAID
+}
+
+enum CommissionStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+// ==========================================
+// 2. NGƯỜI DÙNG & HỒ SƠ
+// ==========================================
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  phone        String?
+  avatarUrl    String?  @map("avatar_url")
+  role         Role     @default(TENANT)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Quan hệ
+  profile              UserProfile?
+  properties           Property[]           // Dành cho Chủ trọ
+  posts                Post[]               // Bài đăng của user
+  lifestyleAnswers     UserLifestyleAnswer[]
+  tenantAppointments   Appointment[]        @relation("TenantAppointments")
+  landlordAppointments Appointment[]       @relation("LandlordAppointments")
+  agentAppointments    Appointment[]        @relation("AgentAppointments")
+  contractsAsTenant    Contract[]           @relation("TenantContracts")
+  contractsAsAgent     Contract[]           @relation("AgentContracts")
+  commissions          Commission[]         // Hoa hồng dành cho AGENT
+  invoices             Invoice[]            // Hóa đơn của khách thuê
+  sentMessages         Message[]            @relation("SentMessages")
+  conversationMembers  ConversationMember[]
+  reports              Report[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id               String    @id @default(uuid())
+  userId           String    @unique @map("user_id")
+  gender           String?
+  dob              DateTime?
+  bio              String?
+  occupation       String?   @map("occupation") // Sinh viên, Nhân viên văn phòng, Môi giới...
+  emergencyContact String?   @map("emergency_contact")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// ==========================================
+// 3. QUẢN LÝ NHÀ TRỌ & PHÒNG
+// ==========================================
+
+model Property {
+  id          String   @id @default(uuid())
+  landlordId  String   @map("landlord_id")
+  name        String   // Tên dãy trọ / Tòa nhà
+  address     String   // Địa chỉ chi tiết
+  province    String   // Tỉnh/Thành phố
+  district    String   // Quận/Huyện
+  ward        String   // Phường/Xã
+  description String?
+  rules       String?  // Nội quy nhà trọ
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  landlord User   @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  rooms    Room[]
+  posts    Post[]
+
+  @@map("properties")
+}
+
+model Room {
+  id            String     @id @default(uuid())
+  propertyId    String     @map("property_id")
+  roomNumber    String     @map("room_number") // Số phòng (Ví dụ: P.101)
+  priceMonthly  Decimal    @map("price_monthly") @db.Decimal(10, 2) // Giá thuê theo tháng
+  priceYearly   Decimal?   @map("price_yearly") @db.Decimal(10, 2)  // Giá ưu đãi thuê dài hạn (nếu hợp đồng 1 năm)
+  depositAmount Decimal    @default(0) @map("deposit_amount") @db.Decimal(10, 2) // Tiền cọc bắt buộc
+  area          Float      // Diện tích (m2)
+  maxOccupants  Int        @default(2) @map("max_occupants")
+  status        RoomStatus @default(AVAILABLE)
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomAmenities RoomAmenity[]
+  posts         Post[]
+  appointments  Appointment[]
+  contracts     Contract[]
+  meterReadings MeterReading[]
+  invoices      Invoice[]
+
+  @@map("rooms")
+}
+
+model Amenity {
+  id      String        @id @default(uuid())
+  name    String        @unique // Điều hòa, Nóng lạnh, Máy giặt, Giường...
+  iconUrl String?       @map("icon_url")
+  rooms   RoomAmenity[]
+
+  @@map("amenities")
+}
+
+model RoomAmenity {
+  roomId    String @map("room_id")
+  amenityId String @map("amenity_id")
+
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, amenityId])
+  @@map("room_amenities")
+}
+
+// ==========================================
+// 4. BÀI ĐĂNG & HÌNH ẢNH
+// ==========================================
+
+model Post {
+  id          String     @id @default(uuid())
+  authorId    String     @map("author_id")
+  propertyId  String?    @map("property_id")
+  roomId      String?    @map("room_id")
+  title       String
+  description String
+  price       Decimal?   @db.Decimal(10, 2)
+  postType    PostType   @map("post_type")
+  status      PostStatus @default(PENDING)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  author   User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  property Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  room     Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  images   PostImage[]
+
+  @@map("posts")
+}
+
+model PostImage {
+  id        String  @id @default(uuid())
+  postId    String  @map("post_id")
+  imageUrl  String  @map("image_url")
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_images")
+}
+
+// ==========================================
+// 5. KHẢO SÁT & MATCHING Ở GHÉP
+// ==========================================
+
+model LifestyleQuestion {
+  id           String              @id @default(uuid())
+  questionText String              @map("question_text")
+  category     String              // Giờ giấc, Vệ sinh, Thú cưng...
+  options      LifestyleOption[]
+  answers      UserLifestyleAnswer[]
+
+  @@map("lifestyle_questions")
+}
+
+model LifestyleOption {
+  id         String @id @default(uuid())
+  questionId String @map("question_id")
+  optionText String @map("option_text")
+  scoreValue Int    @default(0) @map("score_value")
+
+  question LifestyleQuestion     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers  UserLifestyleAnswer[]
+
+  @@map("lifestyle_options")
+}
+
+model UserLifestyleAnswer {
+  id         String @id @default(uuid())
+  userId     String @map("user_id")
+  questionId String @map("question_id")
+  optionId   String @map("option_id")
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question LifestyleQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  option   LifestyleOption   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@map("user_lifestyle_answers")
+}
+
+// ==========================================
+// 6. ĐẶT LỊCH HẸN, HỢP ĐỒNG & HOA HỒNG AGENT
+// ==========================================
+
+model Appointment {
+  id              String            @id @default(uuid())
+  tenantId        String            @map("tenant_id")
+  landlordId      String            @map("landlord_id")
+  agentId         String?           @map("agent_id")     // Người dẫn đi xem (nếu có)
+  roomId          String?           @map("room_id")
+  appointmentTime DateTime          @map("appointment_time")
+  note            String?
+  status          AppointmentStatus @default(PENDING)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  tenant   User  @relation("TenantAppointments", fields: [tenantId], references: [id], onDelete: Cascade)
+  landlord User  @relation("LandlordAppointments", fields: [landlordId], references: [id], onDelete: Cascade)
+  agent    User? @relation("AgentAppointments", fields: [agentId], references: [id], onDelete: SetNull)
+  room     Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@map("appointments")
+}
+
+model Contract {
+  id            String         @id @default(uuid())
+  roomId        String         @map("room_id")
+  tenantId      String         @map("tenant_id")
+  agentId       String?        @map("agent_id")      // Agent chốt được hợp đồng này
+  startDate     DateTime       @map("start_date")
+  endDate       DateTime?      @map("end_date")
+  depositPaid   Decimal        @map("deposit_paid") @db.Decimal(10, 2) // Tiền cọc thực tế đã thu
+  monthlyRent   Decimal        @map("monthly_rent") @db.Decimal(10, 2) // Giá chốt thuê hàng tháng
+  terms         String?        // Điều khoản hợp đồng
+  status        ContractStatus @default(ACTIVE)
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant      User         @relation("TenantContracts", fields: [tenantId], references: [id], onDelete: Cascade)
+  agent       User?        @relation("AgentContracts", fields: [agentId], references: [id], onDelete: SetNull)
+  commissions Commission[]
+
+  @@map("contracts")
+}
+
+model Commission {
+  id          String           @id @default(uuid())
+  contractId  String           @map("contract_id")
+  agentId     String           @map("agent_id")
+  amount      Decimal          @db.Decimal(10, 2) // Số tiền hoa hồng được hưởng
+  note        String?          // Phí môi giới / Dẫn khách chốt phòng
+  status      CommissionStatus @default(PENDING)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  agent    User     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("commissions")
+}
+
+// ==========================================
+// 7. ĐIỆN NƯỚC & HÓA ĐƠN HÀNG THÁNG
+// ==========================================
+
+model MeterReading {
+  id               String   @id @default(uuid())
+  roomId           String   @map("room_id")
+  month            Int      // Tháng (1-12)
+  year             Int      // Năm
+  electricityStart Int      @map("electricity_start")
+  electricityEnd   Int      @map("electricity_end")
+  waterStart       Int      @map("water_start")
+  waterEnd         Int      @map("water_end")
+  recordedAt       DateTime @default(now()) @map("recorded_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, month, year])
+  @@map("meter_readings")
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  roomId         String        @map("room_id")
+  tenantId       String        @map("tenant_id")
+  month          Int
+  year           Int
+  roomFee        Decimal       @map("room_fee") @db.Decimal(10, 2)
+  electricityFee Decimal       @map("electricity_fee") @db.Decimal(10, 2)
+  waterFee       Decimal       @map("water_fee") @db.Decimal(10, 2)
+  otherFee       Decimal       @default(0) @map("other_fee") @db.Decimal(10, 2)
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
+  status         InvoiceStatus @default(UNPAID)
+  dueDate        DateTime      @map("due_date")
+  paidAt         DateTime?     @map("paid_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant User @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+// ==========================================
+// 8. CHAT REAL-TIME & BÁO CÁO VI PHẠM
+// ==========================================
+
+model Conversation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@map("conversations")
+}
+
+model ConversationMember {
+  conversationId String @map("conversation_id")
+  userId         String @map("user_id")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  senderId       String   @map("sender_id")
+  content        String
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Report {
+  id         String   @id @default(uuid())
+  reporterId String   @map("reporter_id")
+  targetType String   @map("target_type") // POST / USER
+  targetId   String   @map("target_id")
+  reason     String
+  status     String   @default("PENDING") // PENDING / RESOLVED
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
