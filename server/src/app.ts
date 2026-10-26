@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandler } from './middlewares/error.middleware';
 import authRoute from './routes/auth.route';
+import propertyRoute from './routes/property.route';
+import roomRoute from './routes/room.route';
 
 const app: Application = express();
 
@@ -23,6 +25,8 @@ app.get('/health', (req: Request, res: Response) => {
 // --- Gắn các Routes sau này vào đây ---
 // app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/auth', authRoute);
+app.use('/api/v1/properties', propertyRoute);
+app.use('/api/v1/rooms', roomRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });
