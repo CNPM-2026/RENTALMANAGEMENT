@@ -6,7 +6,6 @@ import { errorHandler } from './middlewares/error.middleware';
 import authRoute from './routes/auth.route';
 import propertyRoute from './routes/property.route';
 import roomRoute from './routes/room.route';
-
 const app: Application = express();
 
 // Middlewares
