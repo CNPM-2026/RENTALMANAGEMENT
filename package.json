@@ -1,6 +1,8 @@
 {
   "dependencies": {
-    "multer": "^2.5.0"
+    "express-rate-limit": "^8.7.1",
+    "multer": "^2.5.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/multer": "^2.3.0"
