@@ -8,6 +8,9 @@ import authRoute from './routes/auth.route';
 import propertyRoute from './routes/property.route';
 import roomRoute from './routes/room.route';
 import postRoute from './routes/post.route';
+import adminRoute from './routes/admin.route'
+import appointmentRoute from './routes/appointment.route'
+import contractRoute from './routes/contract.route'
 const app: Application = express();
 // Middlewares
 app.use(helmet());
@@ -29,6 +32,9 @@ app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/properties', propertyRoute);
 app.use('/api/v1/rooms', roomRoute);
 app.use('/api/v1/posts', postRoute);
+app.use('/api/v1/admin', adminRoute);
+app.use('/api/v1/appointments', appointmentRoute);
+app.use('/api/v1/contracts', contractRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });
