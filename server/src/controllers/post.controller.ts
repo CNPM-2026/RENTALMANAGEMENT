@@ -31,5 +31,14 @@ export const postController = {
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
     }
-  }
+    // req.files chứa thông tin các file được upload (từ multer)
+    const files = req.files as Express.Multer.File[];
+    const result = await postService.createPost(req.user.id, req.body, files);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Đăng tin thành công, vui lòng chờ Admin duyệt',
+      data: result,
+    });
+  },
 };
