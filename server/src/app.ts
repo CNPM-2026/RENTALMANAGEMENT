@@ -13,6 +13,7 @@ import appointmentRoute from './routes/appointment.route'
 import contractRoute from './routes/contract.route'
 import meterReadingRoute from './routes/meterReading.route';
 import invoiceRoute from './routes/invoice.route';
+import chatRoute from './routes/chat.route';
 const app: Application = express();
 // Middlewares
 app.use(helmet());
@@ -39,6 +40,7 @@ app.use('/api/v1/appointments', appointmentRoute);
 app.use('/api/v1/contracts', contractRoute);
 //app.use('/api/v1/meter-readings', meterReadingRoute);
 //app.use('/api/v1/invoices', invoiceRoute);
+app.use('/api/v1/chats', chatRoute)
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });
