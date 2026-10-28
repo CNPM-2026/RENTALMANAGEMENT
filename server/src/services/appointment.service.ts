@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { notificationService } from './notification.service';
 
 export const appointmentService = {
   createAppointment: async (tenantId: string, data: any) => {
@@ -7,22 +8,24 @@ export const appointmentService = {
 
     let landlordId = '';
     let targetRoomId = roomId || null;
-
+    
     // 1. Tự động tìm Chủ trọ dựa vào Phòng hoặc Bài đăng
     if (roomId) {
-      const room = await prisma.room.findUnique({ 
-        where: { id: roomId }, 
-        include: { property: true } 
+      const room = await prisma.room.findUnique({
+        where: { id: roomId },
+        include: { property: true }
       });
+
       if (!room) throw new AppError('Phòng không tồn tại', 404);
       landlordId = room.property.landlordId;
     } else if (postId) {
-      const post = await prisma.post.findUnique({ 
-        where: { id: postId }, 
-        include: { property: true } 
+      const post = await prisma.post.findUnique({
+        where: { id: postId },
+        include: { property: true }
       });
+
       if (!post) throw new AppError('Bài đăng không tồn tại', 404);
-      
+
       // Nếu bài đăng gắn với nhà trọ thì lấy landlord của nhà trọ
       // Nếu bài đăng tìm phòng ở ghép (không có property) thì landlord chính là author
       landlordId = post.property ? post.property.landlordId : post.authorId;
@@ -37,7 +40,7 @@ export const appointmentService = {
     }
 
     // 2. Tạo lịch hẹn
-    return await prisma.appointment.create({
+    const newAppointment = await prisma.appointment.create({
       data: {
         tenantId,
         landlordId,
@@ -52,6 +55,17 @@ export const appointmentService = {
         landlord: { select: { fullName: true, phone: true } }
       }
     });
+
+    // 3. Gửi thông báo cho chủ trọ khi có lịch hẹn mới
+    await notificationService.createNotification(
+      landlordId,
+      'Lịch hẹn mới',
+      `Bạn có một lịch hẹn xem phòng mới vào lúc ${new Date(appointmentTime).toLocaleString('vi-VN')}`,
+      'APPOINTMENT',
+      newAppointment.id
+    );
+
+    return newAppointment;
   },
 
   // Lấy lịch hẹn của tôi (Dùng chung cho cả Tenant, Landlord, Agent)
@@ -79,7 +93,10 @@ export const appointmentService = {
 
   // Đổi trạng thái lịch hẹn (Xác nhận / Hủy)
   updateStatus: async (userId: string, appointmentId: string, status: any) => {
-    const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+    const appt = await prisma.appointment.findUnique({
+      where: { id: appointmentId }
+    });
+
     if (!appt) throw new AppError('Không tìm thấy lịch hẹn', 404);
 
     // Chỉ người gửi hoặc người nhận mới có quyền đổi trạng thái

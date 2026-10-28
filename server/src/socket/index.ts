@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import prisma from '../config/db';
 import { verifyToken } from '../utils/jwt';
+import { setIoInstance } from './socket.instance'; // Thêm import
 
 // Mở rộng kiểu dữ liệu của Socket để lưu thông tin user
 interface AuthSocket extends Socket {
@@ -12,7 +13,7 @@ export const initSocket = (server: HttpServer) => {
   const io = new Server(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] },
   });
-
+  setIoInstance(io); 
   // Middleware: Xác thực token trước khi cho phép kết nối
   io.use((socket: AuthSocket, next) => {
     const token = socket.handshake.auth.token;
