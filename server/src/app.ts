@@ -11,11 +11,8 @@ import postRoute from './routes/post.route';
 import adminRoute from './routes/admin.route'
 import appointmentRoute from './routes/appointment.route'
 import contractRoute from './routes/contract.route'
-<<<<<<< HEAD
 import meterReadingRoute from './routes/meterReading.route';
 import invoiceRoute from './routes/invoice.route';
-=======
->>>>>>> origin/master
 const app: Application = express();
 // Middlewares
 app.use(helmet());
