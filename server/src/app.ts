@@ -16,6 +16,7 @@ import invoiceRoute from './routes/invoice.route';
 import chatRoute from './routes/chat.route';
 import notificationRoute from './routes/notification.route'
 import matchingRoute from './routes/matching.route'
+import reviewRoute from './routes/review.route'
 const app: Application = express();
 // Middlewares
 app.use(helmet());
@@ -45,6 +46,7 @@ app.use('/api/v1/contracts', contractRoute);
 app.use('/api/v1/chats', chatRoute)
 app.use('/api/v1/notifications', notificationRoute);
 app.use('/api/v1/matching', matchingRoute);
+app.use('/api/v1/reviews', reviewRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });
