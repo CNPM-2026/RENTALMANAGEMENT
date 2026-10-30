@@ -45,11 +45,6 @@ jobs:
           NODE_ENV: test
           DB_URL: postgresql://postgres:postgres@localhost:5432/rental_test
           JWT_SECRET: ci-test-secret-with-at-least-32-characters
-      - run: npx ts-node prisma/seed.ts
-        env:
-          NODE_ENV: test
-          DB_URL: postgresql://postgres:postgres@localhost:5432/rental_test
-          JWT_SECRET: ci-test-secret-with-at-least-32-characters
       - run: npm run build
       - run: npm test
         env:
