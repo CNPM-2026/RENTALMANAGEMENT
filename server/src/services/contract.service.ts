@@ -66,6 +66,10 @@ export const contractService = {
       whereClause.tenantId = userId;
     } else if (role === 'AGENT') {
       whereClause.agentId = userId;
+    } else if (role === 'ADMIN') {
+      // Admin is intentionally allowed to review all contracts.
+    } else {
+      throw new AppError('Role không được phép xem hợp đồng', 403);
     }
 
     return await prisma.contract.findMany({

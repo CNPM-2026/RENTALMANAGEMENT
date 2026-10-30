@@ -23,4 +23,6 @@ export const matchingPreferencesSchema = z.object({
 }).refine((value) => value.budgetMin === undefined || value.budgetMax === undefined || value.budgetMin <= value.budgetMax, {
   message: 'Ngân sách tối thiểu phải nhỏ hơn hoặc bằng ngân sách tối đa',
   path: ['budgetMax'],
+}).refine((value) => Object.keys(value).length > 0, {
+  message: 'Cần cung cấp ít nhất một tiêu chí tìm kiếm',
 });

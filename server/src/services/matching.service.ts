@@ -187,14 +187,9 @@ export const matchingService = {
       if (myPreferences?.preferredGender &&
         myPreferences.preferredGender !== 'ANY' &&
         candidate.profile?.gender !== myPreferences.preferredGender) return false;
-      if (myPreferences?.smokingAllowed !== null && myPreferences?.smokingAllowed !== undefined &&
-        candidatePreferences?.smokingAllowed !== null &&
-        candidatePreferences?.smokingAllowed !== undefined &&
-        myPreferences.smokingAllowed !== candidatePreferences.smokingAllowed) return false;
-      if (myPreferences?.petAllowed !== null && myPreferences?.petAllowed !== undefined &&
-        candidatePreferences?.petAllowed !== null &&
-        candidatePreferences?.petAllowed !== undefined &&
-        myPreferences.petAllowed !== candidatePreferences.petAllowed) return false;
+      // These fields describe the seeker's acceptance policy. They are not
+      // candidate attributes, so they cannot exclude a post until the schema
+      // stores the candidate's actual smoking/pet attributes.
       if (myPreferences?.cleanlinessLevel !== null && myPreferences?.cleanlinessLevel !== undefined &&
         candidatePreferences?.cleanlinessLevel !== null &&
         candidatePreferences?.cleanlinessLevel !== undefined &&
