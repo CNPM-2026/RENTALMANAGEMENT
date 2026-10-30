@@ -126,6 +126,7 @@ model User {
   reviews              Review[] // 🆕 Đánh giá của user
   favorites            Favorite[] // 🆕 Tin đăng yêu thích
 
+  @@index([role])
   @@map("users")
 }
 
@@ -202,6 +203,7 @@ model Room {
   meterReadings MeterReading[]
   invoices      Invoice[]
 
+  @@index([status])
   @@map("rooms")
 }
 
@@ -251,6 +253,8 @@ model Post {
   appointments Appointment[] // 🆕 Lịch hẹn phát sinh từ bài đăng
   favorites    Favorite[] // 🆕 Được yêu thích bởi ai
 
+  @@index([status, postType]) // Thêm dòng này để lọc bài đăng đã duyệt cực nhanh
+  @@index([authorId])
   @@map("posts")
 }
 
@@ -365,6 +369,8 @@ model Appointment {
   room     Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
   post     Post? @relation(fields: [postId], references: [id], onDelete: SetNull) // 🆕
 
+  @@index([tenantId])
+  @@index([landlordId])
   @@map("appointments")
 }
 
@@ -486,6 +492,7 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
+  @@index([conversationId, createdAt])
   @@map("messages")
 }
 
