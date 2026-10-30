@@ -2,14 +2,14 @@ import { Router } from 'express';
 import { postController } from '../controllers/post.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { upload } from '../config/multer';
+import { validate } from '../middlewares/validate.middleware';
+import { searchPostSchema } from '../validations/post.validation';
 
 const router = Router();
 
-// Lấy danh sách bài đăng (Public, ai cũng xem được)
+// Đổi từ GET '/' cũ sang GET '/search' và áp dụng validate query
 router.get('/', postController.getApprovedPosts);
-
-// Tạo bài đăng (Phải đăng nhập, ai cũng có thể đăng: LANDLORD đăng cho thuê, TENANT đăng tìm phòng)
-// upload.array('images', 10): Nhận tối đa 10 file với key là 'images'
+router.get('/search', validate(searchPostSchema), postController.search);
 router.post(
   '/', 
   authenticate, 

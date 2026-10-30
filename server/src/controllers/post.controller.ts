@@ -41,4 +41,18 @@ export const postController = {
       data: result,
     });
   },
+  search: async (req: AuthRequest, res: Response) => {
+    try {
+      // req.query đã được Zod validate và ép kiểu ở middleware
+      const result = await postService.searchPosts(req.query);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách bài đăng thành công',
+        ...result, // Spread data và meta ra
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    }
+  }
 };
