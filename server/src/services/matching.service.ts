@@ -236,10 +236,19 @@ export const matchingService = {
           ? Math.round((matchScore / maxPossibleScore) * 100)
           : 0;
 
+      const price = post.price === null ? null : Number(post.price);
+      const budgetMatches =
+        price !== null &&
+        (myPreferences?.budgetMin === null ||
+          myPreferences?.budgetMin === undefined ||
+          price >= Number(myPreferences.budgetMin)) &&
+        (myPreferences?.budgetMax === null ||
+          myPreferences?.budgetMax === undefined ||
+          price <= Number(myPreferences.budgetMax));
       const preferenceScore = [
         myPreferences?.budgetMin !== null && myPreferences?.budgetMin !== undefined ||
         myPreferences?.budgetMax !== null && myPreferences?.budgetMax !== undefined
-          ? post.price !== null
+          ? budgetMatches
           : null,
         myPreferences?.preferredGender && myPreferences.preferredGender !== 'ANY'
           ? otherUser.profile?.gender === myPreferences.preferredGender
@@ -291,6 +300,8 @@ export const matchingService = {
           occupation: otherUser.profile?.occupation
         },
         compatibilityPercent,
+        // Deal-breakers are represented by the hard filters above until the
+        // schema stores explicit candidate attributes for them.
         isDealBreaker: false
       };
     });
