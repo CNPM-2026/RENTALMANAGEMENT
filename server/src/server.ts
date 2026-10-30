@@ -22,7 +22,6 @@ const startServer = async () => {
     // Chạy server (Lưu ý: dùng server.listen thay vì app.listen)
     server.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
->>>>>>> Stashed changes
     });
 
     // 4. Xử lý tắt Server an toàn (Graceful Shutdown)
