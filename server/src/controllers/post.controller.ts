@@ -54,5 +54,36 @@ export const postController = {
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
     }
+  },
+  getMyPosts: async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await postService.getMyPosts(req.user.id);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    }
+  },
+
+  update: async (req: AuthRequest, res: Response) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      const result = await postService.updatePost(req.user.id, req.params.id, req.body, files);
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Cập nhật bài đăng thành công (Đang chờ duyệt lại)', 
+        data: result 
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    }
+  },
+
+  delete: async (req: AuthRequest, res: Response) => {
+    try {
+      await postService.deletePost(req.user.id, req.user.role, req.params.id);
+      return res.status(200).json({ success: true, message: 'Xóa bài đăng thành công' });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    }
   }
 };
