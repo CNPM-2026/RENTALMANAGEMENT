@@ -12,4 +12,9 @@ const result = spawnSync(command, ['vitest', 'run'], {
   shell: true,
 });
 
-process.exit(result.status || 0);
+if (result.error) {
+  console.error(result.error);
+  process.exit(1);
+}
+
+process.exit(result.status ?? 1);
