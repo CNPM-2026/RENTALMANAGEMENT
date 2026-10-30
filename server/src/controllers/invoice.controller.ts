@@ -31,7 +31,7 @@ export const invoiceController = {
 
   pay: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await invoiceService.payInvoice(req.user.id, req.params.id);
+      const result = await invoiceService.payInvoice(req.user.id, String(req.params.id));
       return res.status(200).json({
         success: true,
         message: 'Đã xác nhận thanh toán hóa đơn',

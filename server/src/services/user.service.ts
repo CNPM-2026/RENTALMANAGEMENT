@@ -1,11 +1,13 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { storageService } from './storage.service';
 
 export const userService = {
   updateProfile: async (userId: string, data: any, file?: Express.Multer.File) => {
     const { fullName, phone, gender, dob, bio, occupation } = data;
 
     // Sử dụng transaction để cập nhật cả bảng User và UserProfile
+    const avatarUrl = file ? await storageService.uploadImage(file, 'rental-management/avatars') : undefined;
     return await prisma.$transaction(async (tx) => {
       // 1. Cập nhật thông tin cơ bản ở bảng User
       const updatedUser = await tx.user.update({
@@ -14,7 +16,7 @@ export const userService = {
           ...(fullName && { fullName }),
           ...(phone && { phone }),
           // Nếu có upload file avatar mới thì cập nhật đường dẫn
-          ...(file && { avatarUrl: `/uploads/${file.filename}` }),
+          ...(avatarUrl && { avatarUrl }),
         }
       });
 
@@ -36,7 +38,7 @@ export const userService = {
       // Lấy lại thông tin full để trả về client
       return await tx.user.findUnique({
         where: { id: userId },
-        include: { profile: true },
+
         // Nhớ giấu password đi
         select: {
           id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true, profile: true

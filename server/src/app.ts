@@ -22,22 +22,24 @@ import userRoute from './routes/user.route'
 import favoriteRoute from './routes/favorite.route'
 import reportRoute from './routes/report.route'
 import statisticRoute from './routes/statistic.route'
-import { fa } from 'zod/locales';
+import { env } from './config/env';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
 const app: Application = express();
 // Middlewares
 app.use(helmet());
 app.use(compression());
-app.use(cors());
+app.use(cors({ origin: env.CORS_ORIGIN.split(',').map((origin) => origin.trim()) }));
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(path.join(process.cwd(), 'public'))); // Nếu có
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'))); // Thêm dòng này để public ảnh
 // Health Check Route
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'Server is running 🚀' });
 });
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // --- Gắn các Routes sau này vào đây ---
 // app.use('/api/v1/auth', authRoutes);
@@ -48,8 +50,8 @@ app.use('/api/v1/posts', postRoute);
 app.use('/api/v1/admin', adminRoute);
 app.use('/api/v1/appointments', appointmentRoute);
 app.use('/api/v1/contracts', contractRoute);
-//app.use('/api/v1/meter-readings', meterReadingRoute);
-//app.use('/api/v1/invoices', invoiceRoute);
+app.use('/api/v1/meter-readings', meterReadingRoute);
+app.use('/api/v1/invoices', invoiceRoute);
 app.use('/api/v1/chats', chatRoute)
 app.use('/api/v1/notifications', notificationRoute);
 app.use('/api/v1/matching', matchingRoute);

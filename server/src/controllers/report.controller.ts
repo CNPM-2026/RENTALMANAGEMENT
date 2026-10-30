@@ -23,7 +23,7 @@ export const reportController = {
 
   resolve: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await reportService.resolveReport(req.params.id, req.body.status);
+      const result = await reportService.resolveReport(String(req.params.id), req.body.status);
       return res.status(200).json({ success: true, message: 'Đã xử lý báo cáo', data: result });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });

@@ -11,6 +11,12 @@ export const reviewService = {
     if (targetType === 'USER' && targetId === reviewerId) {
       throw new AppError('Bạn không thể tự đánh giá chính mình', 400);
     }
+    const targetExists = targetType === 'POST'
+      ? await prisma.post.findUnique({ where: { id: targetId }, select: { id: true } })
+      : targetType === 'ROOM'
+        ? await prisma.room.findUnique({ where: { id: targetId }, select: { id: true } })
+        : await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
+    if (!targetExists) throw new AppError('Đối tượng đánh giá không tồn tại', 404);
 
     // Check xem đã đánh giá chưa (Mỗi người chỉ được đánh giá 1 lần / 1 đối tượng)
     const existingReview = await prisma.review.findUnique({

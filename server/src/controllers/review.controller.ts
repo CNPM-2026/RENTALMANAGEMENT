@@ -14,7 +14,7 @@ export const reviewController = {
 
   getByTarget: async (req: Request, res: Response) => {
     const { targetType, targetId } = req.params;
-    const result = await reviewService.getReviewsByTarget(targetType.toUpperCase(), targetId);
+    const result = await reviewService.getReviewsByTarget(String(targetType).toUpperCase(), String(targetId));
     res.status(200).json({
       success: true,
       data: result,

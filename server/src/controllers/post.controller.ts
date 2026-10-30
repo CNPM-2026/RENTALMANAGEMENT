@@ -67,7 +67,7 @@ export const postController = {
   update: async (req: AuthRequest, res: Response) => {
     try {
       const files = req.files as Express.Multer.File[];
-      const result = await postService.updatePost(req.user.id, req.params.id, req.body, files);
+      const result = await postService.updatePost(req.user.id, String(req.params.id), req.body, files);
       return res.status(200).json({ 
         success: true, 
         message: 'Cập nhật bài đăng thành công (Đang chờ duyệt lại)', 
@@ -80,7 +80,7 @@ export const postController = {
 
   delete: async (req: AuthRequest, res: Response) => {
     try {
-      await postService.deletePost(req.user.id, req.user.role, req.params.id);
+      await postService.deletePost(req.user.id, req.user.role, String(req.params.id));
       return res.status(200).json({ success: true, message: 'Xóa bài đăng thành công' });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });

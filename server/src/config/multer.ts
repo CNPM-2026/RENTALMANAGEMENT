@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req: any, file: any, cb: any) => {
   // Chỉ cho phép upload ảnh
-  if (file.mimetype.startsWith('image/')) {
+  if (new Set(['image/jpeg', 'image/png', 'image/webp']).has(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new AppError('Chỉ cho phép upload file hình ảnh!', 400), false);

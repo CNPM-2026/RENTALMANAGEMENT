@@ -1,10 +1,24 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { PostType, Prisma } from '@prisma/client';
+import { storageService } from './storage.service';
 
 export const postService = {
   createPost: async (authorId: string, data: any, files: Express.Multer.File[]) => {
     const { title, description, price, postType, propertyId, roomId } = data;
+
+    if (propertyId || roomId) {
+      const room = roomId ? await prisma.room.findUnique({ where: { id: roomId }, include: { property: true } }) : null;
+      if (room && room.property.landlordId !== authorId) {
+        throw new AppError('Bạn không có quyền đăng tin cho phòng này', 403);
+      }
+      if (propertyId) {
+        const property = await prisma.property.findUnique({ where: { id: propertyId }, select: { landlordId: true } });
+        if (!property) throw new AppError('Nhà trọ không tồn tại', 404);
+        if (property.landlordId !== authorId) throw new AppError('Bạn không có quyền đăng tin cho nhà trọ này', 403);
+      }
+      if (roomId && !room) throw new AppError('Phòng không tồn tại', 404);
+    }
 
     // 1. Tạo bài đăng
     const post = await prisma.post.create({
@@ -22,11 +36,11 @@ export const postService = {
 
     // 2. Nếu có file ảnh upload lên, lưu vào bảng PostImage
     if (files && files.length > 0) {
-      const imageData = files.map((file, index) => ({
+      const imageData = await Promise.all(files.map(async (file, index) => ({
         postId: post.id,
-        imageUrl: `/uploads/${file.filename}`, // Đường dẫn tương đối
+        imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
         isPrimary: index === 0, // Ảnh đầu tiên làm ảnh đại diện
-      }));
+      })));
 
       await prisma.postImage.createMany({
         data: imageData,
@@ -206,11 +220,11 @@ export const postService = {
     // Nếu có up thêm ảnh mới
     if (files && files.length > 0) {
       await prisma.postImage.createMany({
-        data: files.map((file, index) => ({
+        data: await Promise.all(files.map(async (file, index) => ({
           postId,
-          imageUrl: `/uploads/${file.filename}`,
+          imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
           isPrimary: index === 0,
-        }))
+        })))
       });
     }
 

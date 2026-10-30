@@ -27,7 +27,7 @@ export const appointmentController = {
 
   updateStatus: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await appointmentService.updateStatus(req.user.id, req.params.id, req.body.status);
+      const result = await appointmentService.updateStatus(req.user.id, String(req.params.id), req.body.status);
       return res.status(200).json({
         success: true,
         message: 'Cập nhật trạng thái thành công',

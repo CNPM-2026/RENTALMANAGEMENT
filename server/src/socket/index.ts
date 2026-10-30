@@ -3,6 +3,7 @@ import { Server as HttpServer } from 'http';
 import prisma from '../config/db';
 import { verifyToken } from '../utils/jwt';
 import { setIoInstance } from './socket.instance'; // Thêm import
+import { env } from '../config/env';
 
 // Mở rộng kiểu dữ liệu của Socket để lưu thông tin user
 interface AuthSocket extends Socket {
@@ -11,16 +12,18 @@ interface AuthSocket extends Socket {
 
 export const initSocket = (server: HttpServer) => {
   const io = new Server(server, {
-    cors: { origin: '*', methods: ['GET', 'POST'] },
+    cors: { origin: env.CORS_ORIGIN.split(',').map((origin) => origin.trim()), methods: ['GET', 'POST'] },
   });
   setIoInstance(io); 
   // Middleware: Xác thực token trước khi cho phép kết nối
-  io.use((socket: AuthSocket, next) => {
+  io.use(async (socket: AuthSocket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('Authentication error: Token required'));
 
     try {
       const decoded = verifyToken(token);
+      const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true, isActive: true } });
+      if (!user?.isActive) return next(new Error('Authentication error: User is inactive'));
       socket.user = decoded; // Lưu id và role vào socket
       next();
     } catch (err) {
@@ -36,7 +39,12 @@ export const initSocket = (server: HttpServer) => {
     if (userId) socket.join(`user_${userId}`);
 
     // Sự kiện: Join vào phòng chat cụ thể
-    socket.on('join_conversation', (conversationId: string) => {
+    socket.on('join_conversation', async (conversationId: string) => {
+      if (!userId || typeof conversationId !== 'string') return;
+      const member = await prisma.conversationMember.findUnique({
+        where: { conversationId_userId: { conversationId, userId } }
+      });
+      if (!member) return socket.emit('error_message', 'Bạn không thuộc cuộc trò chuyện này');
       socket.join(`conversation_${conversationId}`);
       console.log(`User ${userId} joined room: ${conversationId}`);
     });
@@ -46,6 +54,13 @@ export const initSocket = (server: HttpServer) => {
       try {
         const { conversationId, content, messageType = 'TEXT' } = data;
         if (!userId) return;
+        if (typeof content !== 'string' || content.trim().length === 0 || content.length > 5000) {
+          return socket.emit('error_message', 'Nội dung tin nhắn không hợp lệ');
+        }
+        const member = await prisma.conversationMember.findUnique({
+          where: { conversationId_userId: { conversationId, userId } }
+        });
+        if (!member) return socket.emit('error_message', 'Bạn không thuộc cuộc trò chuyện này');
 
         // 1. Lưu tin nhắn vào Database (Prisma)
         const newMessage = await prisma.message.create({
@@ -53,7 +68,7 @@ export const initSocket = (server: HttpServer) => {
             conversationId,
             senderId: userId,
             content,
-            messageType: messageType as any,
+            messageType: messageType as 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM',
           },
           include: {
             sender: { select: { fullName: true, avatarUrl: true } }
