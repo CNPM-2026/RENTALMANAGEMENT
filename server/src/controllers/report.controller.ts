@@ -5,7 +5,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 export const reportController = {
   create: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await reportService.createReport(req.user.id, req.body);
+      const result = await reportService.createReport(req.user!.id, req.body);
       return res.status(201).json({ success: true, message: 'Đã gửi báo cáo, Admin sẽ sớm xử lý!', data: result });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });

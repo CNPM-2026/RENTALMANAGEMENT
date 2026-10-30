@@ -12,12 +12,12 @@ Express, TypeScript, Prisma, PostgreSQL/Supabase, Socket.IO and Zod.
 
 ## Environment variables
 
-Create `server/.env` for development and `server/.env.test` for the isolated
-test database. Do not commit either file.
+Copy `.env.example` to `server/.env` for development. Create
+`server/.env.test` for the isolated test database. Do not commit either file.
 
 ```env
-DB_URL="postgresql://..."
-JWT_SECRET="at-least-32-characters"
+DB_URL="postgresql://USER:PASSWORD@HOST:5432/postgres?schema=public"
+JWT_SECRET="replace-with-a-random-secret-at-least-32-characters"
 JWT_EXPIRES_IN=7d
 CORS_ORIGIN=http://localhost:3000
 

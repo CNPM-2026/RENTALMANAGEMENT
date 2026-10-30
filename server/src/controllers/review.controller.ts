@@ -4,7 +4,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 
 export const reviewController = {
   create: async (req: AuthRequest, res: Response) => {
-    const result = await reviewService.createReview(req.user.id, req.body);
+    const result = await reviewService.createReview(req.user!.id, req.body);
     res.status(201).json({
       success: true,
       message: 'Cảm ơn bạn đã gửi đánh giá',

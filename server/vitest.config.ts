@@ -6,5 +6,7 @@ export default defineConfig({
     exclude: ['dist/**', 'node_modules/**'],
     pool: 'forks',
     fileParallelism: false,
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
 });

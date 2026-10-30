@@ -16,20 +16,26 @@ export const matchingService = {
     userId: string,
     answers: { questionId: string; optionId: string }[]
   ) => {
-    // Xóa các câu trả lời cũ nếu user làm lại
-    await prisma.userLifestyleAnswer.deleteMany({
-      where: { userId }
+    const optionIds = answers.map((answer) => answer.optionId);
+    const validOptions = await prisma.lifestyleOption.findMany({
+      where: { id: { in: optionIds }, questionId: { in: answers.map((answer) => answer.questionId) } },
+      select: { id: true, questionId: true },
     });
+    const validAnswerKeys = new Set(validOptions.map((option) => `${option.questionId}:${option.id}`));
+    if (answers.some((answer) => !validAnswerKeys.has(`${answer.questionId}:${answer.optionId}`))) {
+      throw new AppError('Câu trả lời khảo sát không hợp lệ', 400);
+    }
 
-    // Lưu đáp án mới vào DB
-    const dataToInsert = answers.map(ans => ({
-      userId,
-      questionId: ans.questionId,
-      optionId: ans.optionId
-    }));
-
-    await prisma.userLifestyleAnswer.createMany({
-      data: dataToInsert
+    // Xóa các câu trả lời cũ nếu user làm lại
+    await prisma.$transaction(async (tx) => {
+      await tx.userLifestyleAnswer.deleteMany({ where: { userId } });
+      await tx.userLifestyleAnswer.createMany({
+        data: answers.map(ans => ({
+          userId,
+          questionId: ans.questionId,
+          optionId: ans.optionId
+        })),
+      });
     });
 
     return { message: 'Lưu bài khảo sát thành công' };
@@ -42,8 +48,14 @@ export const matchingService = {
       budgetMax,
       preferredGender,
       preferredProvince,
+      preferredDistrict,
+      preferredWard,
       smokingAllowed,
-      petAllowed
+      petAllowed,
+      cleanlinessLevel,
+      sleepSchedule,
+      occupationPreference,
+      note,
     } = data;
 
     return await prisma.roommatePreference.upsert({
@@ -53,8 +65,14 @@ export const matchingService = {
         budgetMax,
         preferredGender,
         preferredProvince,
+        preferredDistrict,
+        preferredWard,
         smokingAllowed,
-        petAllowed
+        petAllowed,
+        cleanlinessLevel,
+        sleepSchedule,
+        occupationPreference,
+        note,
       },
       create: {
         userId,
@@ -62,19 +80,26 @@ export const matchingService = {
         budgetMax,
         preferredGender,
         preferredProvince,
+        preferredDistrict,
+        preferredWard,
         smokingAllowed,
-        petAllowed
+        petAllowed,
+        cleanlinessLevel,
+        sleepSchedule,
+        occupationPreference,
+        note,
       }
     });
   },
 
   // 4. Thuật toán tính điểm tương thích bạn cùng phòng
   getSuggestedRoommates: async (myId: string) => {
-    // B1. Lấy thông tin bản thân và đáp án khảo sát
+    // B1. Lấy thông tin bản thân, câu trả lời và tiêu chí tìm kiếm
     const myInfo = await prisma.user.findUnique({
       where: { id: myId },
       include: {
         profile: true,
+        roommatePreference: true,
         lifestyleAnswers: {
           include: {
             option: {
@@ -113,41 +138,60 @@ export const matchingService = {
       maxPossibleScore += answer.weight;
     });
 
-    // B3. Lấy danh sách user khác
-    const otherUsers = await prisma.user.findMany({
+    // B3. Chỉ lấy các bài đăng tìm bạn ở ghép đang được duyệt
+    const roommatePosts = await prisma.post.findMany({
       where: {
-        id: { not: myId },
-        role: { in: ['TENANT', 'LANDLORD'] },
-        isActive: true
+        status: 'APPROVED',
+        postType: 'FIND_ROOMMATE',
+        authorId: { not: myId },
+        OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
+        author: { isActive: true, role: 'TENANT' },
       },
       include: {
-        profile: true,
-        roommatePreference: true,
-        lifestyleAnswers: {
+        property: { select: { province: true, district: true, ward: true } },
+        author: {
           include: {
-            option: true
-          }
-        }
+            profile: true,
+            roommatePreference: true,
+            lifestyleAnswers: { include: { option: true } },
+          },
+        },
       }
     });
 
-    // B4. Tính điểm tương thích cho từng user
-    const results = otherUsers.map(otherUser => {
+    // B4. Lọc theo tiêu chí của người đang tìm
+    const myPreferences = myInfo.roommatePreference;
+    const eligiblePosts = roommatePosts.filter((post) => {
+      const candidate = post.author;
+      const candidatePreferences = candidate.roommatePreference;
+      const price = post.price === null ? null : Number(post.price);
+      const province = post.property?.province ?? candidatePreferences?.preferredProvince;
+
+      if (myPreferences?.budgetMin !== null && myPreferences?.budgetMin !== undefined &&
+        (price === null || price < Number(myPreferences.budgetMin))) return false;
+      if (myPreferences?.budgetMax !== null && myPreferences?.budgetMax !== undefined &&
+        (price === null || price > Number(myPreferences.budgetMax))) return false;
+      if (myPreferences?.preferredProvince &&
+        province?.toLocaleLowerCase() !== myPreferences.preferredProvince.toLocaleLowerCase()) return false;
+      if (myPreferences?.preferredGender &&
+        myPreferences.preferredGender !== 'ANY' &&
+        candidate.profile?.gender !== myPreferences.preferredGender) return false;
+      if (myPreferences?.smokingAllowed !== null && myPreferences?.smokingAllowed !== undefined &&
+        candidatePreferences?.smokingAllowed !== null &&
+        candidatePreferences?.smokingAllowed !== undefined &&
+        myPreferences.smokingAllowed !== candidatePreferences.smokingAllowed) return false;
+      if (myPreferences?.petAllowed !== null && myPreferences?.petAllowed !== undefined &&
+        candidatePreferences?.petAllowed !== null &&
+        candidatePreferences?.petAllowed !== undefined &&
+        myPreferences.petAllowed !== candidatePreferences.petAllowed) return false;
+      return true;
+    });
+
+    // B5. Tính điểm tương thích cho từng bài đăng
+    const results = eligiblePosts.map(post => {
+      const otherUser = post.author;
       let matchScore = 0;
-      let isDealBreaker = false;
 
-      // 4.1. Kiểm tra tiêu chí loại trừ giới tính
-      const prefs = otherUser.roommatePreference;
-
-      if (
-        prefs?.preferredGender &&
-        prefs.preferredGender !== 'ANY' &&
-        prefs.preferredGender !== myInfo.profile?.gender
-      ) {
-        isDealBreaker = true;
-      }
-
-      // 4.2. Tính điểm dựa trên độ lệch scoreValue
       otherUser.lifestyleAnswers.forEach(otherAnswer => {
         const myAnswer = myAnswerMap.get(otherAnswer.questionId);
 
@@ -167,18 +211,21 @@ export const matchingService = {
         }
       });
 
-      // 4.3. Tính phần trăm tương thích
       let compatibilityPercent =
         maxPossibleScore > 0
           ? Math.round((matchScore / maxPossibleScore) * 100)
           : 0;
 
-      // Vi phạm tiêu chí loại trừ: điểm bằng 0
-      if (isDealBreaker) {
-        compatibilityPercent = 0;
-      }
-
       return {
+        post: {
+          id: post.id,
+          title: post.title,
+          description: post.description,
+          price: post.price,
+          createdAt: post.createdAt,
+          expiredAt: post.expiredAt,
+          property: post.property,
+        },
         user: {
           id: otherUser.id,
           fullName: otherUser.fullName,
@@ -188,12 +235,11 @@ export const matchingService = {
           occupation: otherUser.profile?.occupation
         },
         compatibilityPercent,
-        isDealBreaker
+        isDealBreaker: false
       };
     });
 
-    // B5. Chỉ lấy người tương thích từ 40% trở lên,
-    // không vi phạm tiêu chí loại trừ và sắp xếp giảm dần
+    // B6. Chỉ lấy bài đăng đạt ngưỡng tương thích và sắp xếp giảm dần
     return results
       .filter(
         result =>

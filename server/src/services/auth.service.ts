@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
-import { signToken } from '../utils/jwt';
 import { signShortToken } from '../utils/jwt';
 import { createOpaqueToken, hashToken } from '../utils/tokens';
 import { mailService } from './mail.service';
@@ -71,16 +70,28 @@ export const authService = {
   },
 
   refresh: async (refreshToken: string) => {
-    const stored = await prisma.refreshToken.findUnique({ where: { tokenHash: hashToken(refreshToken), }, include: { user: true } });
-    if (!stored || stored.revokedAt || stored.expiresAt <= new Date() || !stored.user.isActive) {
-      throw new AppError('Refresh token không hợp lệ hoặc đã hết hạn', 401);
-    }
-    await prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
+    const tokenHash = hashToken(refreshToken);
     const nextRefreshToken = createOpaqueToken();
-    await prisma.refreshToken.create({
-      data: { userId: stored.userId, tokenHash: hashToken(nextRefreshToken), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+    const result = await prisma.$transaction(async (tx) => {
+      const stored = await tx.refreshToken.findUnique({ where: { tokenHash }, include: { user: true } });
+      if (!stored || stored.revokedAt || stored.expiresAt <= new Date() || !stored.user.isActive) {
+        throw new AppError('Refresh token không hợp lệ hoặc đã hết hạn', 401);
+      }
+
+      const claimed = await tx.refreshToken.updateMany({
+        where: { id: stored.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        throw new AppError('Refresh token đã được sử dụng', 401);
+      }
+
+      await tx.refreshToken.create({
+        data: { userId: stored.userId, tokenHash: hashToken(nextRefreshToken), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+      });
+      return { user: stored.user, refreshToken: nextRefreshToken };
     });
-    return { token: signShortToken({ id: stored.user.id, role: stored.user.role }), refreshToken: nextRefreshToken };
+    return { token: signShortToken({ id: result.user.id, role: result.user.role }), refreshToken: result.refreshToken };
   },
 
   logout: async (refreshToken: string) => {
