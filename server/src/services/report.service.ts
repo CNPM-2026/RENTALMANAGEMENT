@@ -5,6 +5,12 @@ export const reportService = {
   // Người dùng gửi báo cáo
   createReport: async (reporterId: string, data: any) => {
     const { targetType, targetId, reason } = data;
+    const targetExists = targetType === 'POST'
+      ? await prisma.post.findUnique({ where: { id: targetId }, select: { id: true } })
+      : targetType === 'ROOM'
+        ? await prisma.room.findUnique({ where: { id: targetId }, select: { id: true } })
+        : await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
+    if (!targetExists) throw new AppError('Đối tượng báo cáo không tồn tại', 404);
     return await prisma.report.create({
       data: { reporterId, targetType, targetId, reason, status: 'PENDING' }
     });
@@ -31,4 +37,4 @@ export const reportService = {
       data: { status } // RESOLVED
     });
   }
-};s
+};

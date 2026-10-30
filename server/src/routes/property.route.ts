@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { propertyController } from '../controllers/property.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import { propertySchema } from '../validations/resource.validation';
 
 const router = Router();
 
@@ -9,7 +11,7 @@ const router = Router();
 // 2. Chỉ có LANDLORD mới được dùng (authorize)
 router.use(authenticate, authorize('LANDLORD')); 
 
-router.post('/', propertyController.create);
+router.post('/', validate(propertySchema), propertyController.create);
 router.get('/my', propertyController.getMyProperties);
 
 export default router;

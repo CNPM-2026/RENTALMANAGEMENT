@@ -1,8 +1,11 @@
 import prisma from '../config/db';
+import { AppError } from '../utils/AppError';
 
 export const favoriteService = {
   // Thêm/Xóa khỏi danh sách yêu thích (Toggle)
   toggleFavorite: async (userId: string, postId: string) => {
+    const post = await prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    if (!post) throw new AppError('Bài đăng không tồn tại', 404);
     const existing = await prisma.favorite.findUnique({
       where: { userId_postId: { userId, postId } }
     });

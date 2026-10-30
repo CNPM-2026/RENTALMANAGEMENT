@@ -33,7 +33,7 @@ export const contractController = {
   updateStatus: async (req: AuthRequest, res: Response) => {
     try {
       const { status } = req.body;
-      const result = await contractService.updateStatus(req.user.id, req.params.id, status as ContractStatus);
+      const result = await contractService.updateStatus(req.user.id, String(req.params.id), status as ContractStatus);
       return res.status(200).json({
         success: true,
         message: 'Cập nhật trạng thái hợp đồng thành công',

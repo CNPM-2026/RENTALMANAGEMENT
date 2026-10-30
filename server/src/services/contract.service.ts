@@ -20,10 +20,16 @@ export const contractService = {
     if (room.status === 'RENTED') {
       throw new AppError('Phòng này đã có người thuê', 400);
     }
+    const tenant = await prisma.user.findUnique({ where: { id: tenantId }, select: { id: true, role: true, isActive: true } });
+    if (!tenant || tenant.role !== 'TENANT' || !tenant.isActive) {
+      throw new AppError('Người thuê không hợp lệ', 400);
+    }
 
     // Sử dụng Transaction để tạo hợp đồng VÀ đổi trạng thái phòng cùng lúc
     return await prisma.$transaction(async (tx) => {
       // Tạo hợp đồng
+      const activeContract = await tx.contract.findFirst({ where: { roomId, status: 'ACTIVE' } });
+      if (activeContract) throw new AppError('Phòng này vừa được tạo hợp đồng bởi người khác', 409);
       const contract = await tx.contract.create({
         data: {
           roomId,

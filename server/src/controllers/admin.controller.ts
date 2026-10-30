@@ -21,7 +21,7 @@ export const adminController = {
         return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ' });
       }
 
-      const result = await adminService.updatePostStatus(id, status as PostStatus);
+      const result = await adminService.updatePostStatus(String(id), status as PostStatus);
       return res.status(200).json({ 
         success: true, 
         message: `Đã ${status === 'APPROVED' ? 'duyệt' : 'từ chối'} bài đăng`,

@@ -18,7 +18,7 @@ export const roomController = {
 
   getByProperty: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await roomService.getRoomsByProperty(req.user.id, req.params.propertyId);
+      const result = await roomService.getRoomsByProperty(req.user.id, String(req.params.propertyId));
       return res.status(200).json({
         success: true,
         message: 'Lấy danh sách phòng thành công',

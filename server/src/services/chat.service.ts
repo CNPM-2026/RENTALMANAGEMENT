@@ -5,13 +5,16 @@ export const chatService = {
   // Tạo hoặc lấy cuộc trò chuyện 1-1 giữa 2 người
   getOrCreateConversation: async (myId: string, targetUserId: string) => {
     if (myId === targetUserId) throw new AppError('Không thể tự nhắn tin với chính mình', 400);
+    const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true, isActive: true } });
+    if (!target?.isActive) throw new AppError('Người dùng không tồn tại hoặc đã bị khóa', 404);
 
     // Tìm xem đã có cuộc trò chuyện nào chứa đúng 2 người này chưa
     const existingConv = await prisma.conversation.findFirst({
       where: {
         AND: [
           { members: { some: { userId: myId } } },
-          { members: { some: { userId: targetUserId } } }
+          { members: { some: { userId: targetUserId } } },
+          { members: { every: { userId: { in: [myId, targetUserId] } } } }
         ]
       },
       include: { members: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } } }

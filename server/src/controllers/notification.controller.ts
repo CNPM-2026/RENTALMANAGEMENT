@@ -14,7 +14,7 @@ export const notificationController = {
 
   markAsRead: async (req: AuthRequest, res: Response) => {
     try {
-      await notificationService.markAsRead(req.user.id, req.params.id);
+      await notificationService.markAsRead(req.user.id, String(req.params.id));
       return res.status(200).json({ success: true, message: 'Đã đánh dấu đã đọc' });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
