@@ -1,23 +1,28 @@
-import 'express-async-errors'; // BẮT BUỘC phải ở trên cùng để tự động bắt lỗi async
-import { env } from './config/env'; // Dùng env đã validate
-import http from 'http';
+import dotenv from 'dotenv';
+dotenv.config();
+
+import http from 'http'; // Thêm import
 import app from './app';
 import prisma from './config/db';
-import { initSocket } from './socket'; 
+import { initSocket } from './socket'; // Import hàm initSocket
+
+const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
-    // 1. Kết nối Database
     await prisma.$connect();
     console.log('✅ Connected to PostgreSQL via Prisma');
 
-    // 2. Tạo HTTP Server và gắn Socket.io
+    // Tạo HTTP server từ app Express
     const server = http.createServer(app);
-    initSocket(server); // <--- ĐÂY RỒI, KHÔNG QUÊN ĐÂU NHÉ =))
 
-    // 3. Khởi chạy Server
-    server.listen(env.PORT, () => {
-      console.log(`🚀 Server is running on http://localhost:${env.PORT} [${env.NODE_ENV}]`);
+    // Khởi tạo Socket.io và gắn vào server
+    initSocket(server);
+
+    // Chạy server (Lưu ý: dùng server.listen thay vì app.listen)
+    server.listen(PORT, () => {
+      console.log(`🚀 Server is running on http://localhost:${PORT}`);
+>>>>>>> Stashed changes
     });
 
     // 4. Xử lý tắt Server an toàn (Graceful Shutdown)
