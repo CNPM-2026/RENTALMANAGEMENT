@@ -17,8 +17,8 @@ export const contractService = {
     if (room.property.landlordId !== landlordId) {
       throw new AppError('Bạn không có quyền tạo hợp đồng cho phòng này', 403);
     }
-    if (room.status === 'RENTED') {
-      throw new AppError('Phòng này đã có người thuê', 400);
+    if (room.status !== 'AVAILABLE') {
+      throw new AppError('Phòng này hiện không ở trạng thái sẵn sàng cho thuê', 400);
     }
     const tenant = await prisma.user.findUnique({ where: { id: tenantId }, select: { id: true, role: true, isActive: true } });
     if (!tenant || tenant.role !== 'TENANT' || !tenant.isActive) {
@@ -27,9 +27,14 @@ export const contractService = {
 
     // Sử dụng Transaction để tạo hợp đồng VÀ đổi trạng thái phòng cùng lúc
     return await prisma.$transaction(async (tx) => {
-      // Tạo hợp đồng
-      const activeContract = await tx.contract.findFirst({ where: { roomId, status: 'ACTIVE' } });
-      if (activeContract) throw new AppError('Phòng này vừa được tạo hợp đồng bởi người khác', 409);
+      const claimedRoom = await tx.room.updateMany({
+        where: { id: roomId, status: 'AVAILABLE' },
+        data: { status: 'RENTED' },
+      });
+      if (claimedRoom.count !== 1) {
+        throw new AppError('Phòng này vừa được tạo hợp đồng bởi người khác', 409);
+      }
+
       const contract = await tx.contract.create({
         data: {
           roomId,
@@ -45,12 +50,6 @@ export const contractService = {
           room: { select: { roomNumber: true } },
           tenant: { select: { fullName: true, phone: true } }
         }
-      });
-
-      // Đổi trạng thái phòng thành Đã thuê
-      await tx.room.update({
-        where: { id: roomId },
-        data: { status: 'RENTED' }
       });
 
       return contract;
@@ -92,6 +91,15 @@ export const contractService = {
     if (contract.room.property.landlordId !== landlordId) {
       throw new AppError('Bạn không có quyền thay đổi hợp đồng này', 403);
     }
+    const allowedTransitions: Record<ContractStatus, ContractStatus[]> = {
+      PENDING: ['ACTIVE', 'TERMINATED'],
+      ACTIVE: ['EXPIRED', 'TERMINATED'],
+      EXPIRED: [],
+      TERMINATED: [],
+    };
+    if (!allowedTransitions[contract.status].includes(status)) {
+      throw new AppError(`Không thể chuyển hợp đồng từ ${contract.status} sang ${status}`, 400);
+    }
 
     return await prisma.$transaction(async (tx) => {
       // Cập nhật trạng thái hợp đồng
@@ -100,8 +108,12 @@ export const contractService = {
         data: { status }
       });
 
-      // Nếu hợp đồng bị TERMINATED (chấm dứt) hoặc EXPIRED (hết hạn) -> Trả phòng về trạng thái AVAILABLE
-      if (status === 'TERMINATED' || status === 'EXPIRED') {
+      if (status === 'ACTIVE') {
+        await tx.room.update({
+          where: { id: contract.roomId },
+          data: { status: 'RENTED' }
+        });
+      } else if (status === 'TERMINATED' || status === 'EXPIRED') {
         await tx.room.update({
           where: { id: contract.roomId },
           data: { status: 'AVAILABLE' }

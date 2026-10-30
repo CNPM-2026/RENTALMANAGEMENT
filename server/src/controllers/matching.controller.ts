@@ -14,7 +14,7 @@ export const matchingController = {
 
   submitAnswers: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await matchingService.submitAnswers(req.user.id, req.body.answers);
+      const result = await matchingService.submitAnswers(req.user!.id, req.body.answers);
       return res.status(200).json({ success: true, message: result.message });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
@@ -23,7 +23,7 @@ export const matchingController = {
 
   updatePreferences: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await matchingService.updatePreferences(req.user.id, req.body);
+      const result = await matchingService.updatePreferences(req.user!.id, req.body);
       return res.status(200).json({ success: true, message: 'Cập nhật tiêu chí thành công', data: result });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
@@ -32,7 +32,7 @@ export const matchingController = {
 
   getSuggestedRoommates: async (req: AuthRequest, res: Response) => {
     try {
-      const result = await matchingService.getSuggestedRoommates(req.user.id);
+      const result = await matchingService.getSuggestedRoommates(req.user!.id);
       return res.status(200).json({ 
         success: true, 
         message: 'Lấy danh sách người ở ghép tương thích thành công', 

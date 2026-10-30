@@ -6,7 +6,7 @@ export const propertyController = {
   create: async (req: AuthRequest, res: Response) => {
     try {
       // req.user được lấy từ middleware authenticate
-      const landlordId = req.user.id; 
+      const landlordId = req.user!.id; 
       const result = await propertyService.createProperty(landlordId, req.body);
       
       return res.status(201).json({
@@ -21,7 +21,7 @@ export const propertyController = {
 
   getMyProperties: async (req: AuthRequest, res: Response) => {
     try {
-      const landlordId = req.user.id;
+      const landlordId = req.user!.id;
       const result = await propertyService.getMyProperties(landlordId);
       
       return res.status(200).json({

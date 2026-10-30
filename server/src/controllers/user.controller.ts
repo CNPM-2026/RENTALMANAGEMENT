@@ -7,7 +7,7 @@ export const userController = {
     try {
       // req.file chứa thông tin ảnh (nếu có)
       const file = req.file; 
-      const result = await userService.updateProfile(req.user.id, req.body, file);
+      const result = await userService.updateProfile(req.user!.id, req.body, file);
       
       return res.status(200).json({
         success: true,
