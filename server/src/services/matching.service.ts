@@ -206,6 +206,10 @@ export const matchingService = {
     // B5. Tính điểm tương thích cho từng bài đăng
     const results = eligiblePosts.map(post => {
       const otherUser = post.author;
+      const candidatePreferences = otherUser.roommatePreference;
+      const province = post.property?.province ?? candidatePreferences?.preferredProvince;
+      const district = post.property?.district ?? candidatePreferences?.preferredDistrict;
+      const ward = post.property?.ward ?? candidatePreferences?.preferredWard;
       let matchScore = 0;
 
       otherUser.lifestyleAnswers.forEach(otherAnswer => {
@@ -240,14 +244,14 @@ export const matchingService = {
         myPreferences?.preferredGender && myPreferences.preferredGender !== 'ANY'
           ? otherUser.profile?.gender === myPreferences.preferredGender
           : null,
-        myPreferences?.preferredProvince && post.property?.province
-          ? myPreferences.preferredProvince.toLocaleLowerCase() === post.property.province.toLocaleLowerCase()
+        myPreferences?.preferredProvince && province
+          ? myPreferences.preferredProvince.toLocaleLowerCase() === province.toLocaleLowerCase()
           : null,
-        myPreferences?.preferredDistrict && post.property?.district
-          ? myPreferences.preferredDistrict.toLocaleLowerCase() === post.property.district.toLocaleLowerCase()
+        myPreferences?.preferredDistrict && district
+          ? myPreferences.preferredDistrict.toLocaleLowerCase() === district.toLocaleLowerCase()
           : null,
-        myPreferences?.preferredWard && post.property?.ward
-          ? myPreferences.preferredWard.toLocaleLowerCase() === post.property.ward.toLocaleLowerCase()
+        myPreferences?.preferredWard && ward
+          ? myPreferences.preferredWard.toLocaleLowerCase() === ward.toLocaleLowerCase()
           : null,
         myPreferences?.cleanlinessLevel !== null && myPreferences?.cleanlinessLevel !== undefined &&
         otherUser.roommatePreference?.cleanlinessLevel !== null &&
