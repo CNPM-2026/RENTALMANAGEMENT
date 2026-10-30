@@ -170,5 +170,64 @@ export const postService = {
       },
       data: posts,
     };
+  },
+    // Lấy bài đăng của tôi (Dành cho Landlord/Tenant tự xem bài mình đã đăng)
+  getMyPosts: async (authorId: string) => {
+    return await prisma.post.findMany({
+      where: { authorId },
+      include: { images: true, room: true, property: true },
+      orderBy: { createdAt: 'desc' }
+    });
+  },
+
+  // Sửa bài đăng
+  updatePost: async (userId: string, postId: string, data: any, files?: Express.Multer.File[]) => {
+    // Check quyền
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new AppError('Bài đăng không tồn tại', 404);
+    if (post.authorId !== userId) throw new AppError('Bạn không có quyền sửa bài này', 403);
+
+    const { title, description, price, status } = data;
+
+    // Nếu sửa thông tin -> Đưa về trạng thái PENDING để Admin duyệt lại
+    const newStatus = (title || description || price) ? 'PENDING' : post.status;
+
+    // Cập nhật
+    const updatedPost = await prisma.post.update({
+      where: { id: postId },
+      data: {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(price && { price: parseFloat(price) }),
+        status: newStatus,
+      }
+    });
+
+    // Nếu có up thêm ảnh mới
+    if (files && files.length > 0) {
+      await prisma.postImage.createMany({
+        data: files.map((file, index) => ({
+          postId,
+          imageUrl: `/uploads/${file.filename}`,
+          isPrimary: index === 0,
+        }))
+      });
+    }
+
+    return updatedPost;
+  },
+
+  // Xóa bài đăng
+  deletePost: async (userId: string, role: string, postId: string) => {
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new AppError('Bài đăng không tồn tại', 404);
+    
+    // Admin hoặc chủ bài đăng mới được xóa
+    if (post.authorId !== userId && role !== 'ADMIN') {
+      throw new AppError('Bạn không có quyền xóa bài này', 403);
+    }
+
+    // (Lưu ý: Prisma sẽ tự xóa ảnh trong DB nhờ onDelete Cascade, nhưng file vật lý trong thư mục uploads sẽ cần code thêm để xóa nếu muốn sạch sẽ)
+    return await prisma.post.delete({ where: { id: postId } });
   }
 };
