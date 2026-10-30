@@ -112,10 +112,20 @@ export const authService = {
     const reset = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(token) } });
     if (!reset || reset.usedAt || reset.expiresAt <= new Date()) throw new AppError('Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn', 400);
     const passwordHash = await bcrypt.hash(password, 10);
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
-      prisma.passwordResetToken.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
-      prisma.refreshToken.updateMany({ where: { userId: reset.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
-    ]);
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.passwordResetToken.updateMany({
+        where: {
+          id: reset.id,
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        throw new AppError('Mã đặt lại mật khẩu đã được sử dụng hoặc đã hết hạn', 400);
+      }
+      await tx.user.update({ where: { id: reset.userId }, data: { passwordHash } });
+      await tx.refreshToken.updateMany({ where: { userId: reset.userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    });
   },
 };

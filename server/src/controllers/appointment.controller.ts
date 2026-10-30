@@ -1,9 +1,9 @@
-import { Response } from 'express';
+import { NextFunction, Response } from 'express';
 import { appointmentService } from '../services/appointment.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 export const appointmentController = {
-  create: async (req: AuthRequest, res: Response) => {
+  create: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await appointmentService.createAppointment(req.user!.id, req.body);
       return res.status(201).json({
@@ -11,21 +11,21 @@ export const appointmentController = {
         message: 'Đặt lịch xem phòng thành công',
         data: result,
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    } catch (error) {
+      return next(error);
     }
   },
 
-  getMyAppointments: async (req: AuthRequest, res: Response) => {
+  getMyAppointments: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await appointmentService.getMyAppointments(req.user!.id, req.user!.role);
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    } catch (error) {
+      return next(error);
     }
   },
 
-  updateStatus: async (req: AuthRequest, res: Response) => {
+  updateStatus: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await appointmentService.updateStatus(req.user!.id, String(req.params.id), req.body.status);
       return res.status(200).json({
@@ -33,8 +33,8 @@ export const appointmentController = {
         message: 'Cập nhật trạng thái thành công',
         data: result,
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    } catch (error) {
+      return next(error);
     }
   }
 };

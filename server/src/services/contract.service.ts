@@ -102,25 +102,35 @@ export const contractService = {
     }
 
     return await prisma.$transaction(async (tx) => {
-      // Cập nhật trạng thái hợp đồng
-      const updatedContract = await tx.contract.update({
-        where: { id: contractId },
-        data: { status }
-      });
-
       if (status === 'ACTIVE') {
-        await tx.room.update({
-          where: { id: contract.roomId },
-          data: { status: 'RENTED' }
+        const claimedRoom = await tx.room.updateMany({
+          where: { id: contract.roomId, status: 'AVAILABLE' },
+          data: { status: 'RENTED' },
         });
+        if (claimedRoom.count !== 1) {
+          throw new AppError('Phòng không còn sẵn sàng để kích hoạt hợp đồng', 409);
+        }
       } else if (status === 'TERMINATED' || status === 'EXPIRED') {
-        await tx.room.update({
-          where: { id: contract.roomId },
-          data: { status: 'AVAILABLE' }
-        });
+        if (contract.status === 'ACTIVE') {
+          const releasedRoom = await tx.room.updateMany({
+            where: { id: contract.roomId, status: 'RENTED' },
+            data: { status: 'AVAILABLE' },
+          });
+          if (releasedRoom.count !== 1) {
+            throw new AppError('Trạng thái phòng không khớp với hợp đồng đang hoạt động', 409);
+          }
+        }
       }
 
-      return updatedContract;
+      const updated = await tx.contract.updateMany({
+        where: { id: contractId, status: contract.status },
+        data: { status },
+      });
+      if (updated.count !== 1) {
+        throw new AppError('Hợp đồng vừa được cập nhật bởi request khác', 409);
+      }
+
+      return tx.contract.findUniqueOrThrow({ where: { id: contractId } });
     });
   }
 };

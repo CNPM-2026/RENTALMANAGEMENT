@@ -16,6 +16,11 @@ export const matchingService = {
     userId: string,
     answers: { questionId: string; optionId: string }[]
   ) => {
+    const questionIds = answers.map((answer) => answer.questionId);
+    if (new Set(questionIds).size !== questionIds.length) {
+      throw new AppError('Mỗi câu hỏi chỉ được trả lời một lần', 400);
+    }
+
     const optionIds = answers.map((answer) => answer.optionId);
     const validOptions = await prisma.lifestyleOption.findMany({
       where: { id: { in: optionIds }, questionId: { in: answers.map((answer) => answer.questionId) } },
@@ -166,6 +171,8 @@ export const matchingService = {
       const candidatePreferences = candidate.roommatePreference;
       const price = post.price === null ? null : Number(post.price);
       const province = post.property?.province ?? candidatePreferences?.preferredProvince;
+      const district = post.property?.district ?? candidatePreferences?.preferredDistrict;
+      const ward = post.property?.ward ?? candidatePreferences?.preferredWard;
 
       if (myPreferences?.budgetMin !== null && myPreferences?.budgetMin !== undefined &&
         (price === null || price < Number(myPreferences.budgetMin))) return false;
@@ -173,6 +180,10 @@ export const matchingService = {
         (price === null || price > Number(myPreferences.budgetMax))) return false;
       if (myPreferences?.preferredProvince &&
         province?.toLocaleLowerCase() !== myPreferences.preferredProvince.toLocaleLowerCase()) return false;
+      if (myPreferences?.preferredDistrict &&
+        district?.toLocaleLowerCase() !== myPreferences.preferredDistrict.toLocaleLowerCase()) return false;
+      if (myPreferences?.preferredWard &&
+        ward?.toLocaleLowerCase() !== myPreferences.preferredWard.toLocaleLowerCase()) return false;
       if (myPreferences?.preferredGender &&
         myPreferences.preferredGender !== 'ANY' &&
         candidate.profile?.gender !== myPreferences.preferredGender) return false;
@@ -184,6 +195,16 @@ export const matchingService = {
         candidatePreferences?.petAllowed !== null &&
         candidatePreferences?.petAllowed !== undefined &&
         myPreferences.petAllowed !== candidatePreferences.petAllowed) return false;
+      if (myPreferences?.cleanlinessLevel !== null && myPreferences?.cleanlinessLevel !== undefined &&
+        candidatePreferences?.cleanlinessLevel !== null &&
+        candidatePreferences?.cleanlinessLevel !== undefined &&
+        Math.abs(myPreferences.cleanlinessLevel - candidatePreferences.cleanlinessLevel) > 1) return false;
+      if (myPreferences?.sleepSchedule &&
+        candidatePreferences?.sleepSchedule &&
+        myPreferences.sleepSchedule !== candidatePreferences.sleepSchedule) return false;
+      if (myPreferences?.occupationPreference &&
+        candidate.profile?.occupation &&
+        !candidate.profile.occupation.toLocaleLowerCase().includes(myPreferences.occupationPreference.toLocaleLowerCase())) return false;
       return true;
     });
 
@@ -215,6 +236,42 @@ export const matchingService = {
         maxPossibleScore > 0
           ? Math.round((matchScore / maxPossibleScore) * 100)
           : 0;
+
+      const preferenceScore = [
+        myPreferences?.budgetMin !== null && myPreferences?.budgetMin !== undefined ||
+        myPreferences?.budgetMax !== null && myPreferences?.budgetMax !== undefined
+          ? post.price !== null
+          : null,
+        myPreferences?.preferredGender && myPreferences.preferredGender !== 'ANY'
+          ? otherUser.profile?.gender === myPreferences.preferredGender
+          : null,
+        myPreferences?.preferredProvince && post.property?.province
+          ? myPreferences.preferredProvince.toLocaleLowerCase() === post.property.province.toLocaleLowerCase()
+          : null,
+        myPreferences?.preferredDistrict && post.property?.district
+          ? myPreferences.preferredDistrict.toLocaleLowerCase() === post.property.district.toLocaleLowerCase()
+          : null,
+        myPreferences?.preferredWard && post.property?.ward
+          ? myPreferences.preferredWard.toLocaleLowerCase() === post.property.ward.toLocaleLowerCase()
+          : null,
+        myPreferences?.cleanlinessLevel !== null && myPreferences?.cleanlinessLevel !== undefined &&
+        otherUser.roommatePreference?.cleanlinessLevel !== null &&
+        otherUser.roommatePreference?.cleanlinessLevel !== undefined
+          ? Math.abs(myPreferences.cleanlinessLevel - otherUser.roommatePreference.cleanlinessLevel) <= 1
+          : null,
+        myPreferences?.sleepSchedule && otherUser.roommatePreference?.sleepSchedule
+          ? myPreferences.sleepSchedule === otherUser.roommatePreference.sleepSchedule
+          : null,
+        myPreferences?.occupationPreference && otherUser.profile?.occupation
+          ? otherUser.profile.occupation.toLocaleLowerCase().includes(myPreferences.occupationPreference.toLocaleLowerCase())
+          : null,
+      ].filter((value): value is boolean => value !== null);
+      if (preferenceScore.length > 0) {
+        const preferencePercent = Math.round(
+          (preferenceScore.filter(Boolean).length / preferenceScore.length) * 100
+        );
+        compatibilityPercent = Math.round(compatibilityPercent * 0.7 + preferencePercent * 0.3);
+      }
 
       return {
         post: {
