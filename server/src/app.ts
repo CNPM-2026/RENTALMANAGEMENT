@@ -17,6 +17,10 @@ import chatRoute from './routes/chat.route';
 import notificationRoute from './routes/notification.route'
 import matchingRoute from './routes/matching.route'
 import reviewRoute from './routes/review.route'
+import userRoute from './routes/user.route'
+import favoriteRoute from './routes/favorite.route'
+import reportRoute from './routes/report.route'
+import { fa } from 'zod/locales';
 const app: Application = express();
 // Middlewares
 app.use(helmet());
@@ -47,6 +51,9 @@ app.use('/api/v1/chats', chatRoute)
 app.use('/api/v1/notifications', notificationRoute);
 app.use('/api/v1/matching', matchingRoute);
 app.use('/api/v1/reviews', reviewRoute);
+app.use('/api/v1/users', userRoute);
+app.use('/api/v1/favorites', favoriteRoute);
+app.use('/api/v1/reports', reportRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });
