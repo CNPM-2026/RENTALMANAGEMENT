@@ -1,4 +1,5 @@
 import express, { Application, Request, Response } from 'express';
+import compression from 'compression';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -20,10 +21,12 @@ import reviewRoute from './routes/review.route'
 import userRoute from './routes/user.route'
 import favoriteRoute from './routes/favorite.route'
 import reportRoute from './routes/report.route'
+import statisticRoute from './routes/statistic.route'
 import { fa } from 'zod/locales';
 const app: Application = express();
 // Middlewares
 app.use(helmet());
+app.use(compression());
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
@@ -54,6 +57,7 @@ app.use('/api/v1/reviews', reviewRoute);
 app.use('/api/v1/users', userRoute);
 app.use('/api/v1/favorites', favoriteRoute);
 app.use('/api/v1/reports', reportRoute);
+app.use('/api/v1/statistics', statisticRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });
