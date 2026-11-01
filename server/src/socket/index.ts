@@ -90,7 +90,12 @@ export const initSocket = (server: HttpServer) => {
     });
 
     // Sự kiện: Đang gõ phím (Typing)
-    socket.on('typing', (data: { conversationId: string; isTyping: boolean }) => {
+    socket.on('typing', async (data: { conversationId: string; isTyping: boolean }) => {
+      if (!userId || typeof data?.conversationId !== 'string' || typeof data.isTyping !== 'boolean') return;
+      const member = await prisma.conversationMember.findUnique({
+        where: { conversationId_userId: { conversationId: data.conversationId, userId } }
+      });
+      if (!member) return socket.emit('error_message', 'Bạn không thuộc cuộc trò chuyện này');
       socket.to(`conversation_${data.conversationId}`).emit('user_typing', {
         userId,
         isTyping: data.isTyping

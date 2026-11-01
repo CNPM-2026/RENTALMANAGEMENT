@@ -1,9 +1,9 @@
-import { Response } from 'express';
+import { NextFunction, Response } from 'express';
 import { userService } from '../services/user.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 export const userController = {
-  updateProfile: async (req: AuthRequest, res: Response) => {
+  updateProfile: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // req.file chứa thông tin ảnh (nếu có)
       const file = req.file; 
@@ -14,8 +14,8 @@ export const userController = {
         message: 'Cập nhật hồ sơ thành công',
         data: result,
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    } catch (error) {
+      return next(error);
     }
   }
 };
