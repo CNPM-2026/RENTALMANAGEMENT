@@ -16,9 +16,9 @@ export const mailService = {
       'Nếu bạn không yêu cầu thao tác này, hãy bỏ qua email.',
     ].join('\n');
 
-    if (env.MAIL_PROVIDER === 'mailtrap') {
+    if (env.MAIL_PROVIDER === 'mailtrap' || env.MAIL_PROVIDER === 'gmail') {
       if (!env.SMTP_HOST || !env.SMTP_PORT || !env.SMTP_USER || !env.SMTP_PASSWORD || !env.MAIL_FROM) {
-        throw new AppError('Mailtrap SMTP chưa được cấu hình đầy đủ', 503);
+        throw new AppError(`${env.MAIL_PROVIDER} SMTP chưa được cấu hình đầy đủ`, 503);
       }
 
       const transporter = nodemailer.createTransport({
