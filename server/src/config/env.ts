@@ -17,7 +17,7 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().optional(),
-  MAIL_PROVIDER: z.enum(['resend', 'mailtrap']).default('resend'),
+  MAIL_PROVIDER: z.enum(['resend', 'mailtrap', 'gmail']).default('resend'),
   RESET_PASSWORD_URL: z.string().url().default('http://localhost:3001/reset-password'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),

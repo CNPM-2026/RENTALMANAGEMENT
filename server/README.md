@@ -46,6 +46,21 @@ inside the Mailtrap inbox and are not delivered to real recipients. Keep
 `RESET_PASSWORD_URL` is the frontend reset-password page. The backend appends
 the one-time token as the `token` query parameter.
 
+For a free Gmail SMTP development setup, enable 2-Step Verification on the
+Gmail account, create a Google App Password, and configure:
+
+```env
+MAIL_PROVIDER=gmail
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-account@gmail.com
+SMTP_PASSWORD=your-16-character-app-password
+MAIL_FROM="Rental Management <your-account@gmail.com>"
+```
+
+Use the App Password, not the normal Gmail password. Gmail SMTP is suitable
+for development and small-scale testing, not high-volume production sending.
+
 ## Install and run
 
 ```powershell
@@ -167,6 +182,8 @@ rotated when refreshed.
   `RESEND_API_KEY`, and `MAIL_FROM` are configured.
 - Mailtrap SMTP is used when `MAIL_PROVIDER=mailtrap` and all `SMTP_*`
   variables plus `MAIL_FROM` are configured.
+- Gmail SMTP is used when `MAIL_PROVIDER=gmail` and all `SMTP_*` variables plus
+  `MAIL_FROM` are configured.
 
 ## Security notes
 
