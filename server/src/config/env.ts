@@ -17,6 +17,12 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().optional(),
+  MAIL_PROVIDER: z.enum(['resend', 'mailtrap']).default('resend'),
+  RESET_PASSWORD_URL: z.string().url().default('http://localhost:3000/reset-password'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
 });
 
 // Thử parse các biến môi trường, nếu thiếu hay sai định dạng sẽ báo đỏ ngay lúc khởi động

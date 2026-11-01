@@ -29,6 +29,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.5.0",
+    "nodemailer": "^7.0.10",
     "socket.io": "^4.8.4",
     "zod": "^4.6.7"
   },
@@ -40,6 +41,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.9",
     "@types/multer": "^2.3.0",
+    "@types/nodemailer": "^6.4.21",
     "@types/node": "^22.9.0",
     "@types/socket.io": "^3.0.1",
     "@types/supertest": "^7.2.1",
