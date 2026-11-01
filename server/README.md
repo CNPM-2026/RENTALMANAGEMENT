@@ -27,9 +27,24 @@ CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 RESEND_API_KEY=
 MAIL_FROM=
+MAIL_PROVIDER=resend
+SMTP_HOST=
+SMTP_PORT=2525
+SMTP_USER=
+SMTP_PASSWORD=
 ```
 
 `NODE_ENV=test` loads `.env.test`; other environments load `.env`.
+
+For local password-reset testing without a custom domain, create a Mailtrap
+email sandbox and set `MAIL_PROVIDER=mailtrap`. Copy the SMTP host, port,
+username, and password from Mailtrap's SMTP integration into `SMTP_*`, then
+use a sender such as `no-reply@example.test` in `MAIL_FROM`. Messages remain
+inside the Mailtrap inbox and are not delivered to real recipients. Keep
+`MAIL_PROVIDER=resend` for Resend-based environments.
+
+`RESET_PASSWORD_URL` is the frontend reset-password page. The backend appends
+the one-time token as the `token` query parameter.
 
 ## Install and run
 
@@ -148,8 +163,10 @@ rotated when refreshed.
 
 - Cloudinary is used when all Cloudinary variables are configured.
 - Local `/uploads` storage remains available as a development fallback.
-- Resend is used for password-reset email when `RESEND_API_KEY` and
-  `MAIL_FROM` are configured.
+- Resend is used for password-reset email when `MAIL_PROVIDER=resend`,
+  `RESEND_API_KEY`, and `MAIL_FROM` are configured.
+- Mailtrap SMTP is used when `MAIL_PROVIDER=mailtrap` and all `SMTP_*`
+  variables plus `MAIL_FROM` are configured.
 
 ## Security notes
 
