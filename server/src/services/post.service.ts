@@ -2,6 +2,7 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { PostType, Prisma } from '@prisma/client';
 import { storageService } from './storage.service';
+import fs from 'fs/promises';
 
 export const postService = {
   createPost: async (authorId: string, data: any, files: Express.Multer.File[]) => {
@@ -11,6 +12,9 @@ export const postService = {
       const room = roomId ? await prisma.room.findUnique({ where: { id: roomId }, include: { property: true } }) : null;
       if (room && room.property.landlordId !== authorId) {
         throw new AppError('Bạn không có quyền đăng tin cho phòng này', 403);
+      }
+      if (roomId && propertyId && room && room.propertyId !== propertyId) {
+        throw new AppError('Phòng không thuộc nhà trọ đã chọn', 400);
       }
       if (propertyId) {
         const property = await prisma.property.findUnique({ where: { id: propertyId }, select: { landlordId: true } });
@@ -36,15 +40,18 @@ export const postService = {
 
     // 2. Nếu có file ảnh upload lên, lưu vào bảng PostImage
     if (files && files.length > 0) {
-      const imageData = await Promise.all(files.map(async (file, index) => ({
-        postId: post.id,
-        imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
-        isPrimary: index === 0, // Ảnh đầu tiên làm ảnh đại diện
-      })));
-
-      await prisma.postImage.createMany({
-        data: imageData,
-      });
+      try {
+        const imageData = await Promise.all(files.map(async (file, index) => ({
+          postId: post.id,
+          imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
+          isPrimary: index === 0,
+        })));
+        await prisma.postImage.createMany({ data: imageData });
+      } catch (error) {
+        await Promise.all(files.map((file) => fs.unlink(file.path).catch(() => undefined)));
+        await prisma.post.delete({ where: { id: post.id } }).catch(() => undefined);
+        throw error;
+      }
     }
 
     // 3. Trả về post kèm ảnh
@@ -61,6 +68,7 @@ export const postService = {
     return await prisma.post.findMany({
       where: {
         status: 'APPROVED',
+        OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
         ...(postType && { postType: postType as PostType }),
         // Nếu sau này muốn tìm theo tỉnh thành (thông qua property)
         ...(province && { property: { province: province } })
@@ -84,16 +92,22 @@ export const postService = {
     const skip = (page - 1) * limit;
 
     // 1. Xây dựng điều kiện lọc (Where clause)
+    const andConditions: Prisma.PostWhereInput[] = [
+      { OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }] },
+    ];
     const whereClause: Prisma.PostWhereInput = {
       status: 'APPROVED',
+      AND: andConditions,
     };
 
     // Tìm theo từ khóa (Title hoặc Description)
     if (keyword) {
-      whereClause.OR = [
+      andConditions.push({
+        OR: [
         { title: { contains: keyword, mode: 'insensitive' } },
         { description: { contains: keyword, mode: 'insensitive' } },
-      ];
+        ],
+      });
     }
 
     // Lọc theo Khu vực (Thông qua Property)
@@ -117,19 +131,14 @@ export const postService = {
 
     // Lọc theo Tiện ích (Phải có TẤT CẢ các tiện ích được chọn)
     if (amenityIds && amenityIds.length > 0) {
-      whereClause.room = {
-        ...whereClause.room as any,
-        roomAmenities: {
-          every: { // Hoặc 'some' tùy nhu cầu. Dùng 'every' nếu muốn phòng phải có ĐỦ tiện ích
-            amenityId: { in: amenityIds }
-          }
-        }
-      };
+      andConditions.push(...amenityIds.map((amenityId: string) => ({
+        room: { roomAmenities: { some: { amenityId } } },
+      })));
     }
 
     // 2. Xử lý logic Tìm theo Bản đồ (Map View)
     // Nếu có tọa độ, ta cần lọc những bài đăng nằm trong bán kính R (km)
-    if (lat && lng) {
+    if (lat !== undefined && lng !== undefined) {
       const r = radius || 5; // Mặc định 5km
       
       // Công thức Haversine (Sử dụng Raw Query vì Prisma chưa hỗ trợ tính toán địa lý trực tiếp)
@@ -219,13 +228,18 @@ export const postService = {
 
     // Nếu có up thêm ảnh mới
     if (files && files.length > 0) {
-      await prisma.postImage.createMany({
-        data: await Promise.all(files.map(async (file, index) => ({
-          postId,
-          imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
-          isPrimary: index === 0,
-        })))
-      });
+      try {
+        await prisma.postImage.createMany({
+          data: await Promise.all(files.map(async (file, index) => ({
+            postId,
+            imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
+            isPrimary: index === 0,
+          })))
+        });
+      } catch (error) {
+        await Promise.all(files.map((file) => fs.unlink(file.path).catch(() => undefined)));
+        throw error;
+      }
     }
 
     return updatedPost;

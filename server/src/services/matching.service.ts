@@ -136,13 +136,6 @@ export const matchingService = {
       ])
     );
 
-    // Tổng điểm tối đa có thể đạt được
-    let maxPossibleScore = 0;
-
-    myAnswerMap.forEach(answer => {
-      maxPossibleScore += answer.weight;
-    });
-
     // B3. Chỉ lấy các bài đăng tìm bạn ở ghép đang được duyệt
     const roommatePosts = await prisma.post.findMany({
       where: {
@@ -211,11 +204,13 @@ export const matchingService = {
       const district = post.property?.district ?? candidatePreferences?.preferredDistrict;
       const ward = post.property?.ward ?? candidatePreferences?.preferredWard;
       let matchScore = 0;
+      let matchedPossibleScore = 0;
 
       otherUser.lifestyleAnswers.forEach(otherAnswer => {
         const myAnswer = myAnswerMap.get(otherAnswer.questionId);
 
         if (myAnswer) {
+          matchedPossibleScore += myAnswer.weight;
           const otherScore = otherAnswer.option.scoreValue;
           const diff = Math.abs(myAnswer.score - otherScore);
 
@@ -232,8 +227,8 @@ export const matchingService = {
       });
 
       let compatibilityPercent =
-        maxPossibleScore > 0
-          ? Math.round((matchScore / maxPossibleScore) * 100)
+        matchedPossibleScore > 0
+          ? Math.round((matchScore / matchedPossibleScore) * 100)
           : 0;
 
       const price = post.price === null ? null : Number(post.price);

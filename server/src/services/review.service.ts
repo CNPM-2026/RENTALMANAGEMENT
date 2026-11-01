@@ -18,6 +18,37 @@ export const reviewService = {
         : await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
     if (!targetExists) throw new AppError('Đối tượng đánh giá không tồn tại', 404);
 
+    const isRelated = targetType === 'POST'
+      ? Boolean(await prisma.appointment.findFirst({
+          where: { postId: targetId, tenantId: reviewerId, status: 'COMPLETED' },
+          select: { id: true },
+        }))
+      : targetType === 'ROOM'
+        ? Boolean(await prisma.room.findFirst({
+            where: {
+              id: targetId,
+              OR: [
+                { property: { landlordId: reviewerId } },
+                { contracts: { some: { tenantId: reviewerId } } },
+              ],
+            },
+            select: { id: true },
+          }))
+        : Boolean(await prisma.contract.findFirst({
+            where: {
+              OR: [
+                { tenantId: reviewerId, room: { property: { landlordId: targetId } } },
+                { tenantId: targetId, room: { property: { landlordId: reviewerId } } },
+                { agentId: reviewerId, tenantId: targetId },
+                { agentId: targetId, tenantId: reviewerId },
+              ],
+            },
+            select: { id: true },
+          }));
+    if (!isRelated) {
+      throw new AppError('Bạn chưa có quan hệ giao dịch phù hợp để đánh giá đối tượng này', 403);
+    }
+
     // Check xem đã đánh giá chưa (Mỗi người chỉ được đánh giá 1 lần / 1 đối tượng)
     const existingReview = await prisma.review.findUnique({
       where: {

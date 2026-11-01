@@ -73,11 +73,13 @@ export const invoiceService = {
   // Lấy danh sách hóa đơn (Dùng cho cả Chủ trọ và Người thuê)
   getMyInvoices: async (userId: string, role: string) => {
     const whereClause: any = {};
-    
+
     if (role === 'LANDLORD') {
       whereClause.room = { property: { landlordId: userId } };
     } else if (role === 'TENANT') {
       whereClause.tenantId = userId;
+    } else {
+      throw new AppError('Role không được phép xem hóa đơn cá nhân', 403);
     }
 
     return await prisma.invoice.findMany({

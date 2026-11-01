@@ -11,7 +11,6 @@ router.use(authenticate);
 router.post('/generate', authorize('LANDLORD'), validate(invoiceSchema), invoiceController.generate);
 router.patch('/:id/pay', authorize('LANDLORD'), invoiceController.pay);
 
-// Cả 2 role đều xem được danh sách (Service đã tự phân quyền)
-router.get('/my', invoiceController.getMyInvoices);
+router.get('/my', authorize('LANDLORD', 'TENANT'), invoiceController.getMyInvoices);
 
 export default router;
