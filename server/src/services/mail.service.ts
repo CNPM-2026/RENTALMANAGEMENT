@@ -12,7 +12,6 @@ export const mailService = {
       '',
       `Mở liên kết sau để đặt lại mật khẩu: ${resetUrl}`,
       '',
-      `Mã đặt lại mật khẩu: ${token}`,
       'Liên kết và mã có hiệu lực trong 15 phút và chỉ được sử dụng một lần.',
       'Nếu bạn không yêu cầu thao tác này, hãy bỏ qua email.',
     ].join('\n');
