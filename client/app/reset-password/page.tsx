@@ -3,7 +3,7 @@
 import { FormEvent, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+import { apiClient, ApiError } from "@/lib/api";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -28,19 +28,16 @@ function ResetPasswordForm() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${apiUrl}/api/v1/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      });
-      const body = await response.json();
+      const response = await apiClient.auth.resetPassword({ token, password });
       setMessage(
-        response.ok
-          ? "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới."
-          : body.message ?? "Không thể đặt lại mật khẩu.",
+        response.message ?? "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới."
       );
-    } catch {
-      setMessage("Không thể kết nối tới máy chủ. Vui lòng thử lại.");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setMessage(err.message || "Không thể đặt lại mật khẩu.");
+      } else {
+        setMessage("Không thể kết nối tới máy chủ. Vui lòng thử lại.");
+      }
     } finally {
       setIsSubmitting(false);
     }

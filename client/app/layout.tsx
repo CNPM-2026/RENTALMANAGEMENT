@@ -5,25 +5,68 @@ import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
+  fallback: [
+    "system-ui",
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Arial",
+    "sans-serif",
+  ],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+  fallback: [
+    "ui-monospace",
+    "SFMono-Regular",
+    "Menlo",
+    "Monaco",
+    "Consolas",
+    "Liberation Mono",
+    "Courier New",
+    "monospace",
+  ],
 });
 
 export const metadata: Metadata = {
-  title: "Rental Management",
-  description: "Quản lý nhà trọ",
+  title: {
+    default: "5K-Rental Manager",
+    template: "%s | 5K-Rental Manager",
+  },
+  description: "Nền tảng quản lý thuê trọ thông minh 5K-Rental Manager",
+  keywords: [
+    "thuê phòng trọ",
+    "quản lý phòng trọ",
+    "5K-Rental Manager",
+    "ở ghép",
+    "tìm phòng trọ",
+    "chủ trọ",
+  ],
+  authors: [{ name: "5K-Rental Manager Team" }],
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
-      lang="en"
+      lang="vi"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-surface-bg text-text-primary font-sans antialiased">
+        {children}
+      </body>
     </html>
   );
 }

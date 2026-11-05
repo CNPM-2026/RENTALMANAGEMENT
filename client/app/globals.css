@@ -1,26 +1,84 @@
 @import "tailwindcss";
 
+@theme {
+  /* Brand Primary & Accents (Figma: #15594f, #103f39, #203c37, #eaf2ed) */
+  --color-brand-primary: #15594f;
+  --color-brand-primary-hover: #103f39;
+  --color-brand-accent: #203c37;
+  --color-brand-tint: #eaf2ed;
+
+  /* Surface & Background Neutrals (Figma: #f7f6f2, #ffffff, #f2ede3, #e2e7e1) */
+  --color-surface-bg: #f7f6f2;
+  --color-surface-card: #ffffff;
+  --color-surface-muted: #f2ede3;
+  --color-border-subtle: #e2e7e1;
+
+  /* Typography & Content Colors (Figma: #203c37, #74817b, #9ca3af) */
+  --color-text-primary: #203c37;
+  --color-text-muted: #74817b;
+  --color-text-subtle: #9ca3af;
+  --color-text-on-primary: #ffffff;
+  --color-text-on-dark-sub: #e3ece6;
+
+  /* Semantic Utility Aliases (allows bg-primary, text-accent, border-subtle, etc.) */
+  --color-primary: #15594f;
+  --color-primary-hover: #103f39;
+  --color-accent: #203c37;
+  --color-tint: #eaf2ed;
+  --color-muted: #74817b;
+
+  /* Status Badges & Indicators */
+  --color-status-success: #15594f;
+  --color-status-success-bg: #eaf2ed;
+  --color-status-warning: #92400e;
+  --color-status-warning-bg: #fef3c7;
+  --color-status-error: #991b1b;
+  --color-status-error-bg: #fee2e2;
+  --color-status-info: #075985;
+  --color-status-info-bg: #e0f2fe;
+
+  /* Font Stacks with Offline Fallbacks */
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Radii Tokens */
+  --radius-checkbox: 4px;
+  --radius-button: 8px;
+  --radius-input: 8px;
+  --radius-badge: 12px;
+  --radius-card: 12px;
+  --radius-modal: 16px;
+  --radius-pill: 100px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f7f6f2;
+  --foreground: #203c37;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-surface-bg, #f7f6f2);
+  color: var(--color-text-primary, #203c37);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar for sidebars and tables */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e2e7e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #74817b;
 }

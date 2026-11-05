@@ -93,3 +93,11 @@ pids
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Agent & IDE files
+.agents/
+.vs/
+PROJECT.md
+TEST_INFRA.md
+TEST_READY.md
+ORIGINAL_REQUEST.md
