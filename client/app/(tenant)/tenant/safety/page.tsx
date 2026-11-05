@@ -22,7 +22,7 @@ export default function TenantSafetyCenterPage() {
   const safetyPillars = [
     {
       icon: <FileCheck2 className="size-6 text-[#15594f]" />,
-      title: "Xác thực danh tính chủ trọ 100%",
+      title: "Xác thực danh tính chủ trọ",
       description:
         "Mọi tin đăng trên 5K-Rental Manager đều phải qua kiểm duyệt giấy chứng nhận quyền sở hữu nhà hoặc hợp đồng ủy quyền quản lý kèm CCCD gắn chip.",
     },
@@ -40,9 +40,9 @@ export default function TenantSafetyCenterPage() {
     },
     {
       icon: <ShieldAlert className="size-6 text-[#15594f]" />,
-      title: "Xử lý vi phạm & Danh sách đen",
+      title: "Tiếp nhận vi phạm & Danh sách cảnh báo",
       description:
-        "Đội ngũ an ninh 5K-Rental Manager tiếp nhận và xử lý báo cáo vi phạm trong vòng 2 giờ. Khóa tài khoản vĩnh viễn với các hành vi gian lận.",
+        "Báo cáo được tiếp nhận để kiểm tra theo mức độ nghiêm trọng. Tài khoản có hành vi gian lận có thể bị hạn chế hoặc khóa.",
     },
   ];
 
@@ -156,7 +156,7 @@ export default function TenantSafetyCenterPage() {
         <div className="space-y-1.5">
           <h3 className="text-[18px] font-bold text-[#203c37]">Phát hiện đối tượng nghi vấn hoặc bài đăng lừa đảo?</h3>
           <p className="text-[13px] text-[#74817b] max-w-xl">
-            Báo cáo của bạn sẽ được xử lý hoàn toàn ẩn danh. Đội ngũ an ninh 5K-Rental Manager sẽ tiến hành đối soát, xác minh và gỡ bỏ tin đăng trong vòng 2 giờ.
+            Báo cáo của bạn sẽ được tiếp nhận để đối soát, xác minh và xử lý theo quy định của nền tảng.
           </p>
         </div>
         <Link href="/tenant/safety/report" className="shrink-0">

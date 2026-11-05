@@ -6,13 +6,14 @@ import { apiClient } from "@/lib/api";
 import { AuditLog } from "@/types/models";
 
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = React.useState<AuditLog[]>([
-    { id: "1", userId: "admin-1", action: "APPROVE_POST", entityType: "Post", entityId: "post-101", ipAddress: "192.168.1.5", createdAt: "2026-11-05T04:12:00Z" },
-    { id: "2", userId: "admin-1", action: "VERIFY_KYC", entityType: "User", entityId: "landlord-2", ipAddress: "192.168.1.5", createdAt: "2026-11-05T03:45:00Z" },
-    { id: "3", userId: "system", action: "AUTO_FLAG_FRAUD", entityType: "Post", entityId: "post-99", ipAddress: "127.0.0.1", createdAt: "2026-11-05T02:00:00Z" },
-    { id: "4", userId: "admin-2", action: "UPDATE_SYSTEM_SETTINGS", entityType: "Settings", ipAddress: "192.168.1.18", createdAt: "2026-11-04T18:30:00Z" },
-  ]);
+  const [logs, setLogs] = React.useState<AuditLog[]>([]);
   const [search, setSearch] = React.useState("");
+
+  React.useEffect(() => {
+    apiClient.adminGovernance.getAuditLogs({ search: search || undefined })
+      .then(setLogs)
+      .catch(() => setLogs([]));
+  }, [search]);
 
   const filtered = logs.filter((log) =>
     (log.action ?? "").toLowerCase().includes(search.toLowerCase()) ||

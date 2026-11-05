@@ -93,3 +93,63 @@ export const postWriteSchema = z.object({
   propertyId: uuid.optional(),
   roomId: uuid.optional(),
 });
+
+export const supportCreateSchema = z.object({
+  roomId: uuid.optional(),
+  category: z.string().trim().min(2).max(40),
+  subject: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(10).max(10000),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+});
+
+export const supportUpdateSchema = z.object({
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
+  adminReply: z.string().trim().max(10000).optional(),
+}).refine((value) => value.status !== undefined || value.adminReply !== undefined, {
+  message: 'Cần có trạng thái hoặc nội dung phản hồi',
+});
+
+export const staffInviteSchema = z.object({
+  email: z.string().email(),
+  permissions: z.array(z.enum(['PROPERTIES_ROOMS', 'MAINTENANCE', 'INVOICES', 'APPOINTMENTS'])).min(1),
+});
+
+export const staffUpdateSchema = z.object({
+  permissions: z.array(z.enum(['PROPERTIES_ROOMS', 'MAINTENANCE', 'INVOICES', 'APPOINTMENTS'])).min(1).optional(),
+  isActive: z.boolean().optional(),
+}).refine((value) => value.permissions !== undefined || value.isActive !== undefined, {
+  message: 'Cần có ít nhất một trường cập nhật',
+});
+
+export const maintenanceCreateSchema = z.object({
+  roomId: uuid,
+  title: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(10).max(10000),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+});
+
+export const maintenanceStatusSchema = z.object({
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+});
+
+export const rentalRequestCreateSchema = z.object({
+  roomId: uuid,
+  moveInDate: z.coerce.date(),
+  leaseTermMonths: z.coerce.number().int().positive().max(120),
+  occupantsCount: z.coerce.number().int().positive().max(50).optional(),
+  note: z.string().trim().max(5000).optional(),
+});
+
+export const rentalRequestStatusSchema = z.object({
+  status: z.enum(['APPROVED', 'REJECTED', 'CANCELLED']),
+});
+
+export const roommateInvitationCreateSchema = z.object({
+  recipientId: uuid,
+  postId: uuid.optional(),
+  message: z.string().trim().max(2000).optional(),
+});
+
+export const roommateInvitationStatusSchema = z.object({
+  status: z.enum(['ACCEPTED', 'DECLINED', 'CANCELLED']),
+});

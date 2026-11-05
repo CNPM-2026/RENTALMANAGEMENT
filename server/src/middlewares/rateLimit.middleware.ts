@@ -11,3 +11,11 @@ export const authLimiter = rateLimit({
   standardHeaders: true, // Trả về thông tin rate limit trong header
   legacyHeaders: false, // Tắt header cũ
 });
+
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { success: false, message: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

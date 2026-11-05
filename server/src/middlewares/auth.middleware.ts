@@ -5,7 +5,15 @@ import { AppError } from '../utils/AppError';
 
 // Mở rộng interface Request của Express để thêm req.user
 export interface AuthRequest extends Request {
-  user?: { id: string; email: string; fullName: string; role: string; isActive: boolean };
+  user?: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+    isActive: boolean;
+    landlordId?: string;
+    staffPermissions?: string[];
+  };
 }
 
 export const authenticate: RequestHandler = async (req, res, next) => {
@@ -30,7 +38,21 @@ export const authenticate: RequestHandler = async (req, res, next) => {
       throw new AppError('Tài khoản không tồn tại hoặc đã bị khóa', 401);
     }
 
-    authReq.user = user; // Gắn user vào request
+    // A landlord account always owns its own resources. Staff context is only
+    // resolved for non-landlord users, so another landlord cannot be scoped
+    // into a different owner's data by an incidental membership row.
+    const staff = user.role === 'LANDLORD'
+      ? null
+      : await prisma.staffMembership.findFirst({
+          where: { userId: user.id, isActive: true },
+          select: { landlordId: true, permissions: true },
+          orderBy: { createdAt: 'desc' },
+        });
+    authReq.user = {
+      ...user,
+      landlordId: staff?.landlordId,
+      staffPermissions: staff?.permissions,
+    };
     next();
   } catch (error: any) {
     if (error?.name === 'TokenExpiredError') {
@@ -53,3 +75,29 @@ export const authorize = (...roles: string[]): RequestHandler => {
     next();
   };
 };
+
+export const authorizeStaff = (permission: string): RequestHandler => {
+  return (req, res, next) => {
+    const authReq = req as AuthRequest;
+    const user = authReq.user;
+    if (!user || (user.role !== 'LANDLORD' && !user.staffPermissions?.includes(permission))) {
+      return next(new AppError('Bạn không có quyền thực hiện hành động này', 403));
+    }
+    next();
+  };
+};
+
+export const authorizeStaffOr = (permission: string, ...roles: string[]): RequestHandler => {
+  return (req, res, next) => {
+    const authReq = req as AuthRequest;
+    const user = authReq.user;
+    const isRegularRole = !!user && !user.landlordId && roles.includes(user.role);
+    if (!user || (!isRegularRole && user.role !== 'LANDLORD' && !user.staffPermissions?.includes(permission))) {
+      return next(new AppError('Bạn không có quyền thực hiện hành động này', 403));
+    }
+    next();
+  };
+};
+
+export const resourceOwnerId = (req: AuthRequest): string =>
+  req.user!.role === 'LANDLORD' ? req.user!.id : (req.user!.landlordId ?? req.user!.id);

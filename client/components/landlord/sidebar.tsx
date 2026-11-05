@@ -22,20 +22,26 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/api";
+import { Property } from "@/types/models";
 
 export function LandlordSidebar() {
   const pathname = usePathname();
   const currentPath = pathname ?? "";
-  const [selectedProperty, setSelectedProperty] = React.useState(
-    "Nhà của Minh An"
-  );
+  const [properties, setProperties] = React.useState<Property[]>([]);
+  const [selectedPropertyId, setSelectedPropertyId] = React.useState<string | null>(null);
   const [propertyDropdownOpen, setPropertyDropdownOpen] = React.useState(false);
 
-  const propertyOptions = [
-    "Nhà của Minh An (50 phòng)",
-    "Khu trọ Bình Thạnh (24 phòng)",
-    "Chung cư mini Thủ Đức (18 phòng)",
-  ];
+  React.useEffect(() => {
+    apiClient.properties.getMyProperties()
+      .then((items) => {
+        setProperties(items ?? []);
+        setSelectedPropertyId((current) => current ?? items?.[0]?.id ?? null);
+      })
+      .catch(() => setProperties([]));
+  }, []);
+
+  const selectedProperty = properties.find((property) => property.id === selectedPropertyId);
 
   // 4 Business Groups from Figma Frame 50:4401 and survey_3
   const navGroups = [
@@ -106,7 +112,7 @@ export function LandlordSidebar() {
             </p>
             <div className="flex items-center justify-between mt-1">
               <p className="text-[#203c37] text-[13px] font-semibold truncate">
-                {selectedProperty}
+                {selectedProperty?.name ?? "Chưa có cơ sở"}
               </p>
               <ChevronDown className="size-3.5 text-[#74817b] shrink-0 ml-1" />
             </div>
@@ -114,23 +120,26 @@ export function LandlordSidebar() {
 
           {propertyDropdownOpen && (
             <div className="absolute left-1 right-1 mt-1 bg-white border border-[#e2e7e1] rounded-[8px] shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-              {propertyOptions.map((prop) => (
+              {properties.map((property) => (
                 <button
-                  key={prop}
+                  key={property.id}
                   onClick={() => {
-                    setSelectedProperty(prop.split(" (")[0]);
+                    setSelectedPropertyId(property.id);
                     setPropertyDropdownOpen(false);
                   }}
                   className={cn(
                     "w-full text-left px-3 py-2 text-[12px] truncate hover:bg-[#f7f6f2] transition-colors cursor-pointer",
-                    selectedProperty === prop.split(" (")[0]
+                    selectedPropertyId === property.id
                       ? "text-[#15594f] font-semibold bg-[#eaf2ed]"
                       : "text-[#203c37]"
                   )}
                 >
-                  {prop}
+                  {property.name} ({property._count?.rooms ?? 0} phòng)
                 </button>
               ))}
+              {properties.length === 0 && (
+                <p className="px-3 py-2 text-[12px] text-[#74817b]">Chưa có cơ sở nào</p>
+              )}
             </div>
           )}
         </div>

@@ -19,6 +19,7 @@ const postWriteLimiter = rateLimit({
 router.get('/', postController.getApprovedPosts);
 router.get('/search', validate(searchPostSchema, 'query'), postController.search);
 router.get('/my-posts', authenticate, postController.getMyPosts);
+router.get('/:id', postController.getById);
 router.post(
   '/',
   postWriteLimiter,

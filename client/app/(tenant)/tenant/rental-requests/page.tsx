@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { apiClient } from "@/lib/api";
+import { RentalRequest as ApiRentalRequest } from "@/types/models";
+import { useRouter } from "next/navigation";
 
 interface RentalRequest {
   id: string;
@@ -33,70 +36,39 @@ interface RentalRequest {
   occupantsCount: number;
   landlordName: string;
   landlordPhone: string;
+  landlordId: string;
   status: "SUBMITTED" | "APPROVED" | "CONTRACT_READY" | "SIGNED" | "REJECTED";
   currentStep: number; // 1 to 4
   createdAt: string;
 }
 
-const INITIAL_REQUESTS: RentalRequest[] = [
-  {
-    id: "req-1",
-    contractId: "contract-hd-2026-01",
-    roomTitle: "Studio Ban Mai — Ban Công Hướng Đông",
-    roomNumber: "P.302",
-    roomAddress: "142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP.HCM",
-    roomImage: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=400&q=80",
-    monthlyRent: 4500000,
-    depositAmount: 4500000,
-    moveInDate: "15/11/2026",
-    leaseTermMonths: 12,
-    occupantsCount: 1,
-    landlordName: "Nguyễn Minh An",
-    landlordPhone: "0912345678",
-    status: "APPROVED",
-    currentStep: 3, // Ready to sign contract
-    createdAt: "04/11/2026",
-  },
-  {
-    id: "req-2",
-    roomTitle: "Căn Hộ Sunshine — Trung Tâm Quận 1",
-    roomNumber: "P.501",
-    roomAddress: "88 Nguyễn Du, Phường Bến Nghé, Quận 1, TP.HCM",
-    roomImage: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=400&q=80",
-    monthlyRent: 6200000,
-    depositAmount: 6200000,
-    moveInDate: "01/12/2026",
-    leaseTermMonths: 6,
-    occupantsCount: 2,
-    landlordName: "Trần Văn Bình",
-    landlordPhone: "0908123456",
-    status: "SUBMITTED",
-    currentStep: 1, // Pending landlord review
-    createdAt: "05/11/2026",
-  },
-  {
-    id: "req-3",
-    contractId: "contract-hd-2025-99",
-    roomTitle: "Phòng Trọ Gác Lửng Xanh — TP. Thủ Đức",
-    roomNumber: "P.204",
-    roomAddress: "24 Đường số 6, Linh Trung, TP. Thủ Đức, TP.HCM",
-    roomImage: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=400&q=80",
-    monthlyRent: 3200000,
-    depositAmount: 3200000,
-    moveInDate: "01/09/2025",
-    leaseTermMonths: 12,
-    occupantsCount: 1,
-    landlordName: "Lê Hoàng Yến",
-    landlordPhone: "0934567890",
-    status: "SIGNED",
-    currentStep: 4, // Completed
-    createdAt: "25/08/2025",
-  },
-];
-
 export default function TenantRentalRequestsPage() {
   const [activeTab, setActiveTab] = React.useState<"ALL" | "PENDING" | "APPROVED" | "COMPLETED">("ALL");
-  const [requests, setRequests] = React.useState<RentalRequest[]>(INITIAL_REQUESTS);
+  const [requests, setRequests] = React.useState<RentalRequest[]>([]);
+  const router = useRouter();
+
+  React.useEffect(() => {
+    apiClient.rentalRequests.getMine().then((items: ApiRentalRequest[]) => {
+      setRequests(items.map((item) => ({
+        id: item.id,
+        roomTitle: item.room?.property?.name ?? "Phòng thuê",
+        roomNumber: item.room?.roomNumber ?? "---",
+        roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
+        roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
+        monthlyRent: item.room?.priceMonthly ?? 0,
+        depositAmount: item.room?.depositAmount ?? 0,
+        moveInDate: item.moveInDate,
+        leaseTermMonths: item.leaseTermMonths,
+        occupantsCount: item.occupantsCount,
+        landlordName: item.tenant?.fullName ?? "Chủ trọ",
+        landlordPhone: item.tenant?.phone ?? "",
+        landlordId: item.landlordId,
+        status: item.status === "CANCELLED" ? "REJECTED" : item.status,
+        currentStep: item.status === "SIGNED" ? 4 : item.status === "APPROVED" || item.status === "CONTRACT_READY" ? 3 : 1,
+        createdAt: item.createdAt,
+      })));
+    }).catch(() => setRequests([]));
+  }, []);
 
   const filteredRequests = requests.filter((r) => {
     if (activeTab === "PENDING") return r.status === "SUBMITTED";
@@ -240,7 +212,7 @@ export default function TenantRentalRequestsPage() {
                   variant="outline"
                   size="md"
                   leftIcon={<MessageCircle className="size-4 text-[#15594f]" />}
-                  onClick={() => alert(`Mở khung chat với chủ trọ ${req.landlordName}`)}
+                  onClick={() => router.push(`/tenant/messages?user=${encodeURIComponent(req.landlordId)}`)}
                 >
                   Nhắn tin với chủ trọ
                 </Button>

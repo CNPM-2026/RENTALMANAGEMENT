@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, DoorOpen, Search, Filter, Home, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Property, Room, RoomStatus } from "@/types/models";
+import { Modal } from "@/components/ui/modal";
 
 const STATUS_CONFIG: Record<RoomStatus, { label: string; bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
   AVAILABLE: { label: "Phòng trống", bg: "bg-[#eaf2ed]", text: "text-[#15594f]", icon: CheckCircle2 },
@@ -23,6 +24,8 @@ export default function LandlordRoomsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [form, setForm] = React.useState({ roomNumber: "", priceMonthly: "", area: "", maxOccupants: "1" });
 
   React.useEffect(() => {
     apiClient.properties
@@ -61,6 +64,20 @@ export default function LandlordRoomsPage() {
     const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
     return matchSearch && matchStatus;
   });
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedPropertyId) return;
+    const created = await apiClient.rooms.create({
+      propertyId: selectedPropertyId,
+      roomNumber: form.roomNumber,
+      priceMonthly: Number(form.priceMonthly),
+      area: Number(form.area),
+      maxOccupants: Number(form.maxOccupants),
+    });
+    setRooms((prev) => [...prev, created]);
+    setForm({ roomNumber: "", priceMonthly: "", area: "", maxOccupants: "1" });
+    setIsCreateOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -71,13 +88,24 @@ export default function LandlordRoomsPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Quản lý sơ đồ phòng, trạng thái sử dụng và giá thuê.</p>
         </div>
         <button
-          onClick={() => alert("Chức năng thêm phòng mới")}
+          onClick={() => setIsCreateOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />
           <span>Thêm phòng mới</span>
         </button>
       </div>
+      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Thêm phòng mới">
+        <form onSubmit={handleCreate} className="space-y-3">
+          <input required placeholder="Số phòng" value={form.roomNumber} onChange={(e) => setForm({ ...form, roomNumber: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <input required type="number" min="0" placeholder="Giá thuê/tháng" value={form.priceMonthly} onChange={(e) => setForm({ ...form, priceMonthly: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <div className="grid grid-cols-2 gap-3">
+            <input required type="number" min="1" placeholder="Diện tích (m²)" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className="rounded border p-2 text-sm" />
+            <input required type="number" min="1" placeholder="Số người tối đa" value={form.maxOccupants} onChange={(e) => setForm({ ...form, maxOccupants: e.target.value })} className="rounded border p-2 text-sm" />
+          </div>
+          <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Thêm phòng</button>
+        </form>
+      </Modal>
 
       {/* Property Selector & Filters */}
       <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-[10px] border border-[#e2e7e1] shadow-xs">

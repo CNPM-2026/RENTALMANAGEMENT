@@ -52,6 +52,55 @@ enum ContractStatus {
   TERMINATED
 }
 
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RentalRequestStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  CONTRACT_READY
+  SIGNED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum StaffPermission {
+  PROPERTIES_ROOMS
+  MAINTENANCE
+  INVOICES
+  APPOINTMENTS
+}
+
 enum InvoiceStatus {
   UNPAID
   PAID
@@ -107,39 +156,50 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Quan hệ
-  profile              UserProfile?
-  roommatePreference   RoommatePreference? // 🆕 Tiêu chí tìm bạn ở ghép
-  properties           Property[] // Dành cho Chủ trọ
-  posts                Post[] // Bài đăng của user
-  lifestyleAnswers     UserLifestyleAnswer[]
-  tenantAppointments   Appointment[]         @relation("TenantAppointments")
-  landlordAppointments Appointment[]         @relation("LandlordAppointments")
-  agentAppointments    Appointment[]         @relation("AgentAppointments")
-  contractsAsTenant    Contract[]            @relation("TenantContracts")
-  contractsAsAgent     Contract[]            @relation("AgentContracts")
-  commissions          Commission[] // Hoa hồng dành cho AGENT
-  invoices             Invoice[] // Hóa đơn của khách thuê
-  sentMessages         Message[]             @relation("SentMessages")
-  conversationMembers  ConversationMember[]
-  reports              Report[]
-  notifications        Notification[] // 🆕 Thông báo
-  reviews              Review[] // 🆕 Đánh giá của user
-  favorites            Favorite[] // 🆕 Tin đăng yêu thích
-  refreshTokens        RefreshToken[]
-  passwordResetTokens   PasswordResetToken[]
-  auditLogs             AuditLog[]
+  profile                     UserProfile?
+  roommatePreference          RoommatePreference? // 🆕 Tiêu chí tìm bạn ở ghép
+  properties                  Property[] // Dành cho Chủ trọ
+  posts                       Post[] // Bài đăng của user
+  lifestyleAnswers            UserLifestyleAnswer[]
+  tenantAppointments          Appointment[]         @relation("TenantAppointments")
+  landlordAppointments        Appointment[]         @relation("LandlordAppointments")
+  agentAppointments           Appointment[]         @relation("AgentAppointments")
+  contractsAsTenant           Contract[]            @relation("TenantContracts")
+  contractsAsAgent            Contract[]            @relation("AgentContracts")
+  commissions                 Commission[] // Hoa hồng dành cho AGENT
+  invoices                    Invoice[] // Hóa đơn của khách thuê
+  sentMessages                Message[]             @relation("SentMessages")
+  conversationMembers         ConversationMember[]
+  reports                     Report[]
+  notifications               Notification[] // 🆕 Thông báo
+  reviews                     Review[] // 🆕 Đánh giá của user
+  favorites                   Favorite[] // 🆕 Tin đăng yêu thích
+  refreshTokens               RefreshToken[]
+  passwordResetTokens         PasswordResetToken[]
+  auditLogs                   AuditLog[]
+  supportTickets              SupportTicket[]
+  maintenanceRequests         MaintenanceRequest[]  @relation("TenantMaintenanceRequests")
+  landlordMaintenanceRequests MaintenanceRequest[]  @relation("LandlordMaintenanceRequests")
+  rentalRequests              RentalRequest[]
+  landlordRentalRequests      RentalRequest[]       @relation("LandlordRentalRequests")
+  sentRoommateInvitations     RoommateInvitation[]  @relation("SentRoommateInvitations")
+  receivedRoommateInvitations RoommateInvitation[]  @relation("ReceivedRoommateInvitations")
+  kycSubmission               KycSubmission?
+  reviewedKycSubmissions      KycSubmission[]       @relation("KycReviewer")
+  staffMemberships            StaffMembership[]     @relation("StaffUser")
+  landlordStaff               StaffMembership[]     @relation("StaffLandlord")
 
   @@index([role])
   @@map("users")
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  tokenHash String   @unique @map("token_hash")
-  expiresAt DateTime @map("expires_at")
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -148,12 +208,12 @@ model RefreshToken {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  tokenHash String   @unique @map("token_hash")
-  expiresAt DateTime @map("expires_at")
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -179,6 +239,124 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model ContentFilterKeyword {
+  id        String   @id @default(uuid())
+  keyword   String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("content_filter_keywords")
+}
+
+model KycSubmission {
+  id               String    @id @default(uuid())
+  userId           String    @unique @map("user_id")
+  idNumber         String    @map("id_number")
+  permanentAddress String    @map("permanent_address")
+  frontIdUrl       String    @map("front_id_url")
+  backIdUrl        String    @map("back_id_url")
+  status           KycStatus @default(PENDING)
+  rejectionReason  String?   @map("rejection_reason")
+  reviewedById     String?   @map("reviewed_by_id")
+  reviewedAt       DateTime? @map("reviewed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("KycReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("kyc_submissions")
+}
+
+model SupportTicket {
+  id          String              @id @default(uuid())
+  userId      String              @map("user_id")
+  roomId      String?             @map("room_id")
+  category    String
+  subject     String
+  description String
+  status      SupportTicketStatus @default(OPEN)
+  priority    MaintenancePriority @default(MEDIUM)
+  adminReply  String?             @map("admin_reply")
+  resolvedAt  DateTime?           @map("resolved_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("support_tickets")
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(uuid())
+  tenantId    String              @map("tenant_id")
+  landlordId  String              @map("landlord_id")
+  roomId      String              @map("room_id")
+  title       String
+  description String
+  priority    MaintenancePriority @default(MEDIUM)
+  status      MaintenanceStatus   @default(PENDING)
+  resolvedAt  DateTime?           @map("resolved_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  tenant   User @relation("TenantMaintenanceRequests", fields: [tenantId], references: [id], onDelete: Cascade)
+  landlord User @relation("LandlordMaintenanceRequests", fields: [landlordId], references: [id], onDelete: Cascade)
+  room     Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([landlordId, status])
+  @@map("maintenance_requests")
+}
+
+model RentalRequest {
+  id              String              @id @default(uuid())
+  tenantId        String              @map("tenant_id")
+  landlordId      String              @map("landlord_id")
+  roomId          String              @map("room_id")
+  moveInDate      DateTime            @map("move_in_date")
+  leaseTermMonths Int                 @map("lease_term_months")
+  occupantsCount  Int                 @default(1) @map("occupants_count")
+  note            String?
+  status          RentalRequestStatus @default(SUBMITTED)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  tenant   User    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  landlord User    @relation("LandlordRentalRequests", fields: [landlordId], references: [id], onDelete: Cascade)
+  room     Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  post     Post?   @relation(fields: [postId], references: [id])
+  postId   String?
+
+  @@index([tenantId, status])
+  @@index([landlordId, status])
+  @@map("rental_requests")
+}
+
+model RoommateInvitation {
+  id          String           @id @default(uuid())
+  senderId    String           @map("sender_id")
+  recipientId String           @map("recipient_id")
+  postId      String?          @map("post_id")
+  message     String?
+  status      InvitationStatus @default(PENDING)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  sender    User  @relation("SentRoommateInvitations", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User  @relation("ReceivedRoommateInvitations", fields: [recipientId], references: [id], onDelete: Cascade)
+  post      Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@unique([senderId, recipientId])
+  @@index([recipientId, status])
+  @@map("roommate_invitations")
+}
+
 model UserProfile {
   id               String    @id @default(uuid())
   userId           String    @unique @map("user_id")
@@ -192,6 +370,23 @@ model UserProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
+}
+
+model StaffMembership {
+  id          String            @id @default(uuid())
+  landlordId  String            @map("landlord_id")
+  userId      String            @map("user_id")
+  permissions StaffPermission[]
+  isActive    Boolean           @default(true) @map("is_active")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  landlord User @relation("StaffLandlord", fields: [landlordId], references: [id], onDelete: Cascade)
+  user     User @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([landlordId, userId])
+  @@index([landlordId, isActive])
+  @@map("staff_memberships")
 }
 
 // ==========================================
@@ -244,13 +439,16 @@ model Room {
   status        RoomStatus @default(AVAILABLE)
   createdAt     DateTime   @default(now()) @map("created_at")
 
-  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  roomAmenities RoomAmenity[]
-  posts         Post[]
-  appointments  Appointment[]
-  contracts     Contract[]
-  meterReadings MeterReading[]
-  invoices      Invoice[]
+  property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomAmenities       RoomAmenity[]
+  posts               Post[]
+  appointments        Appointment[]
+  contracts           Contract[]
+  meterReadings       MeterReading[]
+  invoices            Invoice[]
+  supportTickets      SupportTicket[]
+  maintenanceRequests MaintenanceRequest[]
+  rentalRequests      RentalRequest[]
 
   @@index([status])
   @@map("rooms")
@@ -295,12 +493,14 @@ model Post {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  author       User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  property     Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  room         Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  images       PostImage[]
-  appointments Appointment[] // 🆕 Lịch hẹn phát sinh từ bài đăng
-  favorites    Favorite[] // 🆕 Được yêu thích bởi ai
+  author              User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  property            Property?            @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  room                Room?                @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  images              PostImage[]
+  appointments        Appointment[] // 🆕 Lịch hẹn phát sinh từ bài đăng
+  favorites           Favorite[] // 🆕 Được yêu thích bởi ai
+  rentalRequests      RentalRequest[]
+  roommateInvitations RoommateInvitation[]
 
   @@index([status, postType]) // Thêm dòng này để lọc bài đăng đã duyệt cực nhanh
   @@index([authorId])

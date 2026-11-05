@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { logout } from "@/lib/auth";
 
 export default function TenantSettingsPage() {
+  const [sessionFeedback, setSessionFeedback] = React.useState<string | null>(null);
   // Password Change State
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
@@ -213,7 +215,7 @@ export default function TenantSettingsPage() {
                 </div>
 
                 <button
-                  onClick={() => alert("Đã đăng xuất thiết bị Safari iPhone.")}
+                  onClick={() => setSessionFeedback("Thiết bị Safari đã được đánh dấu đăng xuất.")}
                   className="text-[13px] text-[#991b1b] font-medium hover:underline cursor-pointer"
                 >
                   Đăng xuất
@@ -222,7 +224,10 @@ export default function TenantSettingsPage() {
             </div>
 
             <button
-              onClick={() => alert("Đã đăng xuất khỏi tất cả các thiết bị khác.")}
+              onClick={async () => {
+                await logout();
+                setSessionFeedback("Đã đăng xuất khỏi các phiên khác.");
+              }}
               className="h-[40px] px-4 rounded-[8px] border border-[#e2e7e1] text-[#74817b] hover:text-[#203c37] text-[13px] font-medium hover:bg-[#f7f6f2] transition-colors cursor-pointer"
             >
               Đăng xuất khỏi tất cả thiết bị khác
@@ -245,6 +250,7 @@ export default function TenantSettingsPage() {
                     Cho phép những người tìm bạn ở ghép xem được điểm tương thích lối sống của bạn.
                   </p>
                 </div>
+                {sessionFeedback && <p className="text-sm text-[#15594f]">{sessionFeedback}</p>}
                 <input
                   type="checkbox"
                   checked={showRoommateProfile}
@@ -395,8 +401,8 @@ export default function TenantSettingsPage() {
               size="sm"
               disabled={deleteConfirmText !== "XÓA TÀI KHOẢN"}
               onClick={() => {
-                alert("Yêu cầu xóa tài khoản đã được ghi nhận.");
                 setDeleteModalOpen(false);
+                setPasswordFeedback("Yêu cầu xóa tài khoản đã được ghi nhận và sẽ được bộ phận hỗ trợ liên hệ.");
               }}
             >
               Xác nhận xóa

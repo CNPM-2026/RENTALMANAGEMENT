@@ -22,9 +22,15 @@ import userRoute from './routes/user.route'
 import favoriteRoute from './routes/favorite.route'
 import reportRoute from './routes/report.route'
 import statisticRoute from './routes/statistic.route'
+import supportRoute from './routes/support.route'
+import maintenanceRoute from './routes/maintenance.route'
+import rentalRequestRoute from './routes/rental-request.route'
+import roommateInvitationRoute from './routes/roommate-invitation.route'
+import staffRoute from './routes/staff.route'
 import { env } from './config/env';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
+import { apiLimiter } from './middlewares/rateLimit.middleware';
 const app: Application = express();
 // Middlewares
 app.use(helmet());
@@ -40,6 +46,7 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'Server is running 🚀' });
 });
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/v1', apiLimiter);
 
 // --- Gắn các Routes sau này vào đây ---
 // app.use('/api/v1/auth', authRoutes);
@@ -60,6 +67,11 @@ app.use('/api/v1/users', userRoute);
 app.use('/api/v1/favorites', favoriteRoute);
 app.use('/api/v1/reports', reportRoute);
 app.use('/api/v1/statistics', statisticRoute);
+app.use('/api/v1/support', supportRoute);
+app.use('/api/v1/maintenance', maintenanceRoute);
+app.use('/api/v1/rental-requests', rentalRequestRoute);
+app.use('/api/v1/roommate-invitations', roommateInvitationRoute);
+app.use('/api/v1/staff', staffRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });

@@ -38,7 +38,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       secondary:
         "bg-[#eaf2ed] text-[#15594f] hover:bg-[#d6e6db] focus-visible:ring-[#15594f] active:scale-[0.99]",
       outline:
-        "border border-[#e2e7e1] bg-white text-[#203c37] hover:bg-[#f7f6f2] hover:border-[#cbd5cc] focus-visible:ring-[#15594f] active:scale-[0.99]",
+        "border border-[#e2e7e1] bg-white !text-[#203c37] hover:bg-[#f7f6f2] hover:border-[#cbd5cc] focus-visible:ring-[#15594f] active:scale-[0.99]",
       ghost:
         "text-[#203c37] hover:bg-[#f7f6f2] hover:text-[#15594f] focus-visible:ring-[#15594f]",
       danger:

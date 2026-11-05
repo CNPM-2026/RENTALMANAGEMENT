@@ -2,33 +2,18 @@
 
 import * as React from "react";
 import { BadgeCheck, Check, X, Eye, FileText, ShieldAlert } from "lucide-react";
+import { apiClient } from "@/lib/api";
+import { KycSubmission } from "@/types/models";
 
 export default function AdminKycPage() {
-  const [kycRequests, setKycRequests] = React.useState([
-    {
-      id: "1",
-      fullName: "Đức Quang",
-      cccd: "079099012345",
-      address: "245 Bạch Đằng, P.15, Bình Thạnh, TP.HCM",
-      submittedAt: "2026-11-04T14:20:00Z",
-      status: "PENDING",
-      frontIdUrl: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=400",
-      backIdUrl: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=400",
-    },
-    {
-      id: "2",
-      fullName: "Võ Hoàng Yến",
-      cccd: "031088009876",
-      address: "12 Võ Văn Ngân, Linh Chiểu, Thủ Đức",
-      submittedAt: "2026-11-05T09:10:00Z",
-      status: "PENDING",
-      frontIdUrl: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=400",
-      backIdUrl: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=400",
-    },
-  ]);
+  const [kycRequests, setKycRequests] = React.useState<KycSubmission[]>([]);
 
-  const handleAction = (id: string, action: "APPROVED" | "REJECTED") => {
-    alert(`Đã ${action === "APPROVED" ? "phê duyệt" : "từ chối"} hồ sơ KYC`);
+  React.useEffect(() => {
+    apiClient.adminGovernance.getKyc("PENDING").then(setKycRequests).catch(() => setKycRequests([]));
+  }, []);
+
+  const handleAction = async (id: string, action: "APPROVED" | "REJECTED") => {
+    await apiClient.adminGovernance.updateKyc(id, { status: action });
     setKycRequests((prev) => prev.filter((r) => r.id !== id));
   };
 
@@ -55,14 +40,14 @@ export default function AdminKycPage() {
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-[17px] font-bold text-[#203c37]">{req.fullName}</h3>
+                  <h3 className="text-[17px] font-bold text-[#203c37]">{req.user?.fullName ?? "Người dùng"}</h3>
                   <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#fbf1dc] text-[#9a6a12]">
                     Chờ duyệt
                   </span>
                 </div>
-                <p className="text-[13px] text-[#203c37]">Số CCCD: <span className="font-semibold">{req.cccd}</span></p>
-                <p className="text-[13px] text-[#74817b]">Địa chỉ thường trú: {req.address}</p>
-                <p className="text-[11px] text-[#74817b]">Nộp lúc: {new Date(req.submittedAt).toLocaleString("vi-VN")}</p>
+                <p className="text-[13px] text-[#203c37]">Số CCCD: <span className="font-semibold">{req.idNumber}</span></p>
+                <p className="text-[13px] text-[#74817b]">Địa chỉ thường trú: {req.permanentAddress}</p>
+                <p className="text-[11px] text-[#74817b]">Nộp lúc: {new Date(req.createdAt).toLocaleString("vi-VN")}</p>
               </div>
 
               <div className="flex items-center gap-3 shrink-0">

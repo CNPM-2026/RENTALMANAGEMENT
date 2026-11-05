@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, Settings, LogOut, HelpCircle } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { clearAuthSession } from "@/lib/auth";
+import { clearAuthSession, getCurrentUser } from "@/lib/auth";
 
 export function LandlordTopbar() {
   const pathname = usePathname();
@@ -14,6 +14,8 @@ export function LandlordTopbar() {
   const router = useRouter();
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
+  const currentUser = getCurrentUser();
+  const initials = currentUser?.fullName?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
 
   // Generate readable breadcrumb segment
   function getBreadcrumb() {
@@ -68,7 +70,7 @@ export function LandlordTopbar() {
 
           {/* Notification Bell */}
           <Link
-            href="/landlord/messages"
+            href="/landlord/notifications"
             title="Thông báo mới"
             className="relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors"
           >
@@ -85,11 +87,11 @@ export function LandlordTopbar() {
               className="flex items-center gap-2.5 p-1 rounded-[100px] hover:bg-[#f7f6f2] transition-colors cursor-pointer"
             >
               <div className="bg-[#f2ede3] rounded-full size-[34px] text-[#203c37] text-[11px] font-semibold flex items-center justify-center border border-[#e2e7e1]">
-                MA
+                {initials}
               </div>
               <div className="hidden md:flex flex-col text-left">
                 <span className="text-[13px] font-semibold text-[#203c37] leading-tight">
-                  Nguyễn Minh An
+                  {currentUser?.fullName ?? "Chủ trọ"}
                 </span>
                 <span className="text-[10px] text-[#74817b] leading-tight">
                   Chủ sở hữu ⌄
@@ -102,10 +104,10 @@ export function LandlordTopbar() {
               <div className="absolute right-0 mt-2 w-52 bg-white rounded-[10px] border border-[#e2e7e1] shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-4 py-2 border-b border-[#e2e7e1]">
                   <p className="text-[13px] font-semibold text-[#203c37]">
-                    Nguyễn Minh An
+                    {currentUser?.fullName ?? "Chủ trọ"}
                   </p>
                   <p className="text-[11px] text-[#74817b]">
-                    minh.an@gmail.com
+                    {currentUser?.email ?? ""}
                   </p>
                 </div>
 

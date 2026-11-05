@@ -4,35 +4,42 @@ import * as React from "react";
 import Link from "next/link";
 import { Inbox, Check, X, Clock, User, Phone, Mail, Calendar } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { Appointment } from "@/types/models";
+import { RentalRequest } from "@/types/models";
 
 export default function LandlordRentalRequestsPage() {
-  const [appointments, setAppointments] = React.useState<Appointment[]>([]);
+  const [requests, setRequests] = React.useState<RentalRequest[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const loadRequests = React.useCallback(() => {
-    apiClient.appointments
-      .getMyAppointments()
-      .then((data) => setAppointments(data ?? []))
-      .catch(() => setAppointments([]))
+    setIsLoading(true);
+    apiClient.rentalRequests
+      .getMine()
+      .then((data) => setRequests(data ?? []))
+      .catch(() => setErrorMessage("Không tải được yêu cầu thuê phòng."))
       .finally(() => setIsLoading(false));
   }, []);
 
   React.useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
+    apiClient.rentalRequests
+      .getMine()
+      .then((data) => setRequests(data ?? []))
+      .catch(() => setErrorMessage("Không tải được yêu cầu thuê phòng."))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-  const handleUpdate = async (id: string, status: "CONFIRMED" | "CANCELLED") => {
+  const handleUpdate = async (id: string, status: "APPROVED" | "REJECTED") => {
     try {
-      await apiClient.appointments.updateStatus(id, { status });
+      await apiClient.rentalRequests.updateStatus(id, status);
       loadRequests();
     } catch (e) {
-      alert("Cập nhật trạng thái thất bại");
+      setErrorMessage("Cập nhật trạng thái thất bại. Vui lòng thử lại.");
     }
   };
 
   return (
     <div className="space-y-6">
+      {errorMessage && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</p>}
       <div>
         <p className="text-[12px] text-[#74817b]">Cho thuê</p>
         <h1 className="text-[26px] font-semibold text-[#203c37] mt-0.5">Yêu cầu thuê phòng & Đặt chỗ</h1>
@@ -45,7 +52,7 @@ export default function LandlordRentalRequestsPage() {
             <div key={n} className="h-24 rounded-[12px] bg-white border border-[#e2e7e1] animate-pulse" />
           ))}
         </div>
-      ) : appointments.length === 0 ? (
+      ) : requests.length === 0 ? (
         <div className="rounded-[12px] border border-[#e2e7e1] bg-white p-12 text-center shadow-xs">
           <Inbox className="size-12 text-[#9bb5a8] mx-auto mb-3" />
           <h3 className="text-[16px] font-semibold text-[#203c37]">Chưa có yêu cầu nào</h3>
@@ -53,7 +60,7 @@ export default function LandlordRentalRequestsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {appointments.map((item) => (
+          {requests.map((item) => (
             <div
               key={item.id}
               className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4"
@@ -61,28 +68,28 @@ export default function LandlordRentalRequestsPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-[16px] text-[#203c37]">
-                    {item.tenant?.fullName || "Khách thuê"}
+                    {item.tenant?.fullName || "Khách thuê"} · Phòng {item.room?.roomNumber || item.roomId}
                   </span>
                   <span
                     className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
-                      item.status === "CONFIRMED"
+                      item.status === "APPROVED"
                         ? "bg-[#eaf2ed] text-[#15594f]"
-                        : item.status === "CANCELLED"
+                        : item.status === "REJECTED"
                         ? "bg-[#fbeae6] text-[#a4422c]"
                         : "bg-[#fbf1dc] text-[#9a6a12]"
                     }`}
                   >
-                    {item.status === "CONFIRMED"
-                      ? "Đã xác nhận"
-                      : item.status === "CANCELLED"
-                      ? "Đã hủy"
+                    {item.status === "APPROVED"
+                      ? "Đã duyệt"
+                      : item.status === "REJECTED"
+                      ? "Đã từ chối"
                       : "Chờ xác nhận"}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-[13px] text-[#74817b]">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="size-3.5 text-[#15594f]" />
-                    {new Date(item.appointmentTime).toLocaleString("vi-VN")}
+                    Nhận phòng: {new Date(item.moveInDate).toLocaleDateString("vi-VN")}
                   </span>
                   {item.tenant?.phone && (
                     <span className="flex items-center gap-1.5">
@@ -104,17 +111,17 @@ export default function LandlordRentalRequestsPage() {
                 )}
               </div>
 
-              {item.status === "PENDING" && (
+              {item.status === "SUBMITTED" && (
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => handleUpdate(item.id, "CONFIRMED")}
+                    onClick={() => handleUpdate(item.id, "APPROVED")}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] bg-[#15594f] text-white text-[12px] font-semibold hover:bg-[#124b42] transition-colors cursor-pointer"
                   >
                     <Check className="size-3.5" />
-                    <span>Xác nhận</span>
+                    <span>                    Duyệt yêu cầu</span>
                   </button>
                   <button
-                    onClick={() => handleUpdate(item.id, "CANCELLED")}
+                    onClick={() => handleUpdate(item.id, "REJECTED")}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] border border-[#e2e7e1] text-[#a4422c] hover:bg-[#fbeae6] text-[12px] font-semibold transition-colors cursor-pointer"
                   >
                     <X className="size-3.5" />

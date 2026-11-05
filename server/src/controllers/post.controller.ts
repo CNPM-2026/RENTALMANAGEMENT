@@ -3,6 +3,10 @@ import { postService } from '../services/post.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 export const postController = {
+  getById: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try { return res.json({ success: true, data: await postService.getById(String(req.params.id)) }); }
+    catch (error) { return next(error); }
+  },
   create: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // req.files chứa thông tin các file được upload (từ multer)

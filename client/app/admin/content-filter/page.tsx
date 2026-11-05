@@ -2,22 +2,29 @@
 
 import * as React from "react";
 import { Filter, Plus, Trash2 } from "lucide-react";
+import { apiClient } from "@/lib/api";
 
 export default function AdminContentFilterPage() {
-  const [bannedKeywords, setBannedKeywords] = React.useState([
-    "cờ bạc", "vay nóng", "tiền hoa hồng ngoài", "chuyển khoản gấp không cần xem", "lừa đảo"
-  ]);
+  const [bannedKeywords, setBannedKeywords] = React.useState<Array<{ id: string; keyword: string }>>([]);
   const [newKeyword, setNewKeyword] = React.useState("");
+
+  React.useEffect(() => {
+    apiClient.admin.getContentFilterKeywords().then(setBannedKeywords).catch(() => setBannedKeywords([]));
+  }, []);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newKeyword.trim()) return;
-    setBannedKeywords((prev) => [...prev, newKeyword.trim()]);
-    setNewKeyword("");
+    apiClient.admin.addContentFilterKeyword(newKeyword.trim())
+      .then((keyword) => {
+        setBannedKeywords((prev) => [...prev, keyword].sort((a, b) => a.keyword.localeCompare(b.keyword)));
+        setNewKeyword("");
+      });
   };
 
-  const handleRemove = (word: string) => {
-    setBannedKeywords((prev) => prev.filter((w) => w !== word));
+  const handleRemove = (id: string) => {
+    apiClient.admin.removeContentFilterKeyword(id)
+      .then(() => setBannedKeywords((prev) => prev.filter((item) => item.id !== id)));
   };
 
   return (
@@ -48,13 +55,13 @@ export default function AdminContentFilterPage() {
         <div>
           <p className="text-[13px] font-semibold text-[#203c37] mb-3">Từ khóa đang được lọc tự động:</p>
           <div className="flex flex-wrap gap-2">
-            {bannedKeywords.map((word) => (
+            {bannedKeywords.map((item) => (
               <span
-                key={word}
+                key={item.id}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#fbeae6] text-[#a4422c] text-[12px] font-semibold"
               >
-                <span>{word}</span>
-                <button onClick={() => handleRemove(word)} className="hover:opacity-75 cursor-pointer">
+                <span>{item.keyword}</span>
+                <button onClick={() => handleRemove(item.id)} className="hover:opacity-75 cursor-pointer">
                   <Trash2 className="size-3" />
                 </button>
               </span>

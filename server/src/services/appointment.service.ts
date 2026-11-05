@@ -6,6 +6,10 @@ import { AppointmentStatus, PostType } from '@prisma/client';
 export const appointmentService = {
   createAppointment: async (tenantId: string, data: any) => {
     const { roomId, postId, appointmentTime, note } = data;
+    const parsedAppointmentTime = new Date(appointmentTime);
+    if (Number.isNaN(parsedAppointmentTime.getTime()) || parsedAppointmentTime <= new Date()) {
+      throw new AppError('Thời gian xem phòng phải nằm trong tương lai', 400);
+    }
 
     let landlordId = '';
     let targetRoomId = roomId || null;
@@ -54,7 +58,7 @@ export const appointmentService = {
         landlordId,
         roomId: targetRoomId,
         postId: postId || null,
-        appointmentTime: new Date(appointmentTime),
+        appointmentTime: parsedAppointmentTime,
         note,
         status: 'PENDING'
       },
@@ -86,6 +90,8 @@ export const appointmentService = {
       whereClause = { landlordId: userId };
     } else if (role === 'AGENT') {
       whereClause = { agentId: userId };
+    } else {
+      throw new AppError('Role không được phép xem lịch hẹn cá nhân', 403);
     }
 
     return await prisma.appointment.findMany({

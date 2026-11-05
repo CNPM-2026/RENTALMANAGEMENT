@@ -107,6 +107,10 @@ Push the current Prisma schema to the configured database:
 npx prisma db push
 ```
 
+The deployment must run the schema synchronization before starting the API. The
+container startup command performs this automatically; non-container deployments
+should run `npm run db:sync` before `npm start`.
+
 Generate Prisma Client after schema changes:
 
 ```powershell

@@ -19,49 +19,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { apiClient } from "@/lib/api";
+import { SupportTicket } from "@/types/models";
 
 export default function TenantSupportCenterPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("ALL");
 
-  const tickets = [
-    {
-      id: "TK-8021",
-      title: "Điều hòa phòng 302 bị rò rỉ nước và kém lạnh",
-      category: "Cơ sở vật chất & Thiết bị",
-      room: "Studio Ban Mai - P.302",
-      status: "PROCESSING",
-      createdAt: "10:15 08/10/2026",
-      updatedAt: "1 giờ trước",
-      lastReply: "Kỹ thuật viên Trần Văn Bình đã tiếp nhận và sẽ có mặt lúc 14:00 chiều nay.",
-    },
-    {
-      id: "TK-8015",
-      title: "Hỏi về quy trình hoàn tiền cọc khi kết thúc hợp đồng",
-      category: "Hợp đồng & Pháp lý",
-      room: "Studio Ban Mai - P.302",
-      status: "RESOLVED",
-      createdAt: "14:20 02/10/2026",
-      updatedAt: "03/10/2026",
-      lastReply: "Đội ngũ CSKH đã giải đáp chi tiết điều khoản khoản 4 hợp đồng qua email.",
-    },
-    {
-      id: "TK-7990",
-      title: "Đối soát chỉ số đồng hồ điện tháng 9/2026 bị chênh lệch",
-      category: "Hóa đơn & Tiền tệ",
-      room: "Studio Ban Mai - P.302",
-      status: "RESOLVED",
-      createdAt: "09:00 25/09/2026",
-      updatedAt: "26/09/2026",
-      lastReply: "Chủ nhà đã kiểm tra lại đồng hồ và điều chỉnh trừ 70.000đ vào kỳ tới.",
-    },
-  ];
+  const [tickets, setTickets] = React.useState<SupportTicket[]>([]);
+
+  React.useEffect(() => {
+    apiClient.support.getMine().then(setTickets).catch(() => setTickets([]));
+  }, []);
 
   const filteredTickets = tickets.filter((t) => {
-    if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
+    if (statusFilter === "PROCESSING" && !["OPEN", "IN_PROGRESS"].includes(t.status)) return false;
+    if (statusFilter === "RESOLVED" && !["RESOLVED", "CLOSED"].includes(t.status)) return false;
     if (
       searchQuery &&
-      !t.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !t.subject.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !t.id.toLowerCase().includes(searchQuery.toLowerCase())
     ) {
       return false;
@@ -186,16 +162,16 @@ export default function TenantSupportCenterPage() {
                     <span className="font-mono text-[12px] font-bold text-[#15594f] bg-[#eaf2ed] px-2 py-0.5 rounded-[4px]">
                       #{ticket.id}
                     </span>
-                    <h4 className="text-[15px] font-bold text-[#203c37]">{ticket.title}</h4>
-                    <Badge variant={ticket.status === "PROCESSING" ? "info" : "success"} size="sm">
-                      {ticket.status === "PROCESSING" ? "Đang xử lý" : "Đã giải quyết"}
+                    <h4 className="text-[15px] font-bold text-[#203c37]">{ticket.subject}</h4>
+                    <Badge variant={["RESOLVED", "CLOSED"].includes(ticket.status) ? "success" : "info"} size="sm">
+                      {["RESOLVED", "CLOSED"].includes(ticket.status) ? "Đã giải quyết" : "Đang xử lý"}
                     </Badge>
                   </div>
                   <p className="text-[13px] text-[#74817b]">
-                    {ticket.category} • Phòng: <strong className="text-[#203c37]">{ticket.room}</strong> • Tạo lúc: {ticket.createdAt} (Cập nhật: {ticket.updatedAt})
+                    {ticket.category} • Phòng: <strong className="text-[#203c37]">{ticket.room?.roomNumber ?? "Không gắn phòng"}</strong> • Tạo lúc: {new Date(ticket.createdAt).toLocaleString("vi-VN")}
                   </p>
                   <p className="text-[13px] text-[#203c37] bg-[#f7f6f2] p-2.5 rounded-[6px] mt-1 italic">
-                    Phản hồi mới nhất: {ticket.lastReply}
+                    Phản hồi mới nhất: {ticket.adminReply ?? "Đang chờ bộ phận hỗ trợ phản hồi."}
                   </p>
                 </div>
 

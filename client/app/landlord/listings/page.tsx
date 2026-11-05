@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, FileText, Eye, CheckCircle2, Clock, XCircle, Search, Edit } from "lucide-react";
+import { Plus, FileText, Eye, Search } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { Post, PostStatus } from "@/types/models";
+import { Post, PostStatus, Property, Room } from "@/types/models";
+import { Modal } from "@/components/ui/modal";
 
 const STATUS_MAP: Record<PostStatus, { label: string; bg: string; text: string }> = {
   PENDING: { label: "Chờ duyệt", bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]" },
@@ -21,16 +22,44 @@ export default function LandlordListingsPage() {
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [properties, setProperties] = React.useState<Property[]>([]);
+  const [rooms, setRooms] = React.useState<Room[]>([]);
+  const [error, setError] = React.useState<string | null>(null);
+  const [form, setForm] = React.useState({ title: "", description: "", price: "", propertyId: "", roomId: "" });
 
   React.useEffect(() => {
     apiClient.posts
       .getMyPosts()
       .then((data) => setPosts(data ?? []))
-      .catch(() => setPosts([]))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được bài đăng."))
       .finally(() => setIsLoading(false));
+    apiClient.properties.getMyProperties().then(setProperties).catch(() => setProperties([]));
   }, []);
 
+  React.useEffect(() => {
+    if (form.propertyId) {
+      apiClient.rooms.getByProperty(form.propertyId).then(setRooms).catch(() => setRooms([]));
+    }
+  }, [form.propertyId]);
+
+  const availableRooms = rooms.filter((room) => room.propertyId === form.propertyId && room.status === "AVAILABLE");
   const filtered = posts.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const created = await apiClient.posts.create({
+      title: form.title,
+      description: form.description,
+      price: Number(form.price),
+      postType: "RENT_OUT",
+      propertyId: form.propertyId,
+      roomId: form.roomId,
+    });
+    setPosts((prev) => [created, ...prev]);
+    setForm({ title: "", description: "", price: "", propertyId: "", roomId: "" });
+    setIsCreateOpen(false);
+    setError(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -41,7 +70,7 @@ export default function LandlordListingsPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Quản lý các bài đăng tìm khách thuê phòng trên nền tảng 5K-Rental Manager.</p>
         </div>
         <button
-          onClick={() => alert("Mở form đăng tin mới")}
+          onClick={() => setIsCreateOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />
@@ -59,6 +88,7 @@ export default function LandlordListingsPage() {
           className="flex-1 text-[13px] text-[#203c37] placeholder-[#74817b] bg-transparent outline-none"
         />
       </div>
+      {error && <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-4 py-3 text-[14px] text-[#a4422c]">{error}</div>}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -123,6 +153,24 @@ export default function LandlordListingsPage() {
           </div>
         </div>
       )}
+      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Đăng tin cho thuê" size="lg">
+        <form onSubmit={handleCreate} className="space-y-3">
+          <input required placeholder="Tiêu đề" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <textarea required placeholder="Mô tả" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <div className="grid grid-cols-3 gap-3">
+            <input required type="number" min="0" placeholder="Giá thuê" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="rounded border p-2 text-sm" />
+            <select required value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value, roomId: "" })} className="rounded border p-2 text-sm">
+              <option value="">Chọn cơ sở</option>
+              {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
+            </select>
+            <select required value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="rounded border p-2 text-sm" disabled={!form.propertyId}>
+              <option value="">Chọn phòng</option>
+              {availableRooms.map((room) => <option key={room.id} value={room.id}>{room.roomNumber} · {formatCurrency(room.priceMonthly)}</option>)}
+            </select>
+          </div>
+          <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Gửi duyệt</button>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -29,14 +29,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-
-const ROOM_IMAGES = [
-  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80",
-];
+import { apiClient } from "@/lib/api";
+import { Post } from "@/types/models";
 
 function RoomDetailContent() {
   const params = useParams();
@@ -47,6 +41,18 @@ function RoomDetailContent() {
   const [galleryOpen, setGalleryOpen] = React.useState(false);
   const [activeImageIndex, setActiveImageIndex] = React.useState(0);
   const [copiedShare, setCopiedShare] = React.useState(false);
+  const [post, setPost] = React.useState<Post | null>(null);
+  const [roomImages, setRoomImages] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    apiClient.posts.getById(roomId).then((value) => {
+      setPost(value);
+      setRoomImages(value.images?.map((image) => image.imageUrl) ?? []);
+    }).catch(() => setPost(null));
+  }, [roomId]);
+  const roomName = post?.title ?? "Tin đăng";
+  const roomAddress = post?.property?.address ?? "Chưa cập nhật địa chỉ";
+  const ROOM_IMAGES = roomImages;
 
   function handleShare() {
     if (typeof window !== "undefined") {
@@ -72,17 +78,17 @@ function RoomDetailContent() {
               Tìm phòng
             </Link>
             <span>/</span>
-            <span className="text-[#203c37] font-medium">Studio Ban Mai</span>
+            <span className="text-[#203c37] font-medium">{roomName}</span>
           </nav>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
             <div className="space-y-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-[#203c37] tracking-tight">
-                Studio Ban Mai — Ban Công Hướng Đông Thoáng Mát
+                {roomName}
               </h1>
               <div className="flex items-center gap-2 text-[13px] text-[#74817b]">
                 <MapPin className="size-4 text-[#15594f] shrink-0" />
-                <span>142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP. Hồ Chí Minh</span>
+                <span>{roomAddress}</span>
               </div>
             </div>
 
@@ -138,8 +144,8 @@ function RoomDetailContent() {
             }}
           >
             <img
-              src={ROOM_IMAGES[0]}
-              alt="Studio Ban Mai phòng chính"
+              src={roomImages[0] ?? "/placeholder-room.jpg"}
+              alt={roomName}
               className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
             />
             <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
@@ -155,7 +161,7 @@ function RoomDetailContent() {
               }}
             >
               <img
-                src={ROOM_IMAGES[1]}
+                src={roomImages[1] ?? roomImages[0] ?? "/placeholder-room.jpg"}
                 alt="Nội thất phòng"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
@@ -168,7 +174,7 @@ function RoomDetailContent() {
               }}
             >
               <img
-                src={ROOM_IMAGES[2]}
+                src={roomImages[2] ?? roomImages[0] ?? "/placeholder-room.jpg"}
                 alt="Góc làm việc"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />

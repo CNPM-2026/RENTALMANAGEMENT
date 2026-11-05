@@ -40,6 +40,12 @@ export type ReviewTargetType = 'POST' | 'USER' | 'ROOM';
 export type ReportTargetType = 'POST' | 'USER' | 'ROOM';
 
 export type ReportStatus = 'PENDING' | 'RESOLVED';
+export type SupportTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+export type MaintenancePriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type MaintenanceStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type RentalRequestStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'CONTRACT_READY' | 'SIGNED';
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED';
+export type KycStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 // =============================================================================
 // 2. CORE DOMAIN ENTITY MODELS
@@ -366,6 +372,92 @@ export interface AuditLog {
   user?: Partial<User> | null;
 }
 
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  roomId?: string | null;
+  category: string;
+  subject: string;
+  description: string;
+  status: SupportTicketStatus;
+  priority: MaintenancePriority;
+  adminReply?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: Partial<User> | null;
+  room?: Partial<Room> | null;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  tenantId: string;
+  landlordId: string;
+  roomId: string;
+  title: string;
+  description: string;
+  priority: MaintenancePriority;
+  status: MaintenanceStatus;
+  resolvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  room?: Partial<Room>;
+  tenant?: Partial<User>;
+}
+
+export interface RentalRequest {
+  id: string;
+  tenantId: string;
+  landlordId: string;
+  roomId: string;
+  moveInDate: string;
+  leaseTermMonths: number;
+  occupantsCount: number;
+  note?: string | null;
+  status: RentalRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  room?: Room;
+  tenant?: Partial<User>;
+}
+
+export interface RoommateInvitation {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  postId?: string | null;
+  message?: string | null;
+  status: InvitationStatus;
+  createdAt: string;
+  updatedAt: string;
+  sender?: UserWithProfile;
+  recipient?: UserWithProfile;
+}
+
+export interface KycSubmission {
+  id: string;
+  userId: string;
+  idNumber: string;
+  permanentAddress: string;
+  frontIdUrl: string;
+  backIdUrl: string;
+  status: KycStatus;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: Partial<User>;
+}
+
+export type StaffPermission = 'PROPERTIES_ROOMS' | 'MAINTENANCE' | 'INVOICES' | 'APPOINTMENTS';
+
+export interface StaffMembership {
+  id: string;
+  permissions: StaffPermission[];
+  isActive: boolean;
+  createdAt: string;
+  user: Pick<User, 'id' | 'email' | 'fullName' | 'phone' | 'avatarUrl'>;
+}
+
 // =============================================================================
 // 3. API ENDPOINT PAYLOADS & RESPONSES (51 ENDPOINTS)
 // =============================================================================
@@ -625,6 +717,35 @@ export interface ModeratePostPayload {
   status: 'APPROVED' | 'REJECTED';
 }
 
+export interface CreateSupportTicketPayload {
+  roomId?: string;
+  category: string;
+  subject: string;
+  description: string;
+  priority?: MaintenancePriority;
+}
+
+export interface CreateMaintenancePayload {
+  roomId: string;
+  title: string;
+  description: string;
+  priority?: MaintenancePriority;
+}
+
+export interface CreateRentalRequestPayload {
+  roomId: string;
+  moveInDate: string;
+  leaseTermMonths: number;
+  occupantsCount?: number;
+  note?: string;
+}
+
+export interface CreateRoommateInvitationPayload {
+  recipientId: string;
+  postId?: string;
+  message?: string;
+}
+
 // --- Statistics Endpoints ---
 export interface AdminStatsResponse {
   overview: {
@@ -633,6 +754,13 @@ export interface AdminStatsResponse {
     totalAppointments: number;
     pendingPosts: number;
     pendingReports: number;
+    totalRooms?: number;
+    occupiedRooms?: number;
+    vacantRooms?: number;
+    totalProperties?: number;
+    verifiedLandlords?: number;
+    publicPosts?: number;
+    totalPostViews?: number;
   };
   usersByRole: Array<{
     role: Role;

@@ -44,14 +44,6 @@ function TenantLayoutContent({
             role: user.role,
             avatar: user.avatarUrl ?? undefined,
           });
-        } else if (isPortalRoute) {
-          // Fallback demo user for preview if in portal route
-          setCurrentUser({
-            id: "tenant-demo",
-            fullName: "Linh Nguyễn",
-            email: "linh.nguyen@gmail.com",
-            role: "TENANT",
-          });
         }
       } catch {
         // LocalStorage access failure fallback

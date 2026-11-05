@@ -30,6 +30,15 @@ export const matchingController = {
     }
   },
 
+  getPreferences: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await matchingService.getPreferences(req.user!.id);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
   getSuggestedRoommates: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await matchingService.getSuggestedRoommates(req.user!.id);

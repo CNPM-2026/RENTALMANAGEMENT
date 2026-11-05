@@ -18,30 +18,42 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { apiClient } from "@/lib/api";
+import { Contract } from "@/types/models";
 
 export default function CreateSupportTicketPage() {
   const router = useRouter();
 
   const [category, setCategory] = React.useState("MAINTENANCE");
-  const [roomId, setRoomId] = React.useState("room-302");
+  const [roomId, setRoomId] = React.useState("");
+  const [contracts, setContracts] = React.useState<Contract[]>([]);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [contactPhone, setContactPhone] = React.useState("0987654321");
+  const [contactPhone, setContactPhone] = React.useState("");
   const [allowEntryWhenAbsent, setAllowEntryWhenAbsent] = React.useState(true);
-  const [attachedFiles, setAttachedFiles] = React.useState<string[]>([
-    "hinh_anh_dieu_hoa_ro_ri.jpg",
-  ]);
+  const [attachedFiles, setAttachedFiles] = React.useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    apiClient.contracts.getMyContracts().then(setContracts).catch(() => setContracts([]));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) return;
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsSubmitting(false);
-
-    router.push("/tenant/support?created=true");
+    try {
+      await apiClient.support.create({
+        roomId: roomId === "other" ? undefined : roomId,
+        category,
+        subject: title.trim(),
+        description: description.trim(),
+      });
+      router.push("/tenant/support?created=true");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const removeFile = (idx: number) => {
@@ -88,7 +100,10 @@ export default function CreateSupportTicketPage() {
                   onChange={(e) => setRoomId(e.target.value)}
                   className="w-full min-h-[48px] px-3.5 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] outline-none"
                 >
-                  <option value="room-302">Studio Ban Mai - Phòng 302 (Đang thuê)</option>
+                  <option value="">Chọn phòng liên quan</option>
+                  {contracts.filter((contract) => contract.status === "ACTIVE").map((contract) => (
+                    <option key={contract.id} value={contract.roomId}>Phòng {contract.room?.roomNumber ?? contract.roomId} - Hợp đồng {contract.id}</option>
+                  ))}
                   <option value="other">Vấn đề chung khác / Ngoài hợp đồng</option>
                 </select>
               </div>

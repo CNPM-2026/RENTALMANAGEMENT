@@ -188,8 +188,9 @@ function LoginForm() {
       {/* Google Button */}
       <button
         type="button"
-        onClick={() => alert("Tính năng đăng nhập Google đang được tích hợp.")}
-        className="w-full h-[46px] rounded-[8px] bg-white border border-[#e2e7e1] text-[#15594f] text-[14px] font-semibold flex items-center justify-center gap-2 hover:bg-[#f7f6f2] transition-colors cursor-pointer"
+        disabled
+        title="Đăng nhập Google chưa được cấu hình trên máy chủ"
+        className="w-full h-[46px] rounded-[8px] bg-white border border-[#e2e7e1] text-[#74817b] text-[14px] font-semibold flex items-center justify-center gap-2 opacity-60 cursor-not-allowed"
       >
         <svg className="size-4" viewBox="0 0 24 24">
           <path

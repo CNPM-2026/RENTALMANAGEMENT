@@ -24,9 +24,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api";
 import { SuggestedRoommate } from "@/types/models";
+import { getCurrentUser } from "@/lib/auth";
 
-// Mock data fallback for candidates
-const MOCK_CANDIDATES = [
+/* Legacy design fixture retained only for type inference; candidates are loaded from the matching API.
+const LEGACY_CANDIDATES = [
   {
     id: "candidate-1",
     fullName: "Nguyễn Hoàng Nam",
@@ -107,9 +108,15 @@ const MOCK_CANDIDATES = [
     bio: "Mình làm việc tại nhà, thích trồng cây và làm bánh ngọt cuối tuần. Phòng đã sắm đủ máy giặt, tủ lạnh, bếp từ.",
     tags: ["Full nội thất", "Thích làm bánh", "Yêu cây cối", "Sạch sẽ"],
   },
-];
+]; */
+type CandidateShape = {
+  id: string; fullName: string; age: number; gender: string; occupation: string; avatarUrl: string;
+  matchScore: number; budgetMin: number; budgetMax: number; preferredDistrict: string; statusNote: string;
+  sleepSchedule: string; petAllowed: boolean; cooking: string; cleanliness: number; smoking: boolean; bio: string; tags: string[];
+};
 
 export default function RoommateDiscoveryPage() {
+  const currentUser = getCurrentUser();
   const [searchKeyword, setSearchKeyword] = React.useState("");
   const [districtFilter, setDistrictFilter] = React.useState("ALL");
   const [sleepFilter, setSleepFilter] = React.useState("ALL");
@@ -120,7 +127,34 @@ export default function RoommateDiscoveryPage() {
   const [feedbackMessage, setFeedbackMessage] = React.useState<string | null>(null);
 
   // Filter candidates
-  const filteredCandidates = MOCK_CANDIDATES.filter((candidate) => {
+  const [candidates, setCandidates] = React.useState<CandidateShape[]>([]);
+
+  React.useEffect(() => {
+    apiClient.matching.getSuggestions()
+      .then((items) => setCandidates(items.map((item) => ({
+        id: item.user.id,
+        fullName: item.user.fullName,
+        age: 0,
+        gender: item.user.gender ?? "Chưa cập nhật",
+        occupation: item.user.occupation ?? "Chưa cập nhật",
+        avatarUrl: item.user.avatarUrl ?? "/images/default-avatar.svg",
+        matchScore: item.compatibilityPercent,
+        budgetMin: 0,
+        budgetMax: item.post.price ?? 0,
+        preferredDistrict: item.post.property?.district ?? "Chưa cập nhật",
+        statusNote: item.post.title,
+        sleepSchedule: "Chưa cập nhật",
+        petAllowed: false,
+        cooking: "Chưa cập nhật",
+        cleanliness: 0,
+        smoking: false,
+        bio: item.post.description,
+        tags: [],
+      }))))
+      .catch(() => setCandidates([]));
+  }, []);
+
+  const filteredCandidates = candidates.filter((candidate) => {
     if (
       searchKeyword &&
       !candidate.fullName.toLowerCase().includes(searchKeyword.toLowerCase()) &&
@@ -141,11 +175,16 @@ export default function RoommateDiscoveryPage() {
     return true;
   });
 
-  const handleSendInvite = (id: string, name: string) => {
+  const handleSendInvite = async (id: string, name: string) => {
     if (invitedIds.includes(id)) return;
-    setInvitedIds((prev) => [...prev, id]);
-    setFeedbackMessage(`Đã gửi lời mời kết nối thành công tới ${name}!`);
-    setTimeout(() => setFeedbackMessage(null), 4000);
+    try {
+      await apiClient.roommateInvitations.create({ recipientId: id });
+      setInvitedIds((prev) => [...prev, id]);
+      setFeedbackMessage(`Đã gửi lời mời kết nối thành công tới ${name}!`);
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Không thể gửi lời mời.");
+    }
   };
 
   return (
@@ -190,21 +229,21 @@ export default function RoommateDiscoveryPage() {
               <div className="relative size-[60px] rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border-2 border-[#15594f]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80"
+                  src={currentUser?.avatarUrl || "/images/default-avatar.svg"}
                   alt="Ảnh đại diện của bạn"
                   className="size-full object-cover"
                 />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5">
-                  <h3 className="text-[16px] font-semibold text-[#203c37]">Hồ sơ gu sống của bạn: Linh Nguyễn</h3>
+                  <h3 className="text-[16px] font-semibold text-[#203c37]">Hồ sơ gu sống của bạn: {currentUser?.fullName ?? "Chưa cập nhật"}</h3>
                   <Badge variant="success" size="sm">Đang tìm phòng & bạn ghép</Badge>
                 </div>
                 <p className="text-[13px] text-[#74817b]">
-                  Độ hoàn thiện hồ sơ: <span className="font-semibold text-[#15594f]">85%</span> • Điểm tương thích được tính toán dựa trên 6 câu hỏi lối sống.
+                  Cập nhật hồ sơ để hệ thống tính điểm tương thích dựa trên dữ liệu thực tế.
                 </p>
                 <div className="w-full max-w-xs bg-[#eaf2ed] h-2 rounded-full overflow-hidden">
-                  <div className="bg-[#15594f] h-full rounded-full transition-all duration-300" style={{ width: "85%" }} />
+                  <div className="bg-[#15594f] h-full rounded-full transition-all duration-300" style={{ width: "0%" }} />
                 </div>
               </div>
             </div>

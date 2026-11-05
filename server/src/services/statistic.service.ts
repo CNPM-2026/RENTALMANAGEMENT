@@ -8,6 +8,14 @@ export const statisticService = {
     const totalAppointments = await prisma.appointment.count({ where: { status: 'COMPLETED' } });
     const pendingPosts = await prisma.post.count({ where: { status: 'PENDING' } });
     const pendingReports = await prisma.report.count({ where: { status: 'PENDING' } });
+    const [totalRooms, occupiedRooms, verifiedLandlords, totalProperties, publicPosts, totalPostViews] = await Promise.all([
+      prisma.room.count(),
+      prisma.room.count({ where: { status: 'RENTED' } }),
+      prisma.kycSubmission.count({ where: { status: 'APPROVED' } }),
+      prisma.property.count(),
+      prisma.post.count({ where: { status: 'APPROVED' } }),
+      prisma.post.aggregate({ _sum: { viewCount: true } }),
+    ]);
 
     // Đếm user theo Role
     const usersByRole = await prisma.user.groupBy({
@@ -16,7 +24,20 @@ export const statisticService = {
     });
 
     return {
-      overview: { totalUsers, totalPosts, totalAppointments, pendingPosts, pendingReports },
+      overview: {
+        totalUsers,
+        totalPosts,
+        totalAppointments,
+        pendingPosts,
+        pendingReports,
+        totalRooms,
+        occupiedRooms,
+        vacantRooms: totalRooms - occupiedRooms,
+        totalProperties,
+        verifiedLandlords,
+        publicPosts,
+        totalPostViews: totalPostViews._sum.viewCount ?? 0,
+      },
       usersByRole: usersByRole.map(r => ({ role: r.role, count: r._count._all }))
     };
   },

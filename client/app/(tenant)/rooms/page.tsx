@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { apiClient } from "@/lib/api";
 
-// Fallback mock rooms if API is offline
-const MOCK_ROOMS: Array<{
+type RoomCard = {
   id: string;
   title: string;
   type: string;
@@ -33,104 +33,7 @@ const MOCK_ROOMS: Array<{
   image: string;
   verified: boolean;
   amenities: string[];
-}> = [
-  {
-    id: "studio-ban-mai",
-    title: "Studio Ban Mai — Ban Công Hướng Đông Thoáng Mát",
-    type: "STUDIO",
-    area: 28,
-    floor: 3,
-    hasBalcony: true,
-    petFriendly: true,
-    address: "142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP.HCM",
-    district: "Bình Thạnh",
-    price: 4500000,
-    deposit: 4500000,
-    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
-    verified: true,
-    amenities: ["Máy lạnh", "Tủ lạnh", "Máy giặt", "Ban công", "Giờ tự do"],
-  },
-  {
-    id: "can-ho-sunshine",
-    title: "Căn Hộ Sunshine — Full Nội Thất Trung Tâm Quận 1",
-    type: "APARTMENT",
-    area: 35,
-    floor: 5,
-    hasBalcony: true,
-    petFriendly: false,
-    address: "88 Nguyễn Du, Phường Bến Nghé, Quận 1, TP.HCM",
-    district: "Quận 1",
-    price: 6200000,
-    deposit: 6200000,
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
-    verified: true,
-    amenities: ["Máy lạnh", "Thang máy", "Bảo vệ 24/7", "Tủ lạnh", "Máy giặt"],
-  },
-  {
-    id: "gac-lung-thu-duc",
-    title: "Phòng Trọ Gác Lửng Xanh — Gần Làng Đại Học",
-    type: "ROOM",
-    area: 22,
-    floor: 2,
-    hasBalcony: false,
-    petFriendly: true,
-    address: "24 Đường số 6, Linh Trung, TP. Thủ Đức, TP.HCM",
-    district: "Thủ Đức",
-    price: 3200000,
-    deposit: 3200000,
-    image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-    verified: false,
-    amenities: ["Gác lửng", "Giờ tự do", "Camera 24/7", "Chỗ để xe"],
-  },
-  {
-    id: "mini-phu-nhuan",
-    title: "Phòng Mini Hiện Đại — Sát Cầu Kiệu",
-    type: "ROOM",
-    area: 20,
-    floor: 2,
-    hasBalcony: false,
-    petFriendly: false,
-    address: "45 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM",
-    district: "Phú Nhuận",
-    price: 3800000,
-    deposit: 3800000,
-    image: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80",
-    verified: true,
-    amenities: ["Máy lạnh", "Giờ tự do", "Khóa vân tay"],
-  },
-  {
-    id: "studio-tan-binh",
-    title: "Studio Cửa Sổ Lớn — Gần Sân Bay Tân Sơn Nhất",
-    type: "STUDIO",
-    area: 30,
-    floor: 4,
-    hasBalcony: true,
-    petFriendly: true,
-    address: "12 Bạch Đằng, Phường 2, Quận Tân Bình, TP.HCM",
-    district: "Tân Bình",
-    price: 5000000,
-    deposit: 5000000,
-    image: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80",
-    verified: true,
-    amenities: ["Máy lạnh", "Thang máy", "Tủ lạnh", "Ban công", "Bảo vệ 24/7"],
-  },
-  {
-    id: "can-ho-quan-7",
-    title: "Căn Hộ Dịch Vụ View Hồ — Khu Đô Thị Phú Mỹ Hưng",
-    type: "APARTMENT",
-    area: 42,
-    floor: 7,
-    hasBalcony: true,
-    petFriendly: false,
-    address: "102 Nguyễn Lương Bằng, Tân Phú, Quận 7, TP.HCM",
-    district: "Quận 7",
-    price: 7500000,
-    deposit: 7500000,
-    image: "https://images.unsplash.com/photo-1502005229762-ee1b2b81b858?auto=format&fit=crop&w=800&q=80",
-    verified: true,
-    amenities: ["Hồ bơi", "Gym", "Thang máy", "Full nội thất", "Bảo vệ 24/7"],
-  },
-];
+};
 
 const AVAILABLE_AMENITIES = [
   "Máy lạnh",
@@ -160,6 +63,33 @@ function RoomsDiscoveryContent() {
   const [sortBy, setSortBy] = React.useState("NEWEST");
   const [savedFavorites, setSavedFavorites] = React.useState<string[]>([]);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [rooms, setRooms] = React.useState<RoomCard[]>([]);
+
+  React.useEffect(() => {
+    apiClient.posts.search({
+      keyword: keyword || undefined,
+      minPrice: minPrice || undefined,
+      maxPrice: maxPrice || undefined,
+      district: district || undefined,
+      page: currentPage,
+      limit: 50,
+    }).then((response) => setRooms(response.data.map((post) => ({
+      id: post.id,
+      title: post.title,
+      type: post.room ? "ROOM" : "APARTMENT",
+      area: post.room?.area ?? 0,
+      floor: 0,
+      hasBalcony: false,
+      petFriendly: false,
+      address: post.property?.address ?? "Chưa cập nhật địa chỉ",
+      district: post.property?.district ?? "",
+      price: post.price ?? post.room?.priceMonthly ?? 0,
+      deposit: post.room?.depositAmount ?? 0,
+      image: post.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
+      verified: post.status === "APPROVED",
+      amenities: post.room?.roomAmenities?.map((item) => item.amenity?.name ?? "").filter(Boolean) ?? [],
+    })))).catch(() => setRooms([]));
+  }, [keyword, district, minPrice, maxPrice, currentPage]);
 
   function handleAmenityToggle(amenity: string) {
     setSelectedAmenities((prev) =>
@@ -191,7 +121,7 @@ function RoomsDiscoveryContent() {
 
   // Filter computation
   const filteredRooms = React.useMemo(() => {
-    return MOCK_ROOMS.filter((room) => {
+    return rooms.filter((room) => {
       // Keyword / Location match
       if (keyword.trim()) {
         const kw = keyword.toLowerCase().trim();
@@ -235,7 +165,7 @@ function RoomsDiscoveryContent() {
       if (sortBy === "AREA_DESC") return b.area - a.area;
       return 0; // Default NEWEST
     });
-  }, [keyword, district, roomType, minPrice, maxPrice, petFriendly, selectedAmenities, sortBy]);
+  }, [rooms, keyword, district, roomType, minPrice, maxPrice, petFriendly, selectedAmenities, sortBy]);
 
   return (
     <div className="w-full min-h-screen bg-[#f7f6f2] text-[#203c37] py-8 px-4 sm:px-6 lg:px-12">

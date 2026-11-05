@@ -21,8 +21,25 @@ export default function LandlordReportsPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const monthlyRev = stats?.expectedMonthlyRevenue ?? 28500000;
-  const occupancyRate = stats && stats.totalRooms > 0 ? 85 : 0;
+  const monthlyRev = stats?.expectedMonthlyRevenue ?? 0;
+  const rentedRooms = stats?.roomsByStatus.find((item) => item.status === "RENTED")?.count ?? 0;
+  const occupancyRate = stats && stats.totalRooms > 0 ? Math.round((rentedRooms / stats.totalRooms) * 100) : 0;
+  const exportReport = () => {
+    const rows = [
+      ["Chỉ số", "Giá trị"],
+      ["Doanh thu tháng", String(monthlyRev)],
+      ["Tổng số phòng", String(stats?.totalRooms ?? 0)],
+      ["Phòng đã thuê", String(rentedRooms)],
+      ["Tỷ lệ lấp đầy", `${occupancyRate}%`],
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `bao-cao-thu-chi-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -33,7 +50,7 @@ export default function LandlordReportsPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Phân tích dòng tiền, tỷ lệ lấp đầy phòng và hiệu quả kinh doanh.</p>
         </div>
         <button
-          onClick={() => alert("Xuất báo cáo Excel")}
+          onClick={exportReport}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] border border-[#e2e7e1] bg-white text-[#203c37] text-[13px] font-medium hover:bg-[#f7f6f2] transition-colors shadow-xs self-start cursor-pointer"
         >
           <Download className="size-4" />
@@ -103,12 +120,9 @@ export default function LandlordReportsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#eef3ef] text-[#203c37]">
-              {[
-                { month: "Tháng 11/2026", room: monthlyRev * 0.85, service: monthlyRev * 0.15, total: monthlyRev, status: "Đang thu" },
-                { month: "Tháng 10/2026", room: 24000000, service: 3800000, total: 27800000, status: "Hoàn tất" },
-                { month: "Tháng 09/2026", room: 24000000, service: 4100000, total: 28100000, status: "Hoàn tất" },
-                { month: "Tháng 08/2026", room: 22000000, service: 3500000, total: 25500000, status: "Hoàn tất" },
-              ].map((row, i) => (
+              {stats ? [{
+                month: "Tháng hiện tại", room: monthlyRev, service: 0, total: monthlyRev, status: "Đang thu",
+              }].map((row, i) => (
                 <tr key={i} className="hover:bg-[#f7f6f2]/60 transition-colors">
                   <td className="py-3 px-4 font-semibold">{row.month}</td>
                   <td className="py-3 px-4">{formatCurrency(row.room)}</td>
@@ -120,7 +134,9 @@ export default function LandlordReportsPage() {
                     </span>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr><td colSpan={5} className="py-6 text-center text-[#74817b]">Chưa có dữ liệu doanh thu.</td></tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -24,6 +24,22 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { apiClient } from "@/lib/api";
+
+type FeaturedRoom = {
+  id: string;
+  title: string;
+  type: string;
+  area: number;
+  floor: number;
+  hasBalcony: boolean;
+  address: string;
+  price: number;
+  deposit: number;
+  image: string;
+  badge: string;
+  rating: number;
+};
 
 export default function TenantHomePage() {
   const [activeRoomTab, setActiveRoomTab] = React.useState("ALL");
@@ -46,50 +62,26 @@ export default function TenantHomePage() {
     { label: "Full nội thất", href: "/rooms?amenities=furnished" },
   ];
 
-  const featuredRooms = [
-    {
-      id: "room-ban-mai-1",
-      title: "Studio Ban Mai — Ban Công Thoáng Mát",
-      type: "STUDIO",
-      area: 28,
-      floor: 3,
-      hasBalcony: true,
-      address: "142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP.HCM",
-      price: 4500000,
-      deposit: 4500000,
-      image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
-      badge: "MỚI ĐĂNG",
-      rating: 4.9,
-    },
-    {
-      id: "room-sunshine-2",
-      title: "Căn Hộ Sunshine — Full Tiện Nghi Cao Cấp",
-      type: "APARTMENT",
-      area: 35,
-      floor: 5,
-      hasBalcony: true,
-      address: "88 Nguyễn Du, Phường Bến Nghé, Quận 1, TP.HCM",
-      price: 6200000,
-      deposit: 6200000,
-      image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
-      badge: "ĐÃ XÁC MINH",
-      rating: 5.0,
-    },
-    {
-      id: "room-gac-lung-3",
-      title: "Phòng Gác Lửng Xanh — Giờ Giấc Tự Do",
-      type: "ROOM",
-      area: 22,
-      floor: 2,
-      hasBalcony: false,
-      address: "24 Đường số 6, Linh Trung, TP. Thủ Đức, TP.HCM",
-      price: 3200000,
-      deposit: 3200000,
-      image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-      badge: "GIÁ TỐT",
-      rating: 4.8,
-    },
-  ];
+  const [featuredRooms, setFeaturedRooms] = React.useState<FeaturedRoom[]>([]);
+
+  React.useEffect(() => {
+    apiClient.posts.getApproved({ postType: "RENT_OUT" })
+      .then((posts) => setFeaturedRooms(posts.slice(0, 6).map((post) => ({
+        id: post.id,
+        title: post.title,
+        type: post.room ? "ROOM" : "APARTMENT",
+        area: post.room?.area ?? 0,
+        floor: 0,
+        hasBalcony: false,
+        address: post.property?.address ?? "Chưa cập nhật địa chỉ",
+        price: post.room?.priceMonthly ?? post.price ?? 0,
+        deposit: post.room?.depositAmount ?? 0,
+        image: post.images?.find((image) => image.isPrimary)?.imageUrl ?? post.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
+        badge: "ĐANG CHO THUÊ",
+        rating: 0,
+      }))))
+      .catch(() => setFeaturedRooms([]));
+  }, []);
 
   const neighborhoods = [
     {
@@ -218,38 +210,30 @@ export default function TenantHomePage() {
                   </span>
                 </div>
                 <span className="text-[13px] text-[#74817b]">
-                  <strong className="text-[#203c37] font-semibold">12,000+</strong> bạn trẻ đã tìm được chốn về ưng ý
+                  Nền tảng kết nối người thuê và chủ trọ minh bạch
                 </span>
               </div>
             </div>
 
             {/* Right Featured Room Hero Card */}
             <div className="lg:col-span-5 relative w-full h-[380px] sm:h-[420px] rounded-[16px] overflow-hidden border border-[#e2e7e1] shadow-lg group">
-              <img
-                src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1000&q=80"
-                alt="Studio Ban Mai nổi bật"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
+              {featuredRooms[0] ? <img src={featuredRooms[0].image} alt={featuredRooms[0].title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <div className="w-full h-full bg-[#eaf2ed] flex items-center justify-center text-[#74817b]">Chưa có tin đăng nổi bật</div>}
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
 
               <div className="absolute top-4 left-4">
                 <Badge variant="success" size="md">
-                  KHÔNG GIAN NỔI BẬT HÔM NAY
+                  TIN ĐĂNG MỚI NHẤT
                 </Badge>
               </div>
 
               <div className="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
-                <p className="text-[11px] font-semibold text-[#eaf2ed] uppercase tracking-wider">
-                  Q. BÌNH THẠNH — GẦN ĐH NGOẠI THƯƠNG
-                </p>
-                <h3 className="text-xl font-bold tracking-tight">
-                  Studio Ban Mai — Ban Công Hướng Đông
-                </h3>
+                <p className="text-[11px] font-semibold text-[#eaf2ed] uppercase tracking-wider">{featuredRooms[0]?.address ?? "Đang cập nhật địa chỉ"}</p>
+                <h3 className="text-xl font-bold tracking-tight">{featuredRooms[0]?.title ?? "Chưa có tin đăng nổi bật"}</h3>
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-lg font-bold text-white">
-                    4.500.000 đ<span className="text-[13px] font-normal text-white/80">/tháng</span>
+                    {featuredRooms[0] ? `${featuredRooms[0].price.toLocaleString("vi-VN")} đ` : "—"}<span className="text-[13px] font-normal text-white/80">/tháng</span>
                   </span>
-                  <Link href="/rooms/room-ban-mai-1">
+                  <Link href={featuredRooms[0] ? `/rooms/${featuredRooms[0].id}` : "/rooms"}>
                     <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#eaf2ed] hover:underline">
                       Xem chi tiết <ArrowUpRight className="size-4" />
                     </span>

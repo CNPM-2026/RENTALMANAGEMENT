@@ -49,18 +49,29 @@ export const initSocket = (server: HttpServer) => {
       console.log(`User ${userId} joined room: ${conversationId}`);
     });
 
+    socket.on('leave_conversation', (conversationId: string) => {
+      if (typeof conversationId === 'string') socket.leave(`conversation_${conversationId}`);
+    });
+
     // Sự kiện: Gửi tin nhắn
-    socket.on('send_message', async (data: { conversationId: string; content: string; messageType?: string }) => {
+    socket.on('send_message', async (
+      data: { conversationId: string; content: string; messageType?: string },
+      acknowledge?: (result: { success: boolean; message?: string }) => void,
+    ) => {
       try {
         const { conversationId, content, messageType = 'TEXT' } = data;
-        if (!userId) return;
+        if (!userId) return acknowledge?.({ success: false, message: 'Phiên đăng nhập không hợp lệ' });
         if (typeof content !== 'string' || content.trim().length === 0 || content.length > 5000) {
+          acknowledge?.({ success: false, message: 'Nội dung tin nhắn không hợp lệ' });
           return socket.emit('error_message', 'Nội dung tin nhắn không hợp lệ');
         }
         const member = await prisma.conversationMember.findUnique({
           where: { conversationId_userId: { conversationId, userId } }
         });
-        if (!member) return socket.emit('error_message', 'Bạn không thuộc cuộc trò chuyện này');
+        if (!member) {
+          acknowledge?.({ success: false, message: 'Bạn không thuộc cuộc trò chuyện này' });
+          return socket.emit('error_message', 'Bạn không thuộc cuộc trò chuyện này');
+        }
 
         // 1. Lưu tin nhắn vào Database (Prisma)
         const newMessage = await prisma.message.create({
@@ -83,8 +94,10 @@ export const initSocket = (server: HttpServer) => {
 
         // 3. Phát tin nhắn tới tất cả những ai đang ở trong phòng chat này (kể cả người gửi)
         io.to(`conversation_${conversationId}`).emit('receive_message', newMessage);
+        acknowledge?.({ success: true });
 
       } catch (error) {
+        acknowledge?.({ success: false, message: 'Không thể gửi tin nhắn' });
         socket.emit('error_message', 'Không thể gửi tin nhắn');
       }
     });
