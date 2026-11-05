@@ -36,7 +36,8 @@ interface AppointmentItem {
   note: string;
 }
 
-const INITIAL_APPOINTMENTS: AppointmentItem[] = [
+const INITIAL_APPOINTMENTS: AppointmentItem[] = [];
+/*
   {
     id: "apt-1",
     roomTitle: "Studio Ban Mai — Ban Công Hướng Đông",
@@ -94,10 +95,31 @@ const INITIAL_APPOINTMENTS: AppointmentItem[] = [
     note: "Người thuê bận công tác đột xuất nên đã hủy lịch hẹn.",
   },
 ];
+*/
 
 export default function TenantAppointmentsPage() {
   const [activeTab, setActiveTab] = React.useState<"UPCOMING" | "COMPLETED" | "CANCELLED">("UPCOMING");
-  const [appointments, setAppointments] = React.useState<AppointmentItem[]>(INITIAL_APPOINTMENTS);
+  const [appointments, setAppointments] = React.useState<AppointmentItem[]>([]);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    apiClient.appointments.getMyAppointments()
+      .then((items) => setAppointments(items.map((item) => ({
+        id: item.id,
+        roomTitle: item.room?.property?.name ?? "Phòng thuê",
+        roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
+        roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
+        roomId: item.roomId ?? "",
+        landlordName: item.landlord?.fullName ?? "Chủ trọ",
+        landlordPhone: item.landlord?.phone ?? "",
+        appointmentTime: item.appointmentTime,
+        dateStr: new Date(item.appointmentTime).toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" }),
+        timeSlot: new Date(item.appointmentTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+        status: item.status,
+        note: item.note ?? "",
+      }))))
+      .catch(() => setErrorMessage("Không tải được lịch xem phòng."));
+  }, []);
 
   // Modal States
   const [selectedAppointment, setSelectedAppointment] = React.useState<AppointmentItem | null>(null);
@@ -105,7 +127,7 @@ export default function TenantAppointmentsPage() {
   const [cancelModalOpen, setCancelModalOpen] = React.useState(false);
 
   // Reschedule Form State
-  const [newDate, setNewDate] = React.useState("2026-11-09");
+  const [newDate, setNewDate] = React.useState("");
   const [newSlot, setNewSlot] = React.useState("14:00 - 15:00");
   const [rescheduleReason, setRescheduleReason] = React.useState("");
 
@@ -127,42 +149,36 @@ export default function TenantAppointmentsPage() {
   const completedCount = appointments.filter((a) => a.status === "COMPLETED").length;
   const cancelledCount = appointments.filter((a) => a.status === "CANCELLED").length;
 
-  function handleRescheduleSubmit() {
+  async function handleRescheduleSubmit() {
     if (!selectedAppointment) return;
-    setAppointments((prev) =>
-      prev.map((a) =>
-        a.id === selectedAppointment.id
-          ? {
-              ...a,
-              dateStr: `Thứ Hai, ${newDate.split("-").reverse().join("/")}`,
-              timeSlot: newSlot,
-              status: "PENDING",
-              note: `Đề xuất đổi lịch: ${rescheduleReason || "Lịch hẹn mới"}`,
-            }
-          : a
-      )
-    );
+    await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" });
+    const [hour, minute] = newSlot.split(" - ")[0].split(":").map(Number);
+    await apiClient.appointments.create({
+      roomId: selectedAppointment.roomId,
+      appointmentTime: new Date(`${newDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`).toISOString(),
+      note: `Đề xuất đổi lịch: ${rescheduleReason || "Lịch hẹn mới"}`,
+    });
+    const items = await apiClient.appointments.getMyAppointments();
+    setAppointments(items.map((item) => ({
+      id: item.id, roomTitle: item.room?.property?.name ?? "Phòng thuê", roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
+      roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg", roomId: item.roomId ?? "",
+      landlordName: item.landlord?.fullName ?? "Chủ trọ", landlordPhone: item.landlord?.phone ?? "", appointmentTime: item.appointmentTime,
+      dateStr: new Date(item.appointmentTime).toLocaleDateString("vi-VN"), timeSlot: new Date(item.appointmentTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+      status: item.status, note: item.note ?? "",
+    })));
     setRescheduleModalOpen(false);
   }
 
-  function handleCancelSubmit() {
+  async function handleCancelSubmit() {
     if (!selectedAppointment) return;
-    setAppointments((prev) =>
-      prev.map((a) =>
-        a.id === selectedAppointment.id
-          ? {
-              ...a,
-              status: "CANCELLED",
-              note: `Lý do hủy: ${cancelReason}`,
-            }
-          : a
-      )
-    );
+    await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" });
+    setAppointments((prev) => prev.map((a) => a.id === selectedAppointment.id ? { ...a, status: "CANCELLED", note: `Lý do hủy: ${cancelReason}` } : a));
     setCancelModalOpen(false);
   }
 
   return (
     <div className="space-y-6">
+      {errorMessage && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</p>}
       {/* =======================================================================
           1. HEADER & BREADCRUMBS (Figma Node 44:64566)
       ======================================================================== */}

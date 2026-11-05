@@ -13,14 +13,25 @@ const ROLE_LABELS: Record<Role, { label: string; bg: string; text: string }> = {
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = React.useState<User[]>([
-    { id: "1", email: "tenant.test@rental.local", fullName: "Nguyễn Văn Nam", role: "TENANT", phone: "0901234567", isActive: true, createdAt: "2026-10-15T00:00:00Z", updatedAt: "2026-10-15T00:00:00Z" },
-    { id: "2", email: "landlord.test@rental.local", fullName: "Trần Minh An", role: "LANDLORD", phone: "0987654321", isActive: true, createdAt: "2026-10-10T00:00:00Z", updatedAt: "2026-10-10T00:00:00Z" },
-    { id: "3", email: "phuong.le@gmail.com", fullName: "Lê Thị Phương", role: "TENANT", phone: "0912348888", isActive: false, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z" },
-    { id: "4", email: "quang.duc@rental.vn", fullName: "Đức Quang", role: "LANDLORD", phone: "0934567890", isActive: true, createdAt: "2026-09-20T00:00:00Z", updatedAt: "2026-09-20T00:00:00Z" },
-  ]);
+  const [users, setUsers] = React.useState<User[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("ALL");
+
+  const loadUsers = React.useCallback(() => {
+    setIsLoading(true);
+    apiClient.adminGovernance
+      .getUsers({ role: roleFilter === "ALL" ? undefined : roleFilter, search: search || undefined })
+      .then(setUsers)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Không tải được danh sách người dùng."))
+      .finally(() => setIsLoading(false));
+  }, [roleFilter, search]);
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(loadUsers, 250);
+    return () => window.clearTimeout(timer);
+  }, [loadUsers]);
 
   const filtered = users.filter((u) => {
     const matchSearch = u.fullName.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
@@ -109,10 +120,17 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <button
-                      onClick={() => alert(`Khóa/Mở tài khoản: ${u.fullName}`)}
+                      onClick={async () => {
+                        try {
+                          const updated = await apiClient.adminGovernance.updateUserStatus(u.id, !u.isActive);
+                          setUsers((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Không cập nhật được trạng thái tài khoản.");
+                        }
+                      }}
                       className="text-[12px] text-[#a4422c] hover:underline cursor-pointer"
                     >
-                      Khóa tài khoản
+                      {u.isActive ? "Khóa tài khoản" : "Mở tài khoản"}
                     </button>
                   </td>
                 </tr>

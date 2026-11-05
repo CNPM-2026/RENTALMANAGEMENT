@@ -19,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { apiClient } from "@/lib/api";
+import { RoommateInvitation as ApiInvitation } from "@/types/models";
 
 interface Invitation {
   id: string;
@@ -38,55 +40,40 @@ export default function TenantRoommateInvitationsPage() {
   const [activeTab, setActiveTab] = React.useState<"RECEIVED" | "SENT">("RECEIVED");
 
   // State for invitations
-  const [invitations, setInvitations] = React.useState<Invitation[]>([
-    {
-      id: "inv-1",
-      type: "RECEIVED",
-      userName: "Nguyễn Hoàng Nam",
-      userAge: 24,
-      userOccupation: "Kỹ sư phần mềm • FPT Software",
-      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
-      matchScore: 96,
-      message: "Chào Linh! Mình thấy hai đứa đều tìm phòng quanh Quận 10 và có cùng thói quen ngủ sớm 22:30. Mình muốn kết nối để trao đổi xem phòng nhé!",
-      createdAt: "10:30 Hôm nay",
-      status: "PENDING",
-    },
-    {
-      id: "inv-2",
-      type: "RECEIVED",
-      userName: "Trần Mai Phương",
-      userAge: 22,
-      userOccupation: "Sinh viên • ĐH Kinh Tế",
-      avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
-      matchScore: 92,
-      message: "Chào bạn, mình thấy hồ sơ của bạn rất hợp gu với mình về khoản yêu thích nuôi mèo và nấu ăn. Hy vọng có cơ hội làm bạn cùng phòng!",
-      createdAt: "16:45 Hôm qua",
-      status: "ACCEPTED",
-    },
-    {
-      id: "inv-3",
-      type: "SENT",
-      userName: "Phạm Thu Hà",
-      userAge: 23,
-      userOccupation: "Graphic Designer",
-      avatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&auto=format&fit=crop&q=80",
-      matchScore: 85,
-      message: "Chào Hà, mình cũng thích làm bánh và tìm phòng tại Quận 7. Bạn đã tìm được ai ở ghép chưa?",
-      createdAt: "09:15 06/10/2026",
-      status: "PENDING",
-    },
-  ]);
+  const [invitations, setInvitations] = React.useState<Invitation[]>([]);
 
-  const handleAccept = (id: string) => {
-    setInvitations((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: "ACCEPTED" } : item))
-    );
+  React.useEffect(() => {
+    Promise.all([
+      apiClient.roommateInvitations.getMine("received"),
+      apiClient.roommateInvitations.getMine("sent"),
+    ]).then(([received, sent]) => {
+      const map = (items: ApiInvitation[], type: Invitation["type"]) => items.map((item) => {
+        const user = type === "RECEIVED" ? item.sender : item.recipient;
+        return {
+          id: item.id,
+          type,
+          userName: user?.fullName ?? "Người dùng",
+          userAge: user?.profile?.dob ? new Date().getFullYear() - new Date(user.profile.dob).getFullYear() : 0,
+          userOccupation: user?.profile?.occupation ?? "Chưa cập nhật",
+          avatarUrl: user?.avatarUrl ?? "/placeholder-avatar.png",
+          matchScore: 0,
+          message: item.message ?? "",
+          createdAt: new Date(item.createdAt).toLocaleString("vi-VN"),
+          status: item.status === "CANCELLED" ? "DECLINED" : item.status,
+        };
+      });
+      setInvitations([...map(received, "RECEIVED"), ...map(sent, "SENT")]);
+    }).catch(() => setInvitations([]));
+  }, []);
+
+  const handleAccept = async (id: string) => {
+    await apiClient.roommateInvitations.updateStatus(id, "ACCEPTED");
+    setInvitations((prev) => prev.map((item) => item.id === id ? { ...item, status: "ACCEPTED" } : item));
   };
 
-  const handleDecline = (id: string) => {
-    setInvitations((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: "DECLINED" } : item))
-    );
+  const handleDecline = async (id: string) => {
+    await apiClient.roommateInvitations.updateStatus(id, "DECLINED");
+    setInvitations((prev) => prev.map((item) => item.id === id ? { ...item, status: "DECLINED" } : item));
   };
 
   const receivedList = invitations.filter((inv) => inv.type === "RECEIVED");

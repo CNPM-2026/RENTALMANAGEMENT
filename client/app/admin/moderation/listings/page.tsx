@@ -9,6 +9,7 @@ import { Post } from "@/types/models";
 export default function AdminListingModerationPage() {
   const [pendingPosts, setPendingPosts] = React.useState<Post[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const loadPending = React.useCallback(() => {
     apiClient.admin
@@ -24,10 +25,11 @@ export default function AdminListingModerationPage() {
 
   const handleModerate = async (id: string, status: "APPROVED" | "REJECTED") => {
     try {
+      setErrorMessage(null);
       await apiClient.admin.moderatePost(id, { status });
       loadPending();
     } catch {
-      alert("Xử lý thất bại");
+      setErrorMessage("Không thể xử lý tin đăng. Vui lòng thử lại.");
     }
   };
 
@@ -38,6 +40,7 @@ export default function AdminListingModerationPage() {
         <h1 className="text-[26px] font-semibold text-[#203c37] mt-0.5">Kiểm duyệt Tin đăng</h1>
         <p className="text-[14px] text-[#74817b] mt-0.5">Xét duyệt nội dung, hình ảnh và giá cả các bài đăng tìm khách thuê mới.</p>
       </div>
+      {errorMessage && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</p>}
 
       {isLoading ? (
         <div className="space-y-3">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, FileCheck, Search, Eye, Download, CheckCircle2, AlertCircle } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Contract, ContractStatus } from "@/types/models";
+import { Modal } from "@/components/ui/modal";
 
 const STATUS_MAP: Record<ContractStatus, { label: string; bg: string; text: string }> = {
   PENDING: { label: "Chờ ký", bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]" },
@@ -21,6 +22,8 @@ export default function LandlordContractsPage() {
   const [contracts, setContracts] = React.useState<Contract[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [form, setForm] = React.useState({ roomId: "", tenantId: "", startDate: "", endDate: "", depositPaid: "", monthlyRent: "", terms: "" });
 
   React.useEffect(() => {
     apiClient.contracts
@@ -34,6 +37,12 @@ export default function LandlordContractsPage() {
     (c.tenant?.fullName ?? "").toLowerCase().includes(search.toLowerCase()) ||
     (c.room?.roomNumber ?? "").toLowerCase().includes(search.toLowerCase())
   );
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const created = await apiClient.contracts.create({ ...form, depositPaid: Number(form.depositPaid), monthlyRent: Number(form.monthlyRent), endDate: form.endDate || undefined });
+    setContracts((prev) => [created, ...prev]);
+    setIsCreateOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -44,7 +53,7 @@ export default function LandlordContractsPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Quản lý các hợp đồng thuê nhà điện tử và tiền cọc phòng.</p>
         </div>
         <button
-          onClick={() => alert("Mở form lập hợp đồng mới")}
+          onClick={() => setIsCreateOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />
@@ -124,6 +133,18 @@ export default function LandlordContractsPage() {
           </div>
         </div>
       )}
+      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Lập hợp đồng mới" size="lg">
+        <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
+          <input required placeholder="ID phòng" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="rounded border p-2 text-sm" />
+          <input required placeholder="ID khách thuê" value={form.tenantId} onChange={(e) => setForm({ ...form, tenantId: e.target.value })} className="rounded border p-2 text-sm" />
+          <input required type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="rounded border p-2 text-sm" />
+          <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="rounded border p-2 text-sm" />
+          <input required type="number" placeholder="Tiền cọc" value={form.depositPaid} onChange={(e) => setForm({ ...form, depositPaid: e.target.value })} className="rounded border p-2 text-sm" />
+          <input required type="number" placeholder="Tiền thuê/tháng" value={form.monthlyRent} onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })} className="rounded border p-2 text-sm" />
+          <textarea placeholder="Điều khoản" value={form.terms} onChange={(e) => setForm({ ...form, terms: e.target.value })} className="col-span-2 rounded border p-2 text-sm" />
+          <button type="submit" className="col-span-2 rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Tạo hợp đồng</button>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import * as React from "react";
 import { Plus, Receipt, Search, CheckCircle2, Clock, AlertTriangle, Eye } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Invoice, InvoiceStatus } from "@/types/models";
+import { Modal } from "@/components/ui/modal";
 
 const STATUS_MAP: Record<InvoiceStatus, { label: string; bg: string; text: string }> = {
   PAID: { label: "Đã thanh toán", bg: "bg-[#eaf2ed]", text: "text-[#15594f]" },
@@ -18,8 +19,12 @@ export default function LandlordInvoicesPage() {
   const [invoices, setInvoices] = React.useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [form, setForm] = React.useState({ roomId: "", month: "", year: "", otherFee: "0" });
 
   React.useEffect(() => {
+    const now = new Date();
+    setForm((current) => ({ ...current, month: String(now.getMonth() + 1), year: String(now.getFullYear()) }));
     apiClient.invoices
       .getMyInvoices()
       .then((data) => setInvoices(data ?? []))
@@ -28,6 +33,12 @@ export default function LandlordInvoicesPage() {
   }, []);
 
   const filtered = invoices.filter((inv) => statusFilter === "ALL" || inv.status === statusFilter);
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const created = await apiClient.invoices.generate({ roomId: form.roomId, month: Number(form.month), year: Number(form.year), otherFee: Number(form.otherFee) });
+    setInvoices((prev) => [created, ...prev]);
+    setIsCreateOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -38,7 +49,7 @@ export default function LandlordInvoicesPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Quản lý hóa đơn tiền phòng, điện nước và đối soát thanh toán.</p>
         </div>
         <button
-          onClick={() => alert("Mở form tạo hóa đơn tháng")}
+          onClick={() => setIsCreateOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />
@@ -114,7 +125,7 @@ export default function LandlordInvoicesPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <button
-                          onClick={() => alert(`Chi tiết hóa đơn #${inv.id.slice(0, 8)}`)}
+                          onClick={() => window.open(`/tenant/invoices/${inv.id}`, "_self")}
                           className="inline-flex items-center gap-1 text-[12px] font-medium text-[#15594f] hover:underline cursor-pointer"
                         >
                           <Eye className="size-3.5" />
@@ -129,6 +140,17 @@ export default function LandlordInvoicesPage() {
           </div>
         </div>
       )}
+      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Tạo hóa đơn mới">
+        <form onSubmit={handleCreate} className="space-y-3">
+          <input required placeholder="ID phòng" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <div className="grid grid-cols-2 gap-3">
+            <input required type="number" min="1" max="12" placeholder="Tháng" value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} className="rounded border p-2 text-sm" />
+            <input required type="number" min="2020" placeholder="Năm" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="rounded border p-2 text-sm" />
+          </div>
+          <input type="number" min="0" placeholder="Phí khác" value={form.otherFee} onChange={(e) => setForm({ ...form, otherFee: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Tạo hóa đơn</button>
+        </form>
+      </Modal>
     </div>
   );
 }

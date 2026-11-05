@@ -20,7 +20,8 @@ type FilterTab = "ALL" | NotificationType;
 export default function TenantNotificationsPage() {
   const [activeTab, setActiveTab] = React.useState<FilterTab>("ALL");
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
-  const [, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = React.useState(false);
 
   // Load notifications from API
@@ -31,49 +32,7 @@ export default function TenantNotificationsPage() {
         const data = await apiClient.notifications.getMy();
         setNotifications(data || []);
       } catch {
-        // Fallback mock items matching Figma frame 44:65982
-        setNotifications([
-          {
-            id: "notif-1",
-            userId: "u1",
-            title: "Lịch xem phòng đã được xác nhận",
-            content: "Chủ trọ Nguyễn Minh An đã chấp thuận lịch hẹn xem phòng Studio Ban Mai lúc 09:30 ngày mai.",
-            type: "APPOINTMENT",
-            isRead: false,
-            referenceId: "app-101",
-            createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-          },
-          {
-            id: "notif-2",
-            userId: "u1",
-            title: "Hóa đơn tiền phòng tháng 11/2026",
-            content: "Hóa đơn tiền phòng và dịch vụ điện nước kỳ tháng 11/2026 đã sẵn sàng. Hạn thanh toán đến ngày 10/11.",
-            type: "INVOICE",
-            isRead: false,
-            referenceId: "inv-202",
-            createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-          },
-          {
-            id: "notif-3",
-            userId: "u1",
-            title: "Hợp đồng thuê phòng mới",
-            content: "Bản hợp đồng điện tử cho phòng P.302 đã được tạo. Vui lòng kiểm tra các điều khoản và ký xác nhận.",
-            type: "CONTRACT",
-            isRead: true,
-            referenceId: "con-303",
-            createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-          },
-          {
-            id: "notif-4",
-            userId: "u1",
-            title: "Tin nhắn mới từ bạn cùng phòng tiềm năng",
-            content: "Hoàng Long đã gửi tin nhắn phản hồi cho bạn về lời mời kết nối ở ghép tại Quận Bình Thạnh.",
-            type: "MESSAGE",
-            isRead: true,
-            referenceId: "chat-404",
-            createdAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-          },
-        ]);
+        setError("Không tải được thông báo. Vui lòng thử lại.");
       } finally {
         setIsLoading(false);
       }
@@ -89,9 +48,7 @@ export default function TenantNotificationsPage() {
         prev.map((item) => (item.id === id ? { ...item, isRead: true } : item))
       );
     } catch {
-      setNotifications((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, isRead: true } : item))
-      );
+      setError("Không thể cập nhật trạng thái thông báo.");
     }
   }
 
@@ -101,7 +58,7 @@ export default function TenantNotificationsPage() {
       await apiClient.notifications.markAllAsRead();
       setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
     } catch {
-      setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+      setError("Không thể đánh dấu tất cả thông báo.");
     } finally {
       setIsMarkingAll(false);
     }
@@ -159,7 +116,7 @@ export default function TenantNotificationsPage() {
       case "INVOICE":
         return "/tenant/invoices";
       case "MESSAGE":
-        return "/tenant/messages";
+        return refId ? `/tenant/messages?conversation=${encodeURIComponent(refId)}` : "/tenant/messages";
       default:
         return "/tenant/notifications";
     }
@@ -185,6 +142,7 @@ export default function TenantNotificationsPage() {
               Theo dõi biến động lịch hẹn, hóa đơn thanh toán, hợp đồng và tin nhắn mới.
             </p>
           </div>
+          {error && <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-4 py-3 text-[14px] text-[#a4422c]">{error}</div>}
 
           {unreadCount > 0 && (
             <button
@@ -227,7 +185,8 @@ export default function TenantNotificationsPage() {
 
       {/* Notification List Container */}
       <div className="bg-white rounded-[12px] border border-[#e2e7e1] shadow-sm divide-y divide-[#e2e7e1] overflow-hidden">
-        {filteredNotifications.length > 0 ? (
+        {isLoading && <div className="p-10 text-center text-sm text-[#74817b]">Đang tải thông báo...</div>}
+        {!isLoading && filteredNotifications.length > 0 ? (
           filteredNotifications.map((item) => (
             <div
               key={item.id}
@@ -267,7 +226,7 @@ export default function TenantNotificationsPage() {
               </div>
             </div>
           ))
-        ) : (
+        ) : !isLoading ? (
           /* Empty State */
           <div className="py-16 text-center space-y-3">
             <div className="size-14 rounded-full bg-[#f2ede3] text-[#74817b] flex items-center justify-center mx-auto">
@@ -280,7 +239,7 @@ export default function TenantNotificationsPage() {
               Khi có lịch hẹn mới, hóa đơn tiền phòng hoặc tin nhắn từ chủ trọ, thông báo sẽ hiển thị tại đây.
             </p>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

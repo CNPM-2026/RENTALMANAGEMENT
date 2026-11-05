@@ -1,6 +1,6 @@
 import { NextFunction, Response } from 'express';
 import { appointmentService } from '../services/appointment.service';
-import { AuthRequest } from '../middlewares/auth.middleware';
+import { AuthRequest, resourceOwnerId } from '../middlewares/auth.middleware';
 
 export const appointmentController = {
   create: async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -18,7 +18,7 @@ export const appointmentController = {
 
   getMyAppointments: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const result = await appointmentService.getMyAppointments(req.user!.id, req.user!.role);
+      const result = await appointmentService.getMyAppointments(resourceOwnerId(req), req.user!.landlordId ? 'LANDLORD' : req.user!.role);
       return res.status(200).json({ success: true, data: result });
     } catch (error) {
       return next(error);
@@ -27,7 +27,7 @@ export const appointmentController = {
 
   updateStatus: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const result = await appointmentService.updateStatus(req.user!.id, String(req.params.id), req.body.status);
+      const result = await appointmentService.updateStatus(resourceOwnerId(req), String(req.params.id), req.body.status);
       return res.status(200).json({
         success: true,
         message: 'Cập nhật trạng thái thành công',

@@ -3,31 +3,17 @@
 import * as React from "react";
 import { AlertTriangle, Check, ShieldAlert, Eye, User } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { Report } from "@/types/models";
 
 export default function AdminReportsPage() {
-  const [reports, setReports] = React.useState([
-    {
-      id: "1",
-      reason: "Tin đăng phòng sai địa chỉ thực tế",
-      description: "Tôi đến xem phòng nhưng địa chỉ trên tin đăng là quận 1, thực tế phòng nằm ở quận 4.",
-      reporterName: "Nguyễn Văn Nam",
-      targetType: "POST",
-      createdAt: "2026-11-04T16:00:00Z",
-      status: "PENDING",
-    },
-    {
-      id: "2",
-      reason: "Chủ trọ đòi tiền cọc bất thường không có hợp đồng",
-      description: "Chủ trọ yêu cầu chuyển khoản 5 triệu trước khi xem phòng.",
-      reporterName: "Lê Thị Phương",
-      targetType: "USER",
-      createdAt: "2026-11-05T01:30:00Z",
-      status: "PENDING",
-    },
-  ]);
+  const [reports, setReports] = React.useState<Report[]>([]);
 
-  const handleResolve = (id: string) => {
-    alert("Đã xử lý xong báo cáo vi phạm");
+  React.useEffect(() => {
+    apiClient.reports.getAll({ status: "PENDING" }).then(setReports).catch(() => setReports([]));
+  }, []);
+
+  const handleResolve = async (id: string) => {
+    await apiClient.reports.resolve(id, { status: "RESOLVED" });
     setReports((prev) => prev.filter((r) => r.id !== id));
   };
 
@@ -59,9 +45,9 @@ export default function AdminReportsPage() {
                     {rep.targetType === "POST" ? "Vi phạm tin đăng" : "Vi phạm người dùng"}
                   </span>
                 </div>
-                <p className="text-[13px] text-[#74817b]">{rep.description}</p>
+                <p className="text-[13px] text-[#74817b]">Đối tượng: {rep.targetId}</p>
                 <p className="text-[11px] text-[#74817b]">
-                  Người báo cáo: {rep.reporterName} • {new Date(rep.createdAt).toLocaleString("vi-VN")}
+                  Người báo cáo: {rep.reporter?.fullName ?? rep.reporterId} • {new Date(rep.createdAt).toLocaleString("vi-VN")}
                 </p>
               </div>
 

@@ -48,6 +48,7 @@ import {
   LifestyleQuestion,
   SubmitAnswersPayload,
   UpdatePreferencesPayload,
+  RoommatePreference,
   SuggestedRoommate,
   Conversation,
   Message,
@@ -59,6 +60,18 @@ import {
   ModeratePostPayload,
   AdminStatsResponse,
   LandlordStatsResponse,
+  SupportTicket,
+  CreateSupportTicketPayload,
+  MaintenanceRequest,
+  CreateMaintenancePayload,
+  RentalRequest,
+  CreateRentalRequestPayload,
+  RoommateInvitation,
+  CreateRoommateInvitationPayload,
+  KycSubmission,
+  AuditLog,
+  StaffMembership,
+  StaffPermission,
 } from '@/types/models';
 import {
   getAuthToken,
@@ -355,6 +368,8 @@ export const apiClient = {
       apiClient.get<{ meta: PaginationMeta; data: Post[] }>('/posts/search', query as unknown as RequestOptions['params'], { skipAuth: true }),
     getMyPosts: () =>
       apiClient.get<Post[]>('/posts/my-posts'),
+    getById: (id: string) =>
+      apiClient.get<Post>(`/posts/${id}`),
     create: (formData: FormData | CreatePostPayload) =>
       apiClient.post<Post>('/posts', formData),
     update: (id: string, formData: FormData | UpdatePostPayload) =>
@@ -423,6 +438,8 @@ export const apiClient = {
       apiClient.post<{ message: string }>('/matching/answers', payload),
     updatePreferences: (payload: UpdatePreferencesPayload) =>
       apiClient.put<Record<string, unknown>>('/matching/preferences', payload),
+    getPreferences: () =>
+      apiClient.get<RoommatePreference | null>('/matching/preferences'),
     getSuggestions: () =>
       apiClient.get<SuggestedRoommate[]>('/matching/suggestions'),
   },
@@ -463,6 +480,12 @@ export const apiClient = {
       apiClient.get<Post[]>('/admin/posts/pending'),
     moderatePost: (id: string, payload: ModeratePostPayload) =>
       apiClient.patch<Post>(`/admin/posts/${id}/status`, payload),
+    getContentFilterKeywords: () =>
+      apiClient.get<Array<{ id: string; keyword: string }>>('/admin/content-filter'),
+    addContentFilterKeyword: (keyword: string) =>
+      apiClient.post<{ id: string; keyword: string }>('/admin/content-filter', { keyword }),
+    removeContentFilterKeyword: (id: string) =>
+      apiClient.delete<{ id: string }>(`/admin/content-filter/${id}`),
   },
 
   // 17. Statistics
@@ -471,6 +494,62 @@ export const apiClient = {
       apiClient.get<AdminStatsResponse>('/statistics/admin'),
     getLandlordStats: () =>
       apiClient.get<LandlordStatsResponse>('/statistics/landlord'),
+  },
+
+  support: {
+    create: (payload: CreateSupportTicketPayload) =>
+      apiClient.post<SupportTicket>('/support', payload),
+    getMine: () => apiClient.get<SupportTicket[]>('/support/my'),
+    getById: (id: string) => apiClient.get<SupportTicket>(`/support/${id}`),
+    getAll: (status?: string) => apiClient.get<SupportTicket[]>('/support/admin', status ? { status } : undefined),
+    update: (id: string, payload: { status?: string; adminReply?: string }) =>
+      apiClient.patch<SupportTicket>(`/support/${id}`, payload),
+  },
+
+  maintenance: {
+    create: (payload: CreateMaintenancePayload) =>
+      apiClient.post<MaintenanceRequest>('/maintenance', payload),
+    getMine: () => apiClient.get<MaintenanceRequest[]>('/maintenance/my'),
+    updateStatus: (id: string, status: string) =>
+      apiClient.patch<MaintenanceRequest>(`/maintenance/${id}/status`, { status }),
+  },
+
+  rentalRequests: {
+    create: (payload: CreateRentalRequestPayload) =>
+      apiClient.post<RentalRequest>('/rental-requests', payload),
+    getMine: () => apiClient.get<RentalRequest[]>('/rental-requests/my'),
+    updateStatus: (id: string, status: string) =>
+      apiClient.patch<RentalRequest>(`/rental-requests/${id}/status`, { status }),
+  },
+
+  roommateInvitations: {
+    create: (payload: CreateRoommateInvitationPayload) =>
+      apiClient.post<RoommateInvitation>('/roommate-invitations', payload),
+    getMine: (type: 'received' | 'sent') =>
+      apiClient.get<RoommateInvitation[]>('/roommate-invitations/my', { type }),
+    updateStatus: (id: string, status: string) =>
+      apiClient.patch<RoommateInvitation>(`/roommate-invitations/${id}/status`, { status }),
+  },
+
+  adminGovernance: {
+    getUsers: (query?: { role?: string; search?: string }) =>
+      apiClient.get<User[]>('/admin/users', query),
+    updateUserStatus: (id: string, isActive: boolean) =>
+      apiClient.patch<User>(`/admin/users/${id}/status`, { isActive }),
+    getKyc: (status?: string) =>
+      apiClient.get<KycSubmission[]>('/admin/kyc', status ? { status } : undefined),
+    updateKyc: (id: string, payload: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
+      apiClient.patch<KycSubmission>(`/admin/kyc/${id}/status`, payload),
+    getAuditLogs: (query?: { search?: string; limit?: number }) =>
+      apiClient.get<AuditLog[]>('/admin/audit-logs', query),
+  },
+  staff: {
+    getMine: () => apiClient.get<StaffMembership[]>('/staff'),
+    invite: (payload: { email: string; permissions: StaffPermission[] }) =>
+      apiClient.post<StaffMembership>('/staff', payload),
+    update: (id: string, payload: { permissions?: StaffPermission[]; isActive?: boolean }) =>
+      apiClient.patch<StaffMembership>(`/staff/${id}`, payload),
+    remove: (id: string) => apiClient.delete<void>(`/staff/${id}`),
   },
 };
 

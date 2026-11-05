@@ -76,6 +76,10 @@ function SafetyReportViolationContent() {
       setErrorMessage("Bạn cần cam kết tính xác thực của thông tin báo cáo.");
       return;
     }
+    if (!targetIdentifier.trim()) {
+      setErrorMessage("Vui lòng cung cấp mã tin đăng hoặc đối tượng cần báo cáo.");
+      return;
+    }
 
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -83,18 +87,18 @@ function SafetyReportViolationContent() {
     try {
       await apiClient.reports.create({
         targetType,
-        targetId: targetIdentifier || "00000000-0000-0000-0000-000000000001",
+        targetId: targetIdentifier.trim(),
         reason: `[${violationCategory}] ${reasonDescription.trim()} (Liên hệ xác minh: ${contactInfo})`,
       });
-    } catch {
-      // Local sync fallback
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Không thể gửi báo cáo. Vui lòng thử lại.");
+      setIsSubmitting(false);
+      return;
     } finally {
       setIsSubmitting(false);
-      setSubmittedSuccess(true);
-      setTimeout(() => {
-        router.push("/tenant/safety?reported=true");
-      }, 2500);
     }
+    setSubmittedSuccess(true);
+    setTimeout(() => router.push("/tenant/safety?reported=true"), 2500);
   };
 
   return (

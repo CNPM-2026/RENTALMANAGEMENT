@@ -19,24 +19,46 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { apiClient } from "@/lib/api";
+import { Contract } from "@/types/models";
 
 function TenantContractDetailContent() {
   const params = useParams();
   const router = useRouter();
-  const contractId = (params?.id as string) || "contract-hd-2026-01";
+  const contractId = params?.id as string;
+  const [contract, setContract] = React.useState<Contract | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const [isSigned, setIsSigned] = React.useState<boolean>(false);
   const [signing, setSigning] = React.useState<boolean>(false);
   const [signatureTimestamp, setSignatureTimestamp] = React.useState<string | null>(null);
+  const landlord = contract?.room?.property?.landlord;
+  const tenant = contract?.tenant;
+  const property = contract?.room?.property;
+  const room = contract?.room;
+
+  React.useEffect(() => {
+    apiClient.contracts.getMyContracts()
+      .then((items) => {
+        const found = items.find((item) => item.id === contractId);
+        if (!found) throw new Error("Không tìm thấy hợp đồng.");
+        setContract(found);
+        setIsSigned(found.status === "ACTIVE");
+      })
+      .catch((error) => setLoadError(error instanceof Error ? error.message : "Không tải được hợp đồng."));
+  }, [contractId]);
 
   function handleSignContract() {
+    if (!contract) return;
     setSigning(true);
-    setTimeout(() => {
-      setSigning(false);
-      setIsSigned(true);
-      const now = new Date();
-      setSignatureTimestamp(now.toLocaleString("vi-VN"));
-    }, 1000);
+    apiClient.contracts.updateStatus(contract.id, { status: "ACTIVE" })
+      .then((updated) => {
+        setContract(updated);
+        setIsSigned(true);
+        setSignatureTimestamp(new Date().toLocaleString("vi-VN"));
+      })
+      .catch((error) => setLoadError(error instanceof Error ? error.message : "Không thể ký hợp đồng."))
+      .finally(() => setSigning(false));
   }
 
   function handlePrint() {
@@ -47,6 +69,7 @@ function TenantContractDetailContent() {
 
   return (
     <div className="space-y-6">
+      {loadError && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loadError}</p>}
       {/* =======================================================================
           1. HEADER & ACTION TOOLBAR (Figma Node 44:65135)
       ======================================================================== */}
@@ -61,7 +84,7 @@ function TenantContractDetailContent() {
               Hợp đồng
             </Link>
             <span>/</span>
-            <span className="text-[#203c37] font-medium">HĐ-2026/5K-01</span>
+            <span className="text-[#203c37] font-medium">{contract?.id ?? contractId}</span>
           </nav>
           <div className="flex items-center gap-3 pt-0.5">
             <h1 className="text-2xl font-bold text-[#203c37] tracking-tight">
@@ -155,23 +178,23 @@ function TenantContractDetailContent() {
             <div className="divide-y divide-[#e2e7e1] space-y-2">
               <div className="pt-2 flex justify-between">
                 <span className="text-[#74817b]">Mã hợp đồng:</span>
-                <span className="font-bold text-[#203c37]">HĐ-2026/5K-01</span>
+                <span className="font-bold text-[#203c37]">{contract?.id ?? contractId}</span>
               </div>
               <div className="pt-2 flex justify-between">
                 <span className="text-[#74817b]">Ngày bắt đầu:</span>
-                <span className="font-semibold text-[#203c37]">15/11/2026</span>
+                <span className="font-semibold text-[#203c37]">{contract ? new Date(contract.startDate).toLocaleDateString("vi-VN") : "—"}</span>
               </div>
               <div className="pt-2 flex justify-between">
                 <span className="text-[#74817b]">Ngày kết thúc:</span>
-                <span className="font-semibold text-[#203c37]">14/11/2027</span>
+                <span className="font-semibold text-[#203c37]">{contract?.endDate ? new Date(contract.endDate).toLocaleDateString("vi-VN") : "—"}</span>
               </div>
               <div className="pt-2 flex justify-between">
                 <span className="text-[#74817b]">Tiền thuê phòng:</span>
-                <span className="font-bold text-[#15594f]">4.500.000 đ/tháng</span>
+                <span className="font-bold text-[#15594f]">{contract ? `${contract.monthlyRent.toLocaleString("vi-VN")} đ/tháng` : "—"}</span>
               </div>
               <div className="pt-2 flex justify-between">
                 <span className="text-[#74817b]">Tiền đặt cọc:</span>
-                <span className="font-bold text-[#203c37]">4.500.000 đ</span>
+                <span className="font-bold text-[#203c37]">{contract ? `${contract.depositPaid.toLocaleString("vi-VN")} đ` : "—"}</span>
               </div>
             </div>
 
@@ -218,7 +241,7 @@ function TenantContractDetailContent() {
               HỢP ĐỒNG THUÊ PHÒNG TRỌ & CĂN HỘ
             </h2>
             <p className="text-[12px] text-[#74817b] italic font-sans">
-              Số: HĐ-2026/5K-01 • Lập tại TP. Hồ Chí Minh, ngày 05 tháng 11 năm 2026
+              Số: {contract?.id ?? "—"} • Lập ngày {contract ? new Date(contract.createdAt).toLocaleDateString("vi-VN") : "—"}
             </p>
           </div>
 
@@ -228,20 +251,20 @@ function TenantContractDetailContent() {
               <h3 className="font-bold text-[#15594f] text-[14px]">
                 BÊN A (BÊN CHO THUÊ):
               </h3>
-              <p>Họ và tên: <strong>NGUYỄN MINH AN</strong></p>
-              <p>Số CCCD: <strong>079085001234</strong> cấp ngày 15/04/2021 tại Cục CSQLHC về TTXH</p>
-              <p>Địa chỉ thường trú: 142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP.HCM</p>
-              <p>Số điện thoại liên hệ: <strong>0912 345 678</strong></p>
+              <p>Họ và tên: <strong>{landlord?.fullName ?? "Chưa cập nhật"}</strong></p>
+              <p>Số CCCD: <strong>Chưa cập nhật</strong></p>
+              <p>Địa chỉ: {property?.address ?? "Chưa cập nhật"}</p>
+              <p>Số điện thoại liên hệ: <strong>{landlord?.phone ?? "Chưa cập nhật"}</strong></p>
             </div>
 
             <div className="space-y-1.5 p-4 rounded-[10px] bg-[#f7f6f2] border border-[#e2e7e1]">
               <h3 className="font-bold text-[#15594f] text-[14px]">
                 BÊN B (BÊN THUÊ):
               </h3>
-              <p>Họ và tên: <strong>LINH NGUYỄN</strong></p>
-              <p>Số CCCD: <strong>079198001234</strong> cấp ngày 20/08/2022 tại Cục CSQLHC về TTXH</p>
-              <p>Địa chỉ thường trú: Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh</p>
-              <p>Số điện thoại liên hệ: <strong>0987 654 321</strong></p>
+              <p>Họ và tên: <strong>{tenant?.fullName ?? "Chưa cập nhật"}</strong></p>
+              <p>Số CCCD: <strong>Chưa cập nhật</strong></p>
+              <p>Địa chỉ: Chưa cập nhật</p>
+              <p>Số điện thoại liên hệ: <strong>{tenant?.phone ?? "Chưa cập nhật"}</strong></p>
             </div>
           </section>
 
@@ -253,10 +276,10 @@ function TenantContractDetailContent() {
                 ĐIỀU 1: ĐỐI TƯỢNG VÀ MỤC ĐÍCH THUÊ
               </h3>
               <p>
-                1.1. Bên A đồng ý cho Bên B thuê và Bên B đồng ý thuê căn phòng số <strong>P.302 (Tầng 3)</strong> thuộc tòa nhà Studio Ban Mai tại địa chỉ: <strong>142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP. Hồ Chí Minh</strong>.
+                1.1. Bên A đồng ý cho Bên B thuê căn phòng số <strong>{room?.roomNumber ?? contract?.roomId ?? "Chưa cập nhật"}</strong> thuộc cơ sở <strong>{property?.name ?? "Chưa cập nhật"}</strong> tại địa chỉ: <strong>{property?.address ?? "Chưa cập nhật"}</strong>.
               </p>
               <p>
-                1.2. Diện tích sử dụng riêng: <strong>28 m²</strong> kèm ban công riêng biệt. Hiện trạng bàn giao bao gồm: 01 Điều hòa Inverter, 01 Tủ lạnh 150L, 01 Bếp từ đôi, 01 Giường nệm 1m6, 01 Tủ quần áo âm tường và 01 Bình nước nóng vệ sinh hoạt động tốt.
+                1.2. Diện tích sử dụng riêng: <strong>{room?.area ?? "Chưa cập nhật"} m²</strong>. Hiện trạng bàn giao theo biên bản bàn giao thực tế.
               </p>
               <p>
                 1.3. Mục đích thuê: Dùng làm nơi ở sinh hoạt văn minh, hợp pháp. Số lượng người ở tối đa là 02 người.
@@ -269,10 +292,10 @@ function TenantContractDetailContent() {
                 ĐIỀU 2: THỜI HẠN THUÊ VÀ GIÁ THUÊ
               </h3>
               <p>
-                2.1. Thời hạn thuê là <strong>12 tháng</strong>, bắt đầu từ ngày <strong>15/11/2026</strong> đến hết ngày <strong>14/11/2027</strong>.
+                2.1. Thời hạn thuê bắt đầu từ ngày <strong>{contract ? new Date(contract.startDate).toLocaleDateString("vi-VN") : "—"}</strong> đến hết ngày <strong>{contract?.endDate ? new Date(contract.endDate).toLocaleDateString("vi-VN") : "—"}</strong>.
               </p>
               <p>
-                2.2. Giá thuê phòng cố định: <strong>4.500.000 VNĐ / tháng</strong> (Bốn triệu năm trăm ngàn đồng chẵn). Giá này giữ nguyên không đổi trong suốt thời hạn hợp đồng.
+                2.2. Giá thuê phòng theo hợp đồng: <strong>{contract ? contract.monthlyRent.toLocaleString("vi-VN") : "—"} VNĐ / tháng</strong>.
               </p>
               <p>
                 2.3. Chi phí dịch vụ sinh hoạt:
@@ -294,7 +317,7 @@ function TenantContractDetailContent() {
                 ĐIỀU 3: TIỀN ĐẶT CỌC GIỮ PHÒNG VÀ HOÀN CỌC
               </h3>
               <p>
-                3.1. Bên B đặt cọc cho Bên A số tiền: <strong>4.500.000 VNĐ</strong> (Bốn triệu năm trăm ngàn đồng, tương đương 01 tháng tiền phòng) để bảo đảm thực hiện đúng các điều khoản hợp đồng.
+                3.1. Bên B đặt cọc cho Bên A số tiền: <strong>{contract ? contract.depositPaid.toLocaleString("vi-VN") : "—"} VNĐ</strong> để bảo đảm thực hiện đúng các điều khoản hợp đồng.
               </p>
               <p>
                 3.2. Tiền đặt cọc được giữ an toàn trên hệ thống đối soát của 5K-Rental Manager. Khi hợp đồng kết thúc đúng hạn, Bên A có trách nhiệm hoàn trả 100% tiền cọc cho Bên B sau khi trừ các khoản chi phí điện, nước hoặc hư hại tài sản (nếu có do lỗi của Bên B).
@@ -307,7 +330,7 @@ function TenantContractDetailContent() {
                 ĐIỀU 4: QUYỀN VÀ TRÁCH NHIỆM CỦA BÊN CHO THUÊ (BÊN A)
               </h3>
               <p>
-                4.1. Bàn giao phòng và trang thiết bị đúng hiện trạng cam kết vào ngày 15/11/2026.
+                4.1. Bàn giao phòng và trang thiết bị theo hiện trạng cam kết vào ngày {contract ? new Date(contract.startDate).toLocaleDateString("vi-VN") : "—"}.
               </p>
               <p>
                 4.2. Bảo đảm quyền sử dụng riêng tư, an toàn cho Bên B. Chịu trách nhiệm bảo trì, sửa chữa các hư hỏng kết cấu lớn và hệ thống cấp thoát nước, nguồn điện chung của tòa nhà.

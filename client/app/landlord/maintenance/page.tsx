@@ -3,52 +3,29 @@
 import * as React from "react";
 import { Wrench, Plus, CheckCircle2, Clock, AlertTriangle, DoorOpen } from "lucide-react";
 import { apiClient } from "@/lib/api";
-
-interface MaintenanceItem {
-  id: string;
-  roomNumber: string;
-  title: string;
-  description: string;
-  priority: "LOW" | "MEDIUM" | "HIGH";
-  status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
-  createdAt: string;
-}
+import { MaintenanceRequest } from "@/types/models";
+import { Modal } from "@/components/ui/modal";
 
 export default function LandlordMaintenancePage() {
-  const [items, setItems] = React.useState<MaintenanceItem[]>([
-    {
-      id: "1",
-      roomNumber: "201",
-      title: "Hỏng vòi nước bồn rửa mặt",
-      description: "Nước bị rò rỉ dưới chân vòi, cần thợ qua thay gioăng hoặc thay vòi mới.",
-      priority: "MEDIUM",
-      status: "IN_PROGRESS",
-      createdAt: "2026-11-04T08:30:00Z",
-    },
-    {
-      id: "2",
-      roomNumber: "305",
-      title: "Điều hòa không mát / thổi gió thường",
-      description: "Khách báo điều hòa kêu to và không mát từ tối qua.",
-      priority: "HIGH",
-      status: "PENDING",
-      createdAt: "2026-11-05T02:15:00Z",
-    },
-    {
-      id: "3",
-      roomNumber: "102",
-      title: "Bóng đèn hành lang bị chập",
-      description: "Đã thay bóng đèn LED mới 18W.",
-      priority: "LOW",
-      status: "COMPLETED",
-      createdAt: "2026-11-02T10:00:00Z",
-    },
-  ]);
+  const [items, setItems] = React.useState<MaintenanceRequest[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [form, setForm] = React.useState({ roomId: "", title: "", description: "", priority: "MEDIUM" });
 
-  const handleUpdateStatus = (id: string, newStatus: "PENDING" | "IN_PROGRESS" | "COMPLETED") => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
-    );
+  React.useEffect(() => {
+    apiClient.maintenance.getMine().then(setItems).catch(() => setItems([]));
+  }, []);
+
+  const handleUpdateStatus = async (id: string, newStatus: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED") => {
+    const updated = await apiClient.maintenance.updateStatus(id, newStatus);
+    setItems((prev) => prev.map((item) => item.id === id ? { ...item, ...updated } : item));
+  };
+
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const created = await apiClient.maintenance.create({ ...form, priority: form.priority as "LOW" | "MEDIUM" | "HIGH" });
+    setItems((prev) => [created, ...prev]);
+    setForm({ roomId: "", title: "", description: "", priority: "MEDIUM" });
+    setIsCreateOpen(false);
   };
 
   return (
@@ -60,7 +37,7 @@ export default function LandlordMaintenancePage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Tiếp nhận sự cố kỹ thuật từ khách thuê và điều phối thợ sửa chữa.</p>
         </div>
         <button
-          onClick={() => alert("Mở form ghi nhận sự cố mới")}
+          onClick={() => setIsCreateOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />
@@ -79,7 +56,7 @@ export default function LandlordMaintenancePage() {
                 <span className="font-bold text-[16px] text-[#203c37]">{item.title}</span>
                 <span className="text-[12px] font-semibold text-[#15594f] bg-[#eaf2ed] px-2 py-0.5 rounded-full flex items-center gap-1">
                   <DoorOpen className="size-3" />
-                  Phòng {item.roomNumber}
+                  Phòng {item.room?.roomNumber ?? "---"}
                 </span>
                 <span
                   className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
@@ -93,6 +70,17 @@ export default function LandlordMaintenancePage() {
                   {item.priority === "HIGH" ? "Khẩn cấp" : item.priority === "MEDIUM" ? "Bình thường" : "Thấp"}
                 </span>
               </div>
+              <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Tạo phiếu bảo trì">
+                <form onSubmit={handleCreate} className="space-y-3">
+                  <input required placeholder="ID phòng" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="w-full rounded border p-2 text-sm" />
+                  <input required placeholder="Tiêu đề" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded border p-2 text-sm" />
+                  <textarea required placeholder="Mô tả sự cố" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded border p-2 text-sm" />
+                  <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="w-full rounded border p-2 text-sm">
+                    <option value="LOW">Thấp</option><option value="MEDIUM">Bình thường</option><option value="HIGH">Khẩn cấp</option>
+                  </select>
+                  <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Tạo phiếu</button>
+                </form>
+              </Modal>
               <p className="text-[13px] text-[#74817b]">{item.description}</p>
               <p className="text-[11px] text-[#74817b]">
                 Ghi nhận lúc: {new Date(item.createdAt).toLocaleString("vi-VN")}

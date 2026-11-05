@@ -35,13 +35,13 @@ function BookViewingContent() {
   const roomId = (params?.id as string) || "room-ban-mai-1";
 
   // Selected Date & Time Slot
-  const [selectedDate, setSelectedDate] = React.useState<number>(7); // Day of Nov 2026
+  const [selectedDate, setSelectedDate] = React.useState<number>(new Date().getDate());
   const [selectedSlot, setSelectedSlot] = React.useState<string>("16:00 - 17:00");
 
   // Contact Info
-  const [fullName, setFullName] = React.useState("Linh Nguyễn");
-  const [phone, setPhone] = React.useState("0987654321");
-  const [email, setEmail] = React.useState("linh.nguyen@gmail.com");
+  const [fullName, setFullName] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [note, setNote] = React.useState("");
   const [agreeTerms, setAgreeTerms] = React.useState(true);
 
@@ -50,9 +50,9 @@ function BookViewingContent() {
   const [success, setSuccess] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  // Calendar logic for November 2026 (Day 1 is Sunday)
-  const currentMonthName = "Tháng 11, 2026";
-  const daysInMonth = Array.from({ length: 30 }, (_, i) => i + 1);
+  const currentDate = new Date();
+  const currentMonthName = currentDate.toLocaleDateString("vi-VN", { month: "long", year: "numeric" });
+  const daysInMonth = Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate() }, (_, i) => i + 1);
 
   async function handleConfirmBooking(e: React.FormEvent) {
     e.preventDefault();
@@ -64,8 +64,7 @@ function BookViewingContent() {
     setLoading(true);
 
     try {
-      // Formatted ISO date for the appointment
-      const formattedDate = `2026-11-${String(selectedDate).padStart(2, "0")}T${selectedSlot.split(" - ")[0]}:00Z`;
+      const formattedDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}T${selectedSlot.split(" - ")[0]}:00`;
 
       await apiClient.appointments.create({
         roomId,
@@ -77,12 +76,8 @@ function BookViewingContent() {
       setTimeout(() => {
         router.push("/tenant/appointments");
       }, 1500);
-    } catch {
-      // Graceful fallback for offline demo preview
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/tenant/appointments");
-      }, 1500);
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Không thể tạo lịch hẹn. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }

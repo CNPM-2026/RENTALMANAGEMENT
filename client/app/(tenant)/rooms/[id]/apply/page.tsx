@@ -27,7 +27,7 @@ function ApplyRentalContent() {
   const roomId = (params?.id as string) || "room-ban-mai-1";
 
   // Form State
-  const [fullName, setFullName] = React.useState("Linh Nguyễn");
+  const [fullName, setFullName] = React.useState("");
   const [phone, setPhone] = React.useState("0987654321");
   const [citizenId, setCitizenId] = React.useState("079198001234");
   const [email, setEmail] = React.useState("linh.nguyen@gmail.com");

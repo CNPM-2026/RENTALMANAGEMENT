@@ -3,13 +3,19 @@
 import * as React from "react";
 import Link from "next/link";
 import { ShieldCheck, Search, Building, BadgeCheck, FileText, CheckCircle, XCircle } from "lucide-react";
+import { apiClient } from "@/lib/api";
+import { User } from "@/types/models";
 
 export default function AdminLandlordsPage() {
-  const landlords = [
-    { id: "1", name: "Trần Minh An", phone: "0987654321", email: "landlord.test@rental.local", propertiesCount: 3, roomsCount: 50, kycStatus: "VERIFIED" },
-    { id: "2", name: "Đức Quang", phone: "0934567890", email: "quang.duc@rental.vn", propertiesCount: 2, roomsCount: 24, kycStatus: "PENDING" },
-    { id: "3", name: "Nguyễn Thị Hà", phone: "0911222333", email: "ha.nguyen@gmail.com", propertiesCount: 1, roomsCount: 10, kycStatus: "VERIFIED" },
-  ];
+  const [landlords, setLandlords] = React.useState<User[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    apiClient.adminGovernance.getUsers({ role: "LANDLORD" })
+      .then(setLandlords)
+      .catch(() => setLandlords([]))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -29,27 +35,27 @@ export default function AdminLandlordsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {landlords.map((l) => (
+        {!isLoading && landlords.map((l) => (
           <div key={l.id} className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="size-10 rounded-full bg-[#eaf2ed] text-[#15594f] flex items-center justify-center font-bold text-sm">
-                  {l.name.charAt(0)}
+                  {l.fullName.charAt(0)}
                 </span>
                 <span
                   className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                    l.kycStatus === "VERIFIED" ? "bg-[#eaf2ed] text-[#15594f]" : "bg-[#fbf1dc] text-[#9a6a12]"
+                    l.isActive ? "bg-[#eaf2ed] text-[#15594f]" : "bg-[#fbeae6] text-[#a4422c]"
                   }`}
                 >
-                  {l.kycStatus === "VERIFIED" ? "Đã KYC" : "Chờ KYC"}
+                  {l.isActive ? "Đang hoạt động" : "Đã khóa"}
                 </span>
               </div>
-              <h3 className="text-[16px] font-semibold text-[#203c37] mt-3">{l.name}</h3>
-              <p className="text-[12px] text-[#74817b] mt-0.5">{l.email} • {l.phone}</p>
+              <h3 className="text-[16px] font-semibold text-[#203c37] mt-3">{l.fullName}</h3>
+              <p className="text-[12px] text-[#74817b] mt-0.5">{l.email} • {l.phone ?? "Chưa cập nhật"}</p>
 
               <div className="mt-4 pt-3 border-t border-[#e2e7e1] flex items-center justify-between text-[12px] text-[#203c37]">
-                <span>{l.propertiesCount} cơ sở</span>
-                <span className="font-semibold text-[#15594f]">{l.roomsCount} phòng trọ</span>
+                <span>Chủ trọ trên hệ thống</span>
+                <span className="font-semibold text-[#15594f]">ID: {l.id.slice(0, 8)}</span>
               </div>
             </div>
           </div>

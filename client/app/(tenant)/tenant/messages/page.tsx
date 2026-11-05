@@ -1,407 +1,60 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import {
-  Search,
-  Building2,
-  Users,
-  Send,
-  Paperclip,
-  Smile,
-  Phone,
-  MoreVertical,
-  CalendarCheck,
-  Home,
-  CheckCheck,
-  ShieldCheck,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { MessageCircle, Search, Send, UserRound } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
+import { getChatSocket, refreshChatSocketAuth } from "@/lib/socket";
+import { Conversation, Message } from "@/types/models";
 
-interface ChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  text: string;
-  time: string;
-  isMe: boolean;
-}
+export default function TenantMessagesPage() {
+  const [conversations, setConversations] = React.useState<Conversation[]>([]);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [input, setInput] = React.useState("");
+  const [query, setQuery] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const userId = getCurrentUser()?.id;
 
-interface ChatThread {
-  id: string;
-  targetId: string;
-  name: string;
-  role: "LANDLORD" | "ROOMMATE";
-  avatarUrl: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  online: boolean;
-  relatedRoom?: {
-    id: string;
-    title: string;
-    price: string;
-    address: string;
-    imageUrl: string;
-  };
-  appointmentSnippet?: {
-    time: string;
-    status: string;
-  };
-}
+  React.useEffect(() => {
+    apiClient.chats.getMyConversations().then((items) => {
+      setConversations(items);
+      const params = new URLSearchParams(window.location.search);
+      const requested = params.get("conversation");
+      const target = params.get("user");
+      setSelectedId(items.find((item) => item.id === requested || item.members.some((member) => member.userId === target))?.id ?? items[0]?.id ?? null);
+    }).catch(() => setError("Không tải được hội thoại."));
+  }, []);
 
-function TenantDirectMessagesContent() {
-  const searchParams = useSearchParams();
-  const initialUserParam = searchParams?.get("user");
+  React.useEffect(() => {
+    if (!selectedId) return;
+    apiClient.chats.getMessages(selectedId).then((items) => setMessages([...items].reverse())).catch(() => setError("Không tải được tin nhắn."));
+    const socket = refreshChatSocketAuth();
+    const onMessage = (message: Message) => { if (message.conversationId === selectedId) setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]); };
+    const onError = (message: string) => setError(message);
+    socket.connect(); socket.emit("join_conversation", selectedId); socket.on("receive_message", onMessage); socket.on("error_message", onError);
+    return () => { socket.off("receive_message", onMessage); socket.off("error_message", onError); socket.emit("leave_conversation", selectedId); };
+  }, [selectedId]);
 
-  // State
-  const [filterRole, setFilterRole] = React.useState<"ALL" | "LANDLORD" | "ROOMMATE">("ALL");
-  const [searchKeyword, setSearchKeyword] = React.useState("");
-  const [activeThreadId, setActiveThreadId] = React.useState<string>("thread-1");
-  const [inputMessage, setInputMessage] = React.useState("");
+  function sendMessage(event: React.FormEvent) {
+    event.preventDefault();
+    if (!input.trim() || !selectedId) return;
+    getChatSocket().emit("send_message", { conversationId: selectedId, content: input.trim(), messageType: "TEXT" });
+    setInput("");
+  }
 
-  const [threads, setThreads] = React.useState<ChatThread[]>([
-    {
-      id: "thread-1",
-      targetId: "landlord-1",
-      name: "Nguyễn Minh An (Chủ trọ)",
-      role: "LANDLORD",
-      avatarUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop&q=80",
-      lastMessage: "Chào em, 15h thứ Bảy tuần này qua xem phòng 302 nhé!",
-      lastMessageTime: "14:35",
-      unreadCount: 1,
-      online: true,
-      relatedRoom: {
-        id: "room-banmai-302",
-        title: "Studio Ban Mai - Phòng 302 (35m²)",
-        price: "4.500.000 đ/tháng",
-        address: "124/8 Sư Vạn Hạnh, Phường 12, Quận 10",
-        imageUrl: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&auto=format&fit=crop&q=80",
-      },
-      appointmentSnippet: {
-        time: "15:00 Thứ Bảy, 12/10/2026",
-        status: "Đã xác nhận",
-      },
-    },
-    {
-      id: "thread-2",
-      targetId: "roommate-1",
-      name: "Nguyễn Hoàng Nam (Ở ghép)",
-      role: "ROOMMATE",
-      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
-      lastMessage: "Mình cũng hay nấu cơm tối ở nhà, chia đôi tiền gia vị tiện lắm.",
-      lastMessageTime: "11:20",
-      unreadCount: 0,
-      online: false,
-      relatedRoom: {
-        id: "room-match-10",
-        title: "Căn hộ 2PN Sunrise - Quận 10",
-        price: "3.800.000 đ/người",
-        address: "Quận 10, TP.HCM",
-        imageUrl: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=300&auto=format&fit=crop&q=80",
-      },
-    },
-    {
-      id: "thread-3",
-      targetId: "roommate-2",
-      name: "Trần Mai Phương (Ở ghép)",
-      role: "ROOMMATE",
-      avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
-      lastMessage: "Bé mèo của mình ngoan lắm, cuối tuần bạn ghé chơi thử nha!",
-      lastMessageTime: "Hôm qua",
-      unreadCount: 0,
-      online: true,
-    },
-  ]);
-
-  const [messages, setMessages] = React.useState<Record<string, ChatMessage[]>>({
-    "thread-1": [
-      {
-        id: "m-1",
-        senderId: "me",
-        senderName: "Linh Nguyễn",
-        text: "Dạ em chào anh An, em thấy phòng 302 bên mình còn trống trên 5K-Rental Manager. Em muốn hẹn anh xem phòng vào cuối tuần được không ạ?",
-        time: "14:10",
-        isMe: true,
-      },
-      {
-        id: "m-2",
-        senderId: "landlord-1",
-        senderName: "Nguyễn Minh An",
-        text: "Chào Linh, phòng 302 hiện đang sẵn sàng, nội thất đầy đủ y như hình chụp trên app nhé em.",
-        time: "14:22",
-        isMe: false,
-      },
-      {
-        id: "m-3",
-        senderId: "landlord-1",
-        senderName: "Nguyễn Minh An",
-        text: "Chào em, 15h thứ Bảy tuần này qua xem phòng 302 nhé!",
-        time: "14:35",
-        isMe: false,
-      },
-    ],
-    "thread-2": [
-      {
-        id: "m-201",
-        senderId: "roommate-1",
-        senderName: "Nguyễn Hoàng Nam",
-        text: "Chào Linh, cảm ơn bạn đã đồng ý lời mời kết nối nhé!",
-        time: "11:05",
-        isMe: false,
-      },
-      {
-        id: "m-202",
-        senderId: "me",
-        senderName: "Linh Nguyễn",
-        text: "Chào Nam! Mình thấy điểm tương thích của hai đứa tới 96%, cùng muốn ở Quận 10.",
-        time: "11:15",
-        isMe: true,
-      },
-      {
-        id: "m-203",
-        senderId: "roommate-1",
-        senderName: "Nguyễn Hoàng Nam",
-        text: "Mình cũng hay nấu cơm tối ở nhà, chia đôi tiền gia vị tiện lắm.",
-        time: "11:20",
-        isMe: false,
-      },
-    ],
-  });
-
-  const activeThread = threads.find((t) => t.id === activeThreadId) || threads[0];
-  const activeMessages = messages[activeThreadId] || [];
-
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputMessage.trim()) return;
-
-    const newMsg: ChatMessage = {
-      id: `m-${Date.now()}`,
-      senderId: "me",
-      senderName: "Linh Nguyễn",
-      text: inputMessage.trim(),
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isMe: true,
-    };
-
-    setMessages((prev) => ({
-      ...prev,
-      [activeThreadId]: [...(prev[activeThreadId] || []), newMsg],
-    }));
-
-    // Update last message in thread
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === activeThreadId ? { ...t, lastMessage: inputMessage.trim(), lastMessageTime: "Vừa xong" } : t
-      )
-    );
-
-    setInputMessage("");
-  };
+  const visible = conversations.filter((conversation) => (conversation.members.find((item) => item.userId !== userId)?.user?.fullName ?? "Hội thoại").toLowerCase().includes(query.toLowerCase()));
+  const selected = conversations.find((item) => item.id === selectedId);
+  const target = selected?.members.find((member) => member.userId !== userId)?.user;
 
   return (
-    <div className="h-[calc(100vh-140px)] flex flex-col space-y-4 max-w-[1204px]">
-      <div>
-        <h1 className="text-[26px] font-bold text-[#203c37] tracking-tight">Tin nhắn trực tiếp</h1>
-        <p className="text-[14px] text-[#74817b] mt-0.5">
-          Trao đổi thông tin với chủ trọ và các bạn cùng phòng hợp gu trên hệ thống 5K-Rental Manager.
-        </p>
+    <div className="space-y-5">
+      <div><p className="text-[12px] text-[#74817b]">Tài khoản</p><h1 className="mt-1 text-[28px] font-semibold text-[#203c37]">Tin nhắn</h1><p className="mt-1 text-[14px] text-[#74817b]">Kết nối với chủ trọ và người dùng khác.</p></div>
+      {error && <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-4 py-3 text-sm text-[#a4422c]">{error}</div>}
+      <div className="grid h-[min(680px,calc(100vh-190px))] min-h-[520px] grid-cols-1 overflow-hidden rounded-[16px] border border-[#dfe8e1] bg-white shadow-[0_12px_40px_rgba(32,60,55,0.08)] md:grid-cols-[300px_1fr]">
+        <aside className="flex min-h-0 flex-col border-b border-[#e8eee9] bg-[#fbfcfa] md:border-b-0 md:border-r"><div className="border-b border-[#e8eee9] p-4"><div className="flex items-center gap-2 rounded-[10px] border border-[#dfe8e1] bg-white px-3 py-2.5"><Search className="size-4 text-[#74817b]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-sm outline-none placeholder:text-[#9aa8a0]" placeholder="Tìm cuộc trò chuyện" /></div></div><div className="min-h-0 flex-1 overflow-y-auto p-2">{visible.length === 0 ? <div className="p-6 text-center text-sm text-[#74817b]">Chưa có cuộc trò chuyện.</div> : visible.map((conversation) => { const member = conversation.members.find((item) => item.userId !== userId)?.user; return <button key={conversation.id} onClick={() => setSelectedId(conversation.id)} className={`flex w-full items-center gap-3 rounded-[10px] p-3 text-left transition ${selectedId === conversation.id ? "bg-[#e6f1eb]" : "hover:bg-[#f1f5f2]"}`}><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#15594f] font-semibold text-white">{member?.fullName?.[0]?.toUpperCase() ?? <UserRound className="size-4" />}</div><div className="min-w-0"><p className="truncate text-sm font-semibold text-[#203c37]">{member?.fullName ?? "Hội thoại"}</p><p className="mt-0.5 truncate text-xs text-[#74817b]">{conversation.messages?.[0]?.content ?? "Chưa có tin nhắn"}</p></div></button>; })}</div></aside>
+        <section className="flex min-h-0 flex-col"><header className="flex items-center gap-3 border-b border-[#e8eee9] px-5 py-4"><div className="flex size-10 items-center justify-center rounded-full bg-[#eaf2ed] text-[#15594f]"><MessageCircle className="size-5" /></div><div><h2 className="font-semibold text-[#203c37]">{target?.fullName ?? "Chọn cuộc trò chuyện"}</h2><p className="text-xs text-[#74817b]">{selected ? "Đang trao đổi trực tuyến" : "Chọn một hội thoại để bắt đầu"}</p></div></header><div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#fbfcfa] p-5">{!selectedId ? <div className="flex h-full flex-col items-center justify-center text-center text-[#74817b]"><MessageCircle className="size-12 text-[#b8c9bf]" /><p className="mt-3 font-semibold text-[#203c37]">Chọn một cuộc trò chuyện</p><p className="mt-1 text-sm">Tin nhắn của bạn sẽ hiển thị tại đây.</p></div> : messages.length === 0 ? <p className="py-10 text-center text-sm text-[#74817b]">Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện.</p> : messages.map((message) => <div key={message.id} className={`flex ${message.senderId === userId ? "justify-end" : "justify-start"}`}><div className={`max-w-[min(75%,520px)] rounded-2xl px-4 py-3 text-sm shadow-sm ${message.senderId === userId ? "rounded-br-md bg-[#15594f] text-white" : "rounded-bl-md border border-[#e2ebe4] bg-white text-[#203c37]"}`}><p className="whitespace-pre-wrap break-words">{message.content}</p><p className="mt-1 text-[10px] opacity-65">{new Date(message.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</p></div></div>)}</div><form onSubmit={sendMessage} className="flex gap-3 border-t border-[#e8eee9] bg-white p-4"><input value={input} onChange={(event) => setInput(event.target.value)} disabled={!selectedId} className="min-w-0 flex-1 rounded-[10px] border border-[#dfe8e1] px-4 py-3 text-sm outline-none transition focus:border-[#15594f] focus:ring-2 focus:ring-[#15594f]/10 disabled:bg-[#f7f8f7]" placeholder="Nhập tin nhắn..." /><button disabled={!selectedId || !input.trim()} className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-[#15594f] text-white transition hover:bg-[#124b42] disabled:cursor-not-allowed disabled:opacity-40"><Send className="size-4" /></button></form></section>
       </div>
-
-      <Card className="flex-1 border border-[#e2e7e1] bg-white rounded-[12px] shadow-sm overflow-hidden flex flex-col md:flex-row">
-        {/* LEFT DRAWER: Conversations List (320px) */}
-        <div className="w-full md:w-[320px] border-r border-[#e2e7e1] flex flex-col bg-[#ffffff] shrink-0">
-          {/* Search Box */}
-          <div className="p-3.5 border-b border-[#e2e7e1]">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 size-4 text-[#74817b]" />
-              <input
-                type="text"
-                placeholder="Tìm cuộc trò chuyện..."
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                className="w-full h-[38px] pl-9 pr-3 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] focus:bg-white outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Filter Chips (Figma 44:64102) */}
-          <div className="px-3.5 py-2.5 flex items-center gap-2 border-b border-[#e2e7e1] bg-[#f7f6f2]/50">
-            <button
-              onClick={() => setFilterRole("ALL")}
-              className={`px-3 py-1 rounded-full text-[12px] font-semibold cursor-pointer transition-colors ${
-                filterRole === "ALL" ? "bg-[#15594f] text-white" : "bg-white text-[#74817b] border border-[#e2e7e1]"
-              }`}
-            >
-              Tất cả
-            </button>
-            <button
-              onClick={() => setFilterRole("LANDLORD")}
-              className={`px-3 py-1 rounded-full text-[12px] font-semibold cursor-pointer transition-colors ${
-                filterRole === "LANDLORD" ? "bg-[#15594f] text-white" : "bg-white text-[#74817b] border border-[#e2e7e1]"
-              }`}
-            >
-              Chủ trọ
-            </button>
-            <button
-              onClick={() => setFilterRole("ROOMMATE")}
-              className={`px-3 py-1 rounded-full text-[12px] font-semibold cursor-pointer transition-colors ${
-                filterRole === "ROOMMATE" ? "bg-[#15594f] text-white" : "bg-white text-[#74817b] border border-[#e2e7e1]"
-              }`}
-            >
-              Ở ghép
-            </button>
-          </div>
-
-          {/* Thread List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-[#e2e7e1]/60">
-            {threads
-              .filter((t) => (filterRole === "ALL" ? true : t.role === filterRole))
-              .map((thread) => {
-                const isActive = thread.id === activeThreadId;
-
-                return (
-                  <div
-                    key={thread.id}
-                    onClick={() => setActiveThreadId(thread.id)}
-                    className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
-                      isActive ? "bg-[#eaf2ed]/70 border-l-4 border-[#15594f]" : "hover:bg-[#f7f6f2]"
-                    }`}
-                  >
-                    <div className="relative size-11 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#e2e7e1]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={thread.avatarUrl} alt={thread.name} className="size-full object-cover" />
-                      {thread.online && (
-                        <span className="absolute bottom-0 right-0 size-3 rounded-full bg-emerald-500 border-2 border-white" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-[13px] font-bold text-[#203c37] truncate">{thread.name}</h4>
-                        <span className="text-[11px] text-[#74817b] shrink-0">{thread.lastMessageTime}</span>
-                      </div>
-                      <p className="text-[12px] text-[#74817b] truncate mt-0.5">{thread.lastMessage}</p>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-
-        {/* RIGHT PANE: Active Conversation Window (Figma 44:64131) */}
-        <div className="flex-1 flex flex-col bg-[#f7f6f2]/30 min-w-0">
-          {/* Active Chat Header (Figma 44:64132) */}
-          <div className="p-3.5 px-5 bg-white border-b border-[#e2e7e1] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative size-10 rounded-full overflow-hidden bg-[#eaf2ed] border border-[#e2e7e1]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={activeThread.avatarUrl} alt={activeThread.name} className="size-full object-cover" />
-              </div>
-              <div>
-                <h3 className="text-[15px] font-bold text-[#203c37] flex items-center gap-2">
-                  {activeThread.name}
-                  <Badge variant={activeThread.role === "LANDLORD" ? "info" : "success"} size="sm">
-                    {activeThread.role === "LANDLORD" ? "Chủ trọ" : "Ở ghép"}
-                  </Badge>
-                </h3>
-                <span className="text-[12px] text-emerald-600 font-medium">Đang trực tuyến</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-[#74817b]">
-              <Button variant="ghost" size="icon" title="Gọi thoại">
-                <Phone className="size-4.5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Related Room Snippet Banner (Figma 44:64140) */}
-          {activeThread.relatedRoom && (
-            <div className="mx-4 mt-3 bg-white border border-[#e2e7e1] rounded-[8px] p-3 flex items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="size-12 rounded-[6px] overflow-hidden bg-[#f7f6f2] shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={activeThread.relatedRoom.imageUrl} alt="" className="size-full object-cover" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-[13px] font-bold text-[#203c37] truncate">{activeThread.relatedRoom.title}</h4>
-                  <p className="text-[12px] text-[#15594f] font-semibold">{activeThread.relatedRoom.price}</p>
-                </div>
-              </div>
-              <Link href={`/rooms/${activeThread.relatedRoom.id}`}>
-                <Button variant="outline" size="sm">Xem phòng</Button>
-              </Link>
-            </div>
-          )}
-
-          {/* Pinned Viewing Appointment Snippet (Figma 44:64164) */}
-          {activeThread.appointmentSnippet && (
-            <div className="mx-4 mt-2 bg-[#eaf2ed] border border-[#15594f]/20 rounded-[8px] p-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <CalendarCheck className="size-5 text-[#15594f]" />
-                <div className="text-[12px] text-[#203c37]">
-                  <strong>Lịch xem phòng:</strong> {activeThread.appointmentSnippet.time}
-                </div>
-              </div>
-              <Badge variant="success" size="sm">{activeThread.appointmentSnippet.status}</Badge>
-            </div>
-          )}
-
-          {/* Message Stream */}
-          <div className="flex-1 p-5 overflow-y-auto space-y-3">
-            {activeMessages.map((msg) => (
-              <div key={msg.id} className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}>
-                <div
-                  className={`max-w-[75%] px-4 py-2.5 rounded-[12px] text-[14px] leading-relaxed shadow-xs ${
-                    msg.isMe
-                      ? "bg-[#15594f] text-white rounded-tr-[2px]"
-                      : "bg-white text-[#203c37] border border-[#e2e7e1] rounded-tl-[2px]"
-                  }`}
-                >
-                  {msg.text}
-                </div>
-                <span className="text-[11px] text-[#74817b] mt-1 px-1">{msg.time}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Input Bar (Figma 44:64171) */}
-          <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-[#e2e7e1] flex items-center gap-2">
-            <Button type="button" variant="ghost" size="icon" title="Đính kèm tệp">
-              <Paperclip className="size-4.5 text-[#74817b]" />
-            </Button>
-            <input
-              type="text"
-              placeholder="Nhập tin nhắn trao đổi trên 5K-Rental Manager..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              className="flex-1 h-[42px] px-3.5 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:bg-white outline-none"
-            />
-            <Button type="submit" variant="primary" size="md" leftIcon={<Send className="size-4" />}>
-              Gửi
-            </Button>
-          </form>
-        </div>
-      </Card>
     </div>
-  );
-}
-
-export default function TenantDirectMessagesPage() {
-  return (
-    <React.Suspense
-      fallback={
-        <div className="h-[750px] bg-white rounded-[12px] border border-[#e2e7e1] flex items-center justify-center text-[#74817b]">
-          Đang tải tin nhắn...
-        </div>
-      }
-    >
-      <TenantDirectMessagesContent />
-    </React.Suspense>
   );
 }

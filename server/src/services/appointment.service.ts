@@ -86,6 +86,8 @@ export const appointmentService = {
       whereClause = { landlordId: userId };
     } else if (role === 'AGENT') {
       whereClause = { agentId: userId };
+    } else {
+      throw new AppError('Role không được phép xem lịch hẹn cá nhân', 403);
     }
 
     return await prisma.appointment.findMany({

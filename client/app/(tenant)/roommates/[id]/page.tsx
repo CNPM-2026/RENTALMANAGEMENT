@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
+import { apiClient } from "@/lib/api";
+import { SuggestedRoommate } from "@/types/models";
 
 interface CompatibilityCriterion {
   name: string;
@@ -41,23 +43,35 @@ function RoommateDetailContent() {
   const [isSent, setIsSent] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Candidate Mock Detail
-  const candidate = {
-    id: candidateId,
-    fullName: "Nguyễn Hoàng Nam",
-    age: 24,
-    gender: "Nam",
-    occupation: "Kỹ sư phần mềm • FPT Software",
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-    matchScore: 92,
-    statusNote: "Đang tìm 1 bạn nam ở ghép căn hộ 2PN tại Quận 10",
-    budgetMonthly: "3.500.000 - 4.500.000 đ/tháng",
-    targetLocation: "Quận 10, Quận 3, Quận 1",
-    moveInDate: "Đầu tháng 11/2026",
-    bio: "Chào bạn! Mình là Nam, tốt nghiệp Bách Khoa và hiện làm lập trình viên. Mình ít nhậu nhẹt, không hút thuốc, giữ phòng ốc luôn sạch sẽ và tôn trọng tuyệt đối sự riêng tư của bạn cùng phòng. Mình thường tự nấu ăn đơn giản buổi tối.",
+  const [suggestion, setSuggestion] = React.useState<SuggestedRoommate | null>(null);
+
+  React.useEffect(() => {
+    apiClient.matching.getSuggestions()
+      .then((items) => setSuggestion(items.find((item) => item.user.id === candidateId) ?? null))
+      .catch(() => setSuggestion(null));
+  }, [candidateId]);
+
+  const candidate = suggestion ? {
+    id: suggestion.user.id,
+    fullName: suggestion.user.fullName,
+    age: 0,
+    gender: suggestion.user.gender ?? "Chưa cập nhật",
+    occupation: suggestion.user.occupation ?? "Chưa cập nhật",
+    avatarUrl: suggestion.user.avatarUrl ?? "/placeholder-avatar.png",
+    matchScore: suggestion.compatibilityPercent,
+    statusNote: suggestion.post.title,
+    budgetMonthly: suggestion.post.price ? `${suggestion.post.price.toLocaleString("vi-VN")} đ/tháng` : "Chưa cập nhật",
+    targetLocation: suggestion.post.property?.district ?? "Chưa cập nhật",
+    moveInDate: "Chưa cập nhật",
+    bio: suggestion.post.description,
+  } : {
+    id: candidateId, fullName: "Đang tải hồ sơ", age: 0, gender: "Chưa cập nhật",
+    occupation: "Chưa cập nhật", avatarUrl: "/placeholder-avatar.png", matchScore: 0,
+    statusNote: "Chưa có dữ liệu hồ sơ", budgetMonthly: "Chưa cập nhật",
+    targetLocation: "Chưa cập nhật", moveInDate: "Chưa cập nhật", bio: "",
   };
 
-  const compatibilityCriteria: CompatibilityCriterion[] = [
+  const compatibilityCriteria: CompatibilityCriterion[] = suggestion ? [
     {
       name: "Giờ giấc sinh hoạt",
       score: 100,
@@ -100,11 +114,11 @@ function RoommateDetailContent() {
       myHabit: "Báo trước khi có bạn tới",
       candidateHabit: "Báo trước và không ở lại qua đêm",
     },
-  ];
+  ] : [];
 
   const handleSendInvitation = async () => {
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await apiClient.roommateInvitations.create({ recipientId: candidate.id, message: inviteNote });
     setIsSubmitting(false);
     setIsSent(true);
     setInviteModalOpen(false);

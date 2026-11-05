@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { apiClient } from "@/lib/api";
+import { Post } from "@/types/models";
 
 interface MapRoom {
   id: string;
@@ -126,11 +128,34 @@ const MAP_ROOMS: MapRoom[] = [
 ];
 
 export default function RoomsMapPage() {
-  const [selectedRoomId, setSelectedRoomId] = React.useState<string>(MAP_ROOMS[0].id);
+  const [rooms, setRooms] = React.useState<MapRoom[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = React.useState<string>("");
   const [activeFilter, setActiveFilter] = React.useState<string>("ALL");
   const [zoomLevel, setZoomLevel] = React.useState<number>(100);
 
-  const selectedRoom = MAP_ROOMS.find((r) => r.id === selectedRoomId) || MAP_ROOMS[0];
+  React.useEffect(() => {
+    apiClient.posts.getApproved().then((posts) => {
+      const mapped = posts.map((post: Post, index) => ({
+        id: post.id,
+        title: post.title,
+        price: post.price ?? 0,
+        formattedPrice: `${((post.price ?? 0) / 1000000).toFixed(1)} tr`,
+        area: post.room?.area ?? 0,
+        floor: 0,
+        hasBalcony: false,
+        address: post.property?.address ?? "Địa chỉ đang cập nhật",
+        image: post.images?.find((image) => image.isPrimary)?.imageUrl ?? post.images?.[0]?.imageUrl ?? "",
+        verified: true,
+        xPercent: 15 + ((index * 19) % 70),
+        yPercent: 18 + ((index * 23) % 65),
+        landmark: "Tin đăng đã được duyệt",
+      }));
+      setRooms(mapped);
+      setSelectedRoomId(mapped[0]?.id ?? "");
+    }).catch(() => setRooms([]));
+  }, []);
+
+  const selectedRoom = rooms.find((r) => r.id === selectedRoomId) ?? rooms[0];
 
   return (
     <div className="w-full h-[calc(100vh-88px)] flex flex-col bg-[#f7f6f2] text-[#203c37] overflow-hidden">
@@ -195,7 +220,7 @@ export default function RoomsMapPage() {
         <div className="w-[380px] bg-white border-r border-[#e2e7e1] flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 border-b border-[#e2e7e1] bg-[#f7f6f2]/50">
             <h2 className="text-[14px] font-bold text-[#203c37]">
-              Phòng ở khu vực này ({MAP_ROOMS.length})
+              Phòng ở khu vực này ({rooms.length})
             </h2>
             <p className="text-[12px] text-[#74817b]">
               Nhấp vào ghim bản đồ hoặc thẻ phòng để đối chiếu vị trí
@@ -203,7 +228,7 @@ export default function RoomsMapPage() {
           </div>
 
           <div className="p-4 space-y-4 flex-1">
-            {MAP_ROOMS.map((room) => {
+            {rooms.map((room) => {
               const isSelected = room.id === selectedRoomId;
               return (
                 <div
@@ -361,7 +386,7 @@ export default function RoomsMapPage() {
             </svg>
 
             {/* Interactive Room Price Pins on Map */}
-            {MAP_ROOMS.map((room) => {
+            {rooms.map((room) => {
               const isSelected = room.id === selectedRoomId;
               return (
                 <div

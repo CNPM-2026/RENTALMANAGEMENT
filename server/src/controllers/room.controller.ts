@@ -1,11 +1,11 @@
 import { NextFunction, Response } from 'express';
 import { roomService } from '../services/room.service';
-import { AuthRequest } from '../middlewares/auth.middleware';
+import { AuthRequest, resourceOwnerId } from '../middlewares/auth.middleware';
 
 export const roomController = {
   create: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const result = await roomService.createRoom(req.user!.id, req.body);
+      const result = await roomService.createRoom(resourceOwnerId(req), req.body);
       return res.status(201).json({
         success: true,
         message: 'Tạo phòng thành công',
@@ -18,7 +18,7 @@ export const roomController = {
 
   getByProperty: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const result = await roomService.getRoomsByProperty(req.user!.id, String(req.params.propertyId));
+      const result = await roomService.getRoomsByProperty(resourceOwnerId(req), String(req.params.propertyId));
       return res.status(200).json({
         success: true,
         message: 'Lấy danh sách phòng thành công',

@@ -49,6 +49,10 @@ export const initSocket = (server: HttpServer) => {
       console.log(`User ${userId} joined room: ${conversationId}`);
     });
 
+    socket.on('leave_conversation', (conversationId: string) => {
+      if (typeof conversationId === 'string') socket.leave(`conversation_${conversationId}`);
+    });
+
     // Sự kiện: Gửi tin nhắn
     socket.on('send_message', async (data: { conversationId: string; content: string; messageType?: string }) => {
       try {

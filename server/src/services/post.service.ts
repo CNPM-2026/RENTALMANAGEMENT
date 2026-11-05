@@ -5,6 +5,19 @@ import { storageService } from './storage.service';
 import fs from 'fs/promises';
 
 export const postService = {
+  getById: async (postId: string) => {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, status: 'APPROVED', OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }] },
+      include: {
+        images: true,
+        author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
+        property: true,
+        room: { include: { roomAmenities: { include: { amenity: true } } } },
+      },
+    });
+    if (!post) throw new AppError('Không tìm thấy tin đăng', 404);
+    return post;
+  },
   createPost: async (authorId: string, data: any, files: Express.Multer.File[]) => {
     const { title, description, price, postType, propertyId, roomId } = data;
 
@@ -145,12 +158,16 @@ export const postService = {
       // Lưu ý: Để chạy hàm này, Database của fen phải là PostgreSQL (đúng chuẩn dự án)
       const nearbyProperties = await prisma.$queryRaw<{ id: string }[]>`
         SELECT id FROM "properties"
-        WHERE (
-          6371 * acos(
-            cos(radians(${lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${lng})) 
-            + sin(radians(${lat})) * sin(radians(latitude))
-          )
-        ) <= ${r}
+        WHERE latitude IS NOT NULL
+          AND longitude IS NOT NULL
+          AND (
+            6371 * acos(
+              LEAST(1, GREATEST(-1,
+                cos(radians(${lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${lng}))
+                + sin(radians(${lat})) * sin(radians(latitude))
+              ))
+            )
+          ) <= ${r}
       `;
 
       const propertyIds = nearbyProperties.map(p => p.id);

@@ -14,6 +14,7 @@ router.use(authenticate);
 
 router.post('/answers', validate(matchingAnswersSchema), matchingController.submitAnswers);
 router.put('/preferences', validate(matchingPreferencesSchema), matchingController.updatePreferences);
+router.get('/preferences', matchingController.getPreferences);
 router.get('/suggestions', matchingController.getSuggestedRoommates);
 
 export default router;

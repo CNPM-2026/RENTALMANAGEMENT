@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { roomController } from '../controllers/room.controller';
-import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { authenticate, authorizeStaff } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { roomSchema } from '../validations/resource.validation';
 
@@ -10,7 +10,7 @@ const router = Router();
 router.get('/amenities', roomController.getAmenities);
 
 // Các API dưới đây yêu cầu quyền LANDLORD
-router.use(authenticate, authorize('LANDLORD'));
+router.use(authenticate, authorizeStaff('PROPERTIES_ROOMS'));
 
 router.post('/', validate(roomSchema), roomController.create);
 router.get('/property/:propertyId', roomController.getByProperty);

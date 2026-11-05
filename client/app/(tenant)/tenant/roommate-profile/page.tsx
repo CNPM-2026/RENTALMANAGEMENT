@@ -21,6 +21,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
+import { RoommatePreference, UserWithProfile } from "@/types/models";
 
 export default function TenantRoommateProfilePage() {
   const [currentStep, setCurrentStep] = React.useState<1 | 2 | 3>(1);
@@ -28,39 +30,63 @@ export default function TenantRoommateProfilePage() {
   const [savedSuccess, setSavedSuccess] = React.useState(false);
 
   // Form State
-  const [budgetMin, setBudgetMin] = React.useState("3000000");
-  const [budgetMax, setBudgetMax] = React.useState("4500000");
-  const [preferredDistrict, setPreferredDistrict] = React.useState("Quận 10");
-  const [moveInDate, setMoveInDate] = React.useState("2026-11-15");
-  const [sleepSchedule, setSleepSchedule] = React.useState("22:30");
-  const [cleanlinessLevel, setCleanlinessLevel] = React.useState(5);
-  const [petAllowed, setPetAllowed] = React.useState(true);
-  const [cookingHabit, setCookingHabit] = React.useState("REGULAR");
-  const [smokingAllowed, setSmokingAllowed] = React.useState(false);
-  const [guestPolicy, setGuestPolicy] = React.useState("NOTIFY_FIRST");
-  const [preferredGender, setPreferredGender] = React.useState("ANY");
-  const [bioNote, setBioNote] = React.useState(
-    "Mình là nhân viên văn phòng, tính tình hòa nhã, giữ gìn vệ sinh chung và tôn trọng sự riêng tư của bạn cùng phòng."
-  );
+  const [budgetMin, setBudgetMin] = React.useState("");
+  const [budgetMax, setBudgetMax] = React.useState("");
+  const [preferredDistrict, setPreferredDistrict] = React.useState("");
+  const [moveInDate, setMoveInDate] = React.useState("");
+  const [sleepSchedule, setSleepSchedule] = React.useState("");
+  const [cleanlinessLevel, setCleanlinessLevel] = React.useState<number | null>(null);
+  const [petAllowed, setPetAllowed] = React.useState<boolean | null>(null);
+  const [cookingHabit, setCookingHabit] = React.useState("");
+  const [smokingAllowed, setSmokingAllowed] = React.useState<boolean | null>(null);
+  const [guestPolicy, setGuestPolicy] = React.useState("");
+  const [preferredGender, setPreferredGender] = React.useState("");
+  const [bioNote, setBioNote] = React.useState("");
   const [isDiscoverable, setIsDiscoverable] = React.useState(true);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [currentUser, setCurrentUser] = React.useState<UserWithProfile | null>(getCurrentUser());
+
+  React.useEffect(() => {
+    Promise.all([apiClient.auth.getMe() as Promise<UserWithProfile>, apiClient.matching.getPreferences()])
+      .then(([user, preferences]) => {
+        setCurrentUser(user);
+        const value = preferences as RoommatePreference | null;
+        if (!value) return;
+        setBudgetMin(value.budgetMin == null ? "" : String(value.budgetMin));
+        setBudgetMax(value.budgetMax == null ? "" : String(value.budgetMax));
+        setPreferredDistrict(value.preferredDistrict ?? "");
+        setSleepSchedule(value.sleepSchedule ?? "");
+        setCleanlinessLevel(value.cleanlinessLevel ?? null);
+        setPetAllowed(value.petAllowed ?? null);
+        setSmokingAllowed(value.smokingAllowed ?? null);
+        setPreferredGender(value.preferredGender ?? "");
+        setBioNote(value.note ?? "");
+      })
+      .catch((error) => setErrorMessage(error instanceof Error ? error.message : "Không thể tải hồ sơ ở ghép."))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setIsSaving(true);
+    setErrorMessage(null);
     try {
       await apiClient.matching.updatePreferences({
-        budgetMin: Number(budgetMin),
-        budgetMax: Number(budgetMax),
+        ...(budgetMin ? { budgetMin: Number(budgetMin) } : {}),
+        ...(budgetMax ? { budgetMax: Number(budgetMax) } : {}),
         preferredDistrict,
-        cleanlinessLevel,
+        ...(cleanlinessLevel === null ? {} : { cleanlinessLevel }),
         sleepSchedule,
-        petAllowed,
-        smokingAllowed,
+        ...(petAllowed === null ? {} : { petAllowed }),
+        ...(smokingAllowed === null ? {} : { smokingAllowed }),
         preferredGender,
         note: bioNote,
       });
-    } catch {
-      // Local sync fallback
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Không thể lưu hồ sơ.");
+      setIsSaving(false);
+      return;
     } finally {
       setIsSaving(false);
       setSavedSuccess(true);
@@ -70,6 +96,7 @@ export default function TenantRoommateProfilePage() {
 
   return (
     <div className="space-y-8 max-w-[1204px]">
+      {errorMessage && <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</div>}
       {/* Toast Alert */}
       {savedSuccess && (
         <div className="fixed top-24 right-8 z-50 bg-[#15594f] text-white px-5 py-3.5 rounded-[8px] shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top duration-200">
@@ -79,6 +106,7 @@ export default function TenantRoommateProfilePage() {
       )}
 
       {/* Header */}
+      {isLoading && <div className="rounded border border-[#e2e7e1] bg-white p-4 text-sm text-[#74817b]">Đang tải hồ sơ của bạn...</div>}
       <div>
         <h1 className="text-[26px] font-bold text-[#203c37] tracking-tight">
           Hồ sơ gu sống & Tìm bạn ở ghép
@@ -223,7 +251,7 @@ export default function TenantRoommateProfilePage() {
                       min={1}
                       max={5}
                       step={1}
-                      value={cleanlinessLevel}
+                      value={cleanlinessLevel ?? ""}
                       onChange={(e) => setCleanlinessLevel(Number(e.target.value))}
                       className="w-full accent-[#15594f] cursor-pointer"
                     />
@@ -369,21 +397,21 @@ export default function TenantRoommateProfilePage() {
               <div className="size-20 rounded-full overflow-hidden bg-[#eaf2ed] border-2 border-[#15594f]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80"
+                  src={currentUser?.avatarUrl || "/images/default-avatar.svg"}
                   alt="Ảnh của bạn"
                   className="size-full object-cover"
                 />
               </div>
-              <h4 className="text-[18px] font-bold text-[#203c37]">Linh Nguyễn</h4>
-              <p className="text-[12px] text-[#74817b]">Nhân viên văn phòng • TP.HCM</p>
-              <Badge variant="success" size="sm">Hồ sơ hoàn thiện 100%</Badge>
+              <h4 className="text-[18px] font-bold text-[#203c37]">{currentUser?.fullName || "Chưa cập nhật tên"}</h4>
+              <p className="text-[12px] text-[#74817b]">{currentUser?.profile?.occupation || "Chưa cập nhật nghề nghiệp"}{currentUser?.profile?.occupation && " • "}{currentUser?.profile?.bio ? "Đã có giới thiệu" : "Chưa có giới thiệu"}</p>
+              <Badge variant="success" size="sm">Hồ sơ đang cập nhật</Badge>
             </div>
 
             <div className="border-t border-[#e2e7e1] pt-3 space-y-2 text-[12px]">
               <div className="flex justify-between">
                 <span className="text-[#74817b]">Ngân sách:</span>
                 <strong className="text-[#15594f]">
-                  {(Number(budgetMin) / 1000000).toFixed(1)} - {(Number(budgetMax) / 1000000).toFixed(1)} tr/tháng
+                  {budgetMin && budgetMax ? `${(Number(budgetMin) / 1000000).toFixed(1)} - ${(Number(budgetMax) / 1000000).toFixed(1)} tr/tháng` : "Chưa cập nhật"}
                 </strong>
               </div>
               <div className="flex justify-between">
@@ -392,11 +420,11 @@ export default function TenantRoommateProfilePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[#74817b]">Giờ ngủ:</span>
-                <strong className="text-[#203c37]">{sleepSchedule}</strong>
+                <strong className="text-[#203c37]">{sleepSchedule || "Chưa cập nhật"}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#74817b]">Thú cưng:</span>
-                <strong className="text-[#203c37]">{petAllowed ? "Cho phép" : "Không nuôi"}</strong>
+                <strong className="text-[#203c37]">{petAllowed === null ? "Chưa cập nhật" : petAllowed ? "Cho phép" : "Không nuôi"}</strong>
               </div>
             </div>
 
@@ -408,7 +436,7 @@ export default function TenantRoommateProfilePage() {
           <div className="bg-[#eaf2ed] border border-[#15594f]/20 rounded-[12px] p-4 text-[12px] text-[#203c37] flex items-start gap-2.5">
             <Sparkles className="size-4 text-[#15594f] shrink-0 mt-0.5" />
             <p>
-              Hồ sơ gu sống càng chân thực và chi tiết sẽ tăng 300% cơ hội tìm được người ở ghép hợp ý trong vòng 7 ngày.
+              Cập nhật đầy đủ hồ sơ giúp hệ thống tìm người ở ghép phù hợp hơn.
             </p>
           </div>
         </div>

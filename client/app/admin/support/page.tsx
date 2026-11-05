@@ -2,12 +2,23 @@
 
 import * as React from "react";
 import { LifeBuoy, Check, MessageSquare, Clock } from "lucide-react";
+import { apiClient } from "@/lib/api";
+import { SupportTicket } from "@/types/models";
 
 export default function AdminSupportPage() {
-  const [tickets, setTickets] = React.useState([
-    { id: "1", user: "Nguyễn Văn Nam", subject: "Không nhận được mã xác nhận OTP reset mật khẩu", status: "PENDING", createdAt: "2026-11-05T03:00:00Z" },
-    { id: "2", user: "Trần Minh An", subject: "Hỏi về cách xuất hóa đơn VAT cho công ty thuê trọ", status: "RESOLVED", createdAt: "2026-11-04T11:00:00Z" },
-  ]);
+  const [tickets, setTickets] = React.useState<SupportTicket[]>([]);
+  const loadTickets = React.useCallback(() => {
+    apiClient.support.getAll().then(setTickets).catch(() => setTickets([]));
+  }, []);
+
+  React.useEffect(() => {
+    loadTickets();
+  }, [loadTickets]);
+
+  const resolveTicket = async (id: string) => {
+    await apiClient.support.update(id, { status: "RESOLVED" });
+    loadTickets();
+  };
 
   return (
     <div className="space-y-6">
@@ -31,24 +42,24 @@ export default function AdminSupportPage() {
           <tbody className="divide-y divide-[#eef3ef] text-[#203c37]">
             {tickets.map((t) => (
               <tr key={t.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
-                <td className="py-3.5 px-4 font-semibold">{t.user}</td>
+                <td className="py-3.5 px-4 font-semibold">{t.user?.fullName ?? "Người dùng"}</td>
                 <td className="py-3.5 px-4">{t.subject}</td>
                 <td className="py-3.5 px-4 text-[#74817b]">{new Date(t.createdAt).toLocaleString("vi-VN")}</td>
                 <td className="py-3.5 px-4">
                   <span
                     className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                      t.status === "RESOLVED" ? "bg-[#eaf2ed] text-[#15594f]" : "bg-[#fbf1dc] text-[#9a6a12]"
+                      ["RESOLVED", "CLOSED"].includes(t.status) ? "bg-[#eaf2ed] text-[#15594f]" : "bg-[#fbf1dc] text-[#9a6a12]"
                     }`}
                   >
-                    {t.status === "RESOLVED" ? "Đã giải quyết" : "Đang chờ"}
+                    {["RESOLVED", "CLOSED"].includes(t.status) ? "Đã giải quyết" : "Đang chờ"}
                   </span>
                 </td>
                 <td className="py-3.5 px-4 text-right">
                   <button
-                    onClick={() => alert(`Mở ticket #${t.id}`)}
+                    onClick={() => resolveTicket(t.id)}
                     className="text-[12px] text-[#15594f] font-semibold hover:underline cursor-pointer"
                   >
-                    Trả lời ticket
+                    {["RESOLVED", "CLOSED"].includes(t.status) ? "Đã xử lý" : "Đánh dấu đã xử lý"}
                   </button>
                 </td>
               </tr>

@@ -76,7 +76,13 @@ export const contractService = {
       where: whereClause,
       include: {
         room: { 
-          include: { property: { select: { name: true, address: true } } } 
+          include: {
+            property: {
+              include: {
+                landlord: { select: { id: true, fullName: true, phone: true, email: true } },
+              },
+            },
+          }
         },
         tenant: { select: { fullName: true, phone: true, email: true } }
       },

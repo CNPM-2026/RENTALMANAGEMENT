@@ -19,8 +19,8 @@ export default function TenantFavoritesPage() {
         const data = await apiClient.favorites.getMyFavorites();
         setFavorites(data || []);
       } catch {
-        // Fallback mock items matching Figma frame 44:63255
-        setFavorites([
+        setFavorites([]);
+        /* setFavorites([
           {
             userId: "u1",
             postId: "post-1",
@@ -111,7 +111,7 @@ export default function TenantFavoritesPage() {
               ],
             },
           },
-        ]);
+        ]); */
       } finally {
         setIsLoading(false);
       }

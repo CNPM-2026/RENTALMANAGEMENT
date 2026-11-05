@@ -10,6 +10,7 @@ export default function LandlordUtilitiesPage() {
   const [selectedPropertyId, setSelectedPropertyId] = React.useState<string>("");
   const [rooms, setRooms] = React.useState<Room[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [readings, setReadings] = React.useState<Record<string, { electricityEnd: string; waterEnd: string }>>({});
 
   React.useEffect(() => {
     apiClient.properties
@@ -52,7 +53,7 @@ export default function LandlordUtilitiesPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Nhập và chốt chỉ số công tơ điện, đồng hồ nước hàng tháng.</p>
         </div>
         <button
-          onClick={() => alert("Mở form ghi chỉ số nhanh")}
+          onClick={() => document.getElementById("utility-table")?.scrollIntoView({ behavior: "smooth" })}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />
@@ -86,7 +87,7 @@ export default function LandlordUtilitiesPage() {
           <h3 className="text-[16px] font-semibold text-[#203c37]">Chưa có phòng nào để ghi chỉ số</h3>
         </div>
       ) : (
-        <div className="rounded-[12px] border border-[#e2e7e1] bg-white overflow-hidden shadow-xs">
+        <div id="utility-table" className="rounded-[12px] border border-[#e2e7e1] bg-white overflow-hidden shadow-xs">
           <table className="w-full text-left border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-[#e2e7e1] bg-[#f7f6f2] text-[#74817b] text-[12px] font-semibold">
@@ -108,6 +109,8 @@ export default function LandlordUtilitiesPage() {
                     <input
                       type="number"
                       placeholder="Số điện mới"
+                      value={readings[room.id]?.electricityEnd ?? ""}
+                      onChange={(e) => setReadings((prev) => ({ ...prev, [room.id]: { electricityEnd: e.target.value, waterEnd: prev[room.id]?.waterEnd ?? "" } }))}
                       className="w-28 px-2 py-1 text-[13px] border border-[#e2e7e1] rounded-[6px] bg-[#f7f6f2] outline-none"
                     />
                   </td>
@@ -115,12 +118,26 @@ export default function LandlordUtilitiesPage() {
                     <input
                       type="number"
                       placeholder="Số nước mới"
+                      value={readings[room.id]?.waterEnd ?? ""}
+                      onChange={(e) => setReadings((prev) => ({ ...prev, [room.id]: { electricityEnd: prev[room.id]?.electricityEnd ?? "", waterEnd: e.target.value } }))}
                       className="w-28 px-2 py-1 text-[13px] border border-[#e2e7e1] rounded-[6px] bg-[#f7f6f2] outline-none"
                     />
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <button
-                      onClick={() => alert(`Lưu chỉ số phòng ${room.roomNumber} thành công`)}
+                      onClick={async () => {
+                        const reading = readings[room.id];
+                        if (!reading?.electricityEnd || !reading.waterEnd) return;
+                        await apiClient.meterReadings.create({
+                          roomId: room.id,
+                          month: new Date().getMonth() + 1,
+                          year: new Date().getFullYear(),
+                          electricityStart: 0,
+                          electricityEnd: Number(reading.electricityEnd),
+                          waterStart: 0,
+                          waterEnd: Number(reading.waterEnd),
+                        });
+                      }}
                       className="px-3 py-1 rounded-[6px] bg-[#15594f] text-white text-[12px] font-medium hover:bg-[#124b42] cursor-pointer"
                     >
                       Lưu

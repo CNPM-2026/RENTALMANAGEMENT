@@ -97,6 +97,10 @@ export const matchingService = {
     });
   },
 
+  getPreferences: async (userId: string) => {
+    return prisma.roommatePreference.findUnique({ where: { userId } });
+  },
+
   // 4. Thuật toán tính điểm tương thích bạn cùng phòng
   getSuggestedRoommates: async (myId: string) => {
     // B1. Lấy thông tin bản thân, câu trả lời và tiêu chí tìm kiếm

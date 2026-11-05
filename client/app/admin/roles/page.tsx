@@ -2,12 +2,19 @@
 
 import * as React from "react";
 import { Key, ShieldCheck, Check } from "lucide-react";
+import { apiClient } from "@/lib/api";
+import { User } from "@/types/models";
 
 export default function AdminRolesPage() {
+  const [users, setUsers] = React.useState<User[]>([]);
+  React.useEffect(() => {
+    apiClient.adminGovernance.getUsers().then(setUsers).catch(() => setUsers([]));
+  }, []);
   const roles = [
-    { name: "Super Admin", desc: "Toàn quyền cấu hình, xóa dữ liệu và quản trị nhân sự", count: 2 },
-    { name: "Kiểm duyệt viên (Moderator)", desc: "Quyền duyệt bài đăng, xử lý báo cáo vi phạm và kiểm tra KYC", count: 5 },
-    { name: "CSKH & Hỗ trợ kỹ thuật", desc: "Quyền tiếp nhận và trả lời tickets của người thuê & chủ trọ", count: 8 },
+    { name: "Quản trị viên", desc: "Tài khoản có quyền quản trị hệ thống", count: users.filter((user) => user.role === "ADMIN").length },
+    { name: "Chủ trọ", desc: "Quản lý cơ sở, phòng, tin đăng và hợp đồng", count: users.filter((user) => user.role === "LANDLORD").length },
+    { name: "Người thuê", desc: "Tìm phòng, đặt lịch và quản lý hợp đồng thuê", count: users.filter((user) => user.role === "TENANT").length },
+    { name: "Môi giới", desc: "Hỗ trợ dẫn xem phòng và quản lý hoa hồng", count: users.filter((user) => user.role === "AGENT").length },
   ];
 
   return (
