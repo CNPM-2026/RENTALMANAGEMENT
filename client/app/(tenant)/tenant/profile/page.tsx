@@ -7,6 +7,47 @@ import { apiClient, ApiError } from "@/lib/api";
 import { getCurrentUser, updateStoredUser } from "@/lib/auth";
 import { UserWithProfile } from "@/types/models";
 
+const SAFE_IMAGE_URL = /^(blob:)?https?:\/\/[^\s"'<>`]+$/;
+
+function safeImageUrl(url: string | null | undefined): string | null {
+  if (!url || !SAFE_IMAGE_URL.test(url)) return null;
+  return url;
+}
+
+function AvatarImage({ file, url, className }: { file: File | null; url: string | null; className: string }) {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!file || !canvas) return;
+    let cancelled = false;
+    createImageBitmap(file)
+      .then((bitmap) => {
+        if (cancelled) {
+          bitmap.close();
+          return;
+        }
+        const size = Math.min(bitmap.width, bitmap.height);
+        canvas.width = size;
+        canvas.height = size;
+        canvas
+          .getContext("2d")
+          ?.drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, size, size);
+        bitmap.close();
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
+
+  if (file) {
+    return <canvas ref={canvasRef} className={className} role="img" aria-label="Avatar" />;
+  }
+  const src = safeImageUrl(url);
+  return src ? <img src={src} alt="Avatar" className={className} /> : null;
+}
+
 export default function TenantProfilePage() {
   const [user, setUser] = React.useState<UserWithProfile | null>(null);
   const [fullName, setFullName] = React.useState("");
@@ -33,7 +74,7 @@ export default function TenantProfilePage() {
         setUser(currentUser as UserWithProfile);
         setFullName(currentUser.fullName || "");
         setPhone(currentUser.phone || "");
-        setAvatarPreview(currentUser.avatarUrl || null);
+        setAvatarPreview(safeImageUrl(currentUser.avatarUrl));
 
         const profile = (currentUser as UserWithProfile).profile;
         if (profile) {
@@ -66,7 +107,7 @@ export default function TenantProfilePage() {
         return;
       }
       setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
+      setAvatarPreview(null);
       setFeedback(null);
     }
   }
@@ -170,12 +211,8 @@ export default function TenantProfilePage() {
               {/* Avatar Uploader Section */}
               <div className="flex items-center gap-5">
                 <div className="relative size-[94px] rounded-full overflow-hidden bg-[#eaf2ed] border-2 border-[#15594f]/20 shrink-0 flex items-center justify-center text-[#15594f]">
-                  {avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar"
-                      className="size-full object-cover"
-                    />
+                  {avatarFile || avatarPreview ? (
+                    <AvatarImage file={avatarFile} url={avatarPreview} className="size-full object-cover" />
                   ) : (
                     <User className="size-10" />
                   )}
@@ -349,12 +386,8 @@ export default function TenantProfilePage() {
           <div className="bg-white rounded-[12px] border border-[#e2e7e1] p-6 shadow-sm space-y-5">
             <div className="flex flex-col items-center text-center">
               <div className="size-[84px] rounded-full overflow-hidden bg-[#eaf2ed] border-2 border-[#15594f]/20 flex items-center justify-center text-[#15594f] mb-3">
-                {avatarPreview ? (
-                  <img
-                    src={avatarPreview}
-                    alt="Avatar"
-                    className="size-full object-cover"
-                  />
+                {avatarFile || avatarPreview ? (
+                  <AvatarImage file={avatarFile} url={avatarPreview} className="size-full object-cover" />
                 ) : (
                   <User className="size-9" />
                 )}
