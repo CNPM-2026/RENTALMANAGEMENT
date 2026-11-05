@@ -782,7 +782,15 @@ export const tier2AdminBoundaries: TestCase[] = [
     tier: 2,
     name: 'Reject path traversal characters in file upload routes (e.g., ../../etc/passwd)',
     run: () => {
-      const sanitizeFilename = (fn: string) => fn.replace(/(\.\.[\/\\])+/g, '');
+      const sanitizeFilename = (fn: string) => {
+        let out = fn;
+        let prev: string;
+        do {
+          prev = out;
+          out = out.replace(/\.\.[\/\\]/g, '');
+        } while (out !== prev);
+        return out;
+      };
       Assert.strictEqual(sanitizeFilename('../../uploads/avatar.jpg'), 'uploads/avatar.jpg');
     },
   },
