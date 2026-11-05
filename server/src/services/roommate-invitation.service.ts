@@ -6,11 +6,20 @@ export const roommateInvitationService = {
     if (senderId === data.recipientId) throw new AppError('Không thể tự gửi lời mời cho chính mình', 400);
     const recipient = await prisma.user.findFirst({ where: { id: data.recipientId, isActive: true, role: 'TENANT' }, select: { id: true } });
     if (!recipient) throw new AppError('Người nhận không hợp lệ', 404);
-    return prisma.roommateInvitation.upsert({
+    const existing = await prisma.roommateInvitation.findUnique({
       where: { senderId_recipientId: { senderId, recipientId: data.recipientId } },
-      update: { message: data.message, postId: data.postId, status: 'PENDING' },
-      create: { senderId, recipientId: data.recipientId, postId: data.postId, message: data.message },
     });
+    if (existing && existing.status !== 'PENDING') {
+      throw new AppError('Lời mời trước đó đã được xử lý, không thể ghi đè lịch sử', 409);
+    }
+    return existing
+      ? prisma.roommateInvitation.update({
+          where: { id: existing.id },
+          data: { message: data.message, postId: data.postId },
+        })
+      : prisma.roommateInvitation.create({
+          data: { senderId, recipientId: data.recipientId, postId: data.postId, message: data.message },
+        });
   },
   getMine: (userId: string, type: 'received' | 'sent') => prisma.roommateInvitation.findMany({
     where: type === 'received' ? { recipientId: userId } : { senderId: userId },

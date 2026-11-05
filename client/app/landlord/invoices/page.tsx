@@ -22,9 +22,17 @@ export default function LandlordInvoicesPage() {
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [form, setForm] = React.useState({ roomId: "", month: "", year: "", otherFee: "0" });
 
-  React.useEffect(() => {
+  const openCreateForm = () => {
     const now = new Date();
-    setForm((current) => ({ ...current, month: String(now.getMonth() + 1), year: String(now.getFullYear()) }));
+    setForm((current) => ({
+      ...current,
+      month: current.month || String(now.getMonth() + 1),
+      year: current.year || String(now.getFullYear()),
+    }));
+    setIsCreateOpen(true);
+  };
+
+  React.useEffect(() => {
     apiClient.invoices
       .getMyInvoices()
       .then((data) => setInvoices(data ?? []))
@@ -49,7 +57,7 @@ export default function LandlordInvoicesPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Quản lý hóa đơn tiền phòng, điện nước và đối soát thanh toán.</p>
         </div>
         <button
-          onClick={() => setIsCreateOpen(true)}
+          onClick={openCreateForm}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />

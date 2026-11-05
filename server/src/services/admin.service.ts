@@ -71,7 +71,17 @@ export const adminService = {
     if (adminId === userId) throw new AppError('Không thể tự khóa tài khoản admin hiện tại', 400);
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!user) throw new AppError('Không tìm thấy người dùng', 404);
-    const updated = await prisma.user.update({ where: { id: userId }, data: { isActive } });
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { isActive },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+      },
+    });
     await auditService.record({ userId: adminId, action: isActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', entityType: 'User', entityId: userId });
     return updated;
   },

@@ -38,10 +38,16 @@ export const authenticate: RequestHandler = async (req, res, next) => {
       throw new AppError('Tài khoản không tồn tại hoặc đã bị khóa', 401);
     }
 
-    const staff = await prisma.staffMembership.findFirst({
-      where: { userId: user.id, isActive: true },
-      select: { landlordId: true, permissions: true },
-    });
+    // A landlord account always owns its own resources. Staff context is only
+    // resolved for non-landlord users, so another landlord cannot be scoped
+    // into a different owner's data by an incidental membership row.
+    const staff = user.role === 'LANDLORD'
+      ? null
+      : await prisma.staffMembership.findFirst({
+          where: { userId: user.id, isActive: true },
+          select: { landlordId: true, permissions: true },
+          orderBy: { createdAt: 'desc' },
+        });
     authReq.user = {
       ...user,
       landlordId: staff?.landlordId,
@@ -93,4 +99,5 @@ export const authorizeStaffOr = (permission: string, ...roles: string[]): Reques
   };
 };
 
-export const resourceOwnerId = (req: AuthRequest): string => req.user!.landlordId ?? req.user!.id;
+export const resourceOwnerId = (req: AuthRequest): string =>
+  req.user!.role === 'LANDLORD' ? req.user!.id : (req.user!.landlordId ?? req.user!.id);

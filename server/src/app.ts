@@ -30,6 +30,7 @@ import staffRoute from './routes/staff.route'
 import { env } from './config/env';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
+import { apiLimiter } from './middlewares/rateLimit.middleware';
 const app: Application = express();
 // Middlewares
 app.use(helmet());
@@ -45,6 +46,7 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'Server is running 🚀' });
 });
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/v1', apiLimiter);
 
 // --- Gắn các Routes sau này vào đây ---
 // app.use('/api/v1/auth', authRoutes);

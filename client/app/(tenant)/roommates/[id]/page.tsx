@@ -42,6 +42,7 @@ function RoommateDetailContent() {
   const [inviteNote, setInviteNote] = React.useState("");
   const [isSent, setIsSent] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [inviteError, setInviteError] = React.useState<string | null>(null);
 
   const [suggestion, setSuggestion] = React.useState<SuggestedRoommate | null>(null);
 
@@ -71,57 +72,20 @@ function RoommateDetailContent() {
     targetLocation: "Chưa cập nhật", moveInDate: "Chưa cập nhật", bio: "",
   };
 
-  const compatibilityCriteria: CompatibilityCriterion[] = suggestion ? [
-    {
-      name: "Giờ giấc sinh hoạt",
-      score: 100,
-      explanation: "Hoàn hảo! Cả hai bạn đều đi ngủ trước 23:00 và thức dậy khoảng 06:30 sáng.",
-      myHabit: "Ngủ lúc 22:30 • Dậy lúc 06:30",
-      candidateHabit: "Ngủ lúc 22:30 • Dậy lúc 06:30",
-    },
-    {
-      name: "Khả năng tài chính & Ngân sách",
-      score: 95,
-      explanation: "Khoảng ngân sách dự kiến của hai bạn trùng khớp 95% (3.5 - 4.5 triệu/tháng).",
-      myHabit: "Ngân sách 4.0 triệu/tháng",
-      candidateHabit: "Ngân sách 3.5 - 4.5 triệu/tháng",
-    },
-    {
-      name: "Mức độ ngăn nắp & Sạch sẽ",
-      score: 90,
-      explanation: "Cả hai đều đánh giá tiêu chuẩn sạch sẽ 5/5 sao và đồng thuận dọn dẹp chung hàng tuần.",
-      myHabit: "Sạch sẽ 5★, quét dọn mỗi ngày",
-      candidateHabit: "Sạch sẽ 5★, không để bát đĩa qua đêm",
-    },
-    {
-      name: "Thú cưng & Động vật",
-      score: 100,
-      explanation: "Cả hai bạn đều yêu quý mèo và không ai bị dị ứng lông động vật.",
-      myHabit: "Thích nuôi mèo",
-      candidateHabit: "Yêu thích thú cưng",
-    },
-    {
-      name: "Nấu ăn & Sinh hoạt bếp",
-      score: 85,
-      explanation: "Đều có thói quen tự nấu ăn tại nhà 3-4 buổi/tuần, sẵn sàng chia sẻ chi phí gia vị cơ bản.",
-      myHabit: "Tự nấu ăn 4 buổi/tuần",
-      candidateHabit: "Tự nấu bữa tối",
-    },
-    {
-      name: "Bạn bè & Khách ghé thăm",
-      score: 90,
-      explanation: "Thống nhất quy tắc báo trước ít nhất 2 giờ khi có bạn bè hoặc người thân ghé phòng chơi.",
-      myHabit: "Báo trước khi có bạn tới",
-      candidateHabit: "Báo trước và không ở lại qua đêm",
-    },
-  ] : [];
+  const compatibilityCriteria: CompatibilityCriterion[] = [];
 
   const handleSendInvitation = async () => {
     setIsSubmitting(true);
-    await apiClient.roommateInvitations.create({ recipientId: candidate.id, message: inviteNote });
-    setIsSubmitting(false);
-    setIsSent(true);
-    setInviteModalOpen(false);
+    setInviteError(null);
+    try {
+      await apiClient.roommateInvitations.create({ recipientId: candidate.id, message: inviteNote });
+      setIsSent(true);
+      setInviteModalOpen(false);
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : "Không thể gửi lời mời.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -271,11 +235,11 @@ function RoommateDetailContent() {
                 {/* Score Commentary (Figma 44:63867) */}
                 <div className="space-y-1.5 text-center sm:text-left">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#15594f] text-white text-[11px] font-semibold uppercase">
-                    Độ tương thích rất cao
+                    Điểm tương thích
                   </span>
-                  <h3 className="text-[20px] font-bold text-[#203c37]">Hai bạn có nhịp sống cực kỳ đồng điệu!</h3>
+                  <h3 className="text-[20px] font-bold text-[#203c37]">Mức độ phù hợp được tính từ dữ liệu hiện có</h3>
                   <p className="text-[14px] text-[#74817b] leading-relaxed">
-                    Dựa trên khảo sát thói quen sinh hoạt và tiêu chí tìm kiếm, hai bạn tương đồng tuyệt đối về giờ giấc ngủ sớm, sự ngăn nắp và thiện cảm với thú cưng.
+                    Điểm số và thông tin bên dưới được lấy từ hồ sơ, bài đăng và tiêu chí tìm kiếm đã lưu.
                   </p>
                 </div>
               </div>
@@ -286,12 +250,14 @@ function RoommateDetailContent() {
               <div>
                 <h3 className="text-[18px] font-bold text-[#203c37]">Chi tiết điểm tương đồng theo từng tiêu chí</h3>
                 <p className="text-[13px] text-[#74817b] mt-0.5">
-                  Đối chiếu giữa câu trả lời khảo sát của bạn và ứng viên Nguyễn Hoàng Nam.
+                  Đối chiếu giữa dữ liệu tìm kiếm của bạn và hồ sơ ứng viên.
                 </p>
               </div>
 
               <div className="space-y-6">
-                {compatibilityCriteria.map((criterion, idx) => (
+                {compatibilityCriteria.length === 0 ? (
+                  <p className="text-sm text-[#74817b]">Chưa có dữ liệu chi tiết theo từng tiêu chí.</p>
+                ) : compatibilityCriteria.map((criterion, idx) => (
                   <div key={idx} className="space-y-2 border-b border-[#e2e7e1]/60 pb-5 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between text-[14px]">
                       <span className="font-semibold text-[#203c37]">{criterion.name}</span>
@@ -347,6 +313,11 @@ function RoommateDetailContent() {
         }
       >
         <div className="space-y-4">
+          {inviteError && (
+            <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-3 py-2 text-sm text-[#a4422c]">
+              {inviteError}
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-[13px] font-medium text-[#203c37]">Lời nhắn gửi kèm (Tùy chọn)</label>
             <textarea

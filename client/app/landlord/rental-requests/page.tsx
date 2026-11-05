@@ -21,8 +21,12 @@ export default function LandlordRentalRequestsPage() {
   }, []);
 
   React.useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
+    apiClient.rentalRequests
+      .getMine()
+      .then((data) => setRequests(data ?? []))
+      .catch(() => setErrorMessage("Không tải được yêu cầu thuê phòng."))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const handleUpdate = async (id: string, status: "APPROVED" | "REJECTED") => {
     try {

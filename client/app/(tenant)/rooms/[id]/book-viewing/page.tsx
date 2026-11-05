@@ -176,7 +176,7 @@ function BookViewingContent() {
               {/* Day Cells Grid */}
               <div className="grid grid-cols-7 gap-1 text-center text-[13px]">
                 {daysInMonth.map((day) => {
-                  const isPast = day < 5; // Days before today (demo: day 5)
+                  const isPast = day < currentDate.getDate();
                   const isSelected = day === selectedDate;
                   return (
                     <button

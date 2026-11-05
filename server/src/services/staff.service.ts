@@ -19,6 +19,7 @@ export const staffService = {
   invite: async (landlordId: string, email: string, permissions: string[]) => {
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
     if (!user) throw new AppError('Không tìm thấy tài khoản với email này', 404);
+    if (user.role === 'LANDLORD') throw new AppError('Không thể thêm tài khoản chủ trọ làm nhân viên', 400);
     if (user.id === landlordId) throw new AppError('Không thể tự thêm chính mình', 400);
     const existing = await prisma.staffMembership.findUnique({
       where: { landlordId_userId: { landlordId, userId: user.id } },

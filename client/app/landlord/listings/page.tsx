@@ -38,13 +38,12 @@ export default function LandlordListingsPage() {
   }, []);
 
   React.useEffect(() => {
-    if (!form.propertyId) {
-      setRooms([]);
-      return;
+    if (form.propertyId) {
+      apiClient.rooms.getByProperty(form.propertyId).then(setRooms).catch(() => setRooms([]));
     }
-    apiClient.rooms.getByProperty(form.propertyId).then(setRooms).catch(() => setRooms([]));
   }, [form.propertyId]);
 
+  const availableRooms = rooms.filter((room) => room.propertyId === form.propertyId && room.status === "AVAILABLE");
   const filtered = posts.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -166,7 +165,7 @@ export default function LandlordListingsPage() {
             </select>
             <select required value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="rounded border p-2 text-sm" disabled={!form.propertyId}>
               <option value="">Chọn phòng</option>
-              {rooms.filter((room) => room.status === "AVAILABLE").map((room) => <option key={room.id} value={room.id}>{room.roomNumber} · {formatCurrency(room.priceMonthly)}</option>)}
+              {availableRooms.map((room) => <option key={room.id} value={room.id}>{room.roomNumber} · {formatCurrency(room.priceMonthly)}</option>)}
             </select>
           </div>
           <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Gửi duyệt</button>

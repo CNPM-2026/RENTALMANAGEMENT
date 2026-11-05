@@ -33,6 +33,32 @@ export const rentalRequestService = {
         : false;
     if (!allowed) throw new AppError('Bạn không có quyền cập nhật yêu cầu này', 403);
     if (request.status !== 'SUBMITTED') throw new AppError('Yêu cầu đã được xử lý', 400);
-    return prisma.rentalRequest.update({ where: { id }, data: { status } });
+    if (status !== 'APPROVED') {
+      return prisma.rentalRequest.update({ where: { id }, data: { status } });
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const roomClaim = await tx.room.updateMany({
+        where: { id: request.roomId, status: 'AVAILABLE' },
+        data: { status: 'RENTED' },
+      });
+      if (roomClaim.count !== 1) {
+        throw new AppError('Phòng đã được giữ hoặc cho thuê bởi yêu cầu khác', 409);
+      }
+
+      const approved = await tx.rentalRequest.update({
+        where: { id: request.id, status: 'SUBMITTED' },
+        data: { status: 'APPROVED' },
+      });
+      await tx.rentalRequest.updateMany({
+        where: {
+          roomId: request.roomId,
+          id: { not: request.id },
+          status: 'SUBMITTED',
+        },
+        data: { status: 'REJECTED' },
+      });
+      return approved;
+    });
   },
 };
