@@ -28,14 +28,21 @@ export const userController = {
       if (!frontId || !backId) {
         return res.status(400).json({ success: false, message: 'Vui lòng tải lên đủ ảnh CCCD mặt trước và mặt sau' });
       }
-      const [frontIdUrl, backIdUrl] = await Promise.all([
-        storageService.uploadImage(frontId, 'rental-management/kyc'),
-        storageService.uploadImage(backId, 'rental-management/kyc'),
-      ]);
-      return res.status(200).json({
-        success: true,
-        data: await userService.submitKyc(req.user!.id, { ...req.body, frontIdUrl, backIdUrl }),
-      });
+      const uploaded: string[] = [];
+      try {
+        const [frontIdUrl, backIdUrl] = await Promise.all([
+          storageService.uploadPrivateImage(frontId, 'rental-management/kyc'),
+          storageService.uploadPrivateImage(backId, 'rental-management/kyc'),
+        ]);
+        uploaded.push(frontIdUrl, backIdUrl);
+        return res.status(200).json({
+          success: true,
+          data: await userService.submitKyc(req.user!.id, { ...req.body, frontIdUrl, backIdUrl }),
+        });
+      } catch (error) {
+        await Promise.all(uploaded.map((asset) => storageService.deleteImage(asset, 'authenticated')));
+        throw error;
+      }
     } catch (error) { return next(error); }
   },
 

@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { PostStatus } from '@prisma/client';
 import { notificationService } from './notification.service';
 import { auditService } from './audit.service';
+import { storageService } from './storage.service';
 
 export const adminService = {
   // Lấy danh sách bài chờ duyệt
@@ -54,9 +55,10 @@ export const adminService = {
   },
 
   deletePost: async (adminId: string, postId: string) => {
-    const post = await prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    const post = await prisma.post.findUnique({ where: { id: postId }, select: { id: true, images: { select: { imageUrl: true } } } });
     if (!post) throw new AppError('Không tìm thấy bài đăng', 404);
     const deleted = await prisma.post.delete({ where: { id: postId } });
+    await Promise.all(post.images.map((image) => storageService.deleteImage(image.imageUrl)));
     await auditService.record({ userId: adminId, action: 'DELETE_REPORTED_POST', entityType: 'Post', entityId: postId });
     return deleted;
   },
@@ -94,11 +96,18 @@ export const adminService = {
     return updated;
   },
 
-  getKycSubmissions: (status?: string) => prisma.kycSubmission.findMany({
-    where: status ? { status: status as never } : undefined,
-    include: { user: { select: { id: true, fullName: true, email: true, phone: true } } },
-    orderBy: { createdAt: 'asc' },
-  }),
+  getKycSubmissions: async (status?: string) => {
+    const submissions = await prisma.kycSubmission.findMany({
+      where: status ? { status: status as never } : undefined,
+      include: { user: { select: { id: true, fullName: true, email: true, phone: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    return submissions.map((submission) => ({
+      ...submission,
+      frontIdUrl: storageService.getPrivateImageUrl(submission.frontIdUrl),
+      backIdUrl: storageService.getPrivateImageUrl(submission.backIdUrl),
+    }));
+  },
 
   updateKyc: async (adminId: string, id: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
     const submission = await prisma.kycSubmission.findUnique({ where: { id }, select: { id: true, userId: true } });

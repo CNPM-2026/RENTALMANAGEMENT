@@ -2,7 +2,6 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { PostType, Prisma } from '@prisma/client';
 import { storageService } from './storage.service';
-import fs from 'fs/promises';
 
 export const postService = {
   getById: async (postId: string) => {
@@ -61,15 +60,16 @@ export const postService = {
 
     // 2. Nếu có file ảnh upload lên, lưu vào bảng PostImage
     if (files && files.length > 0) {
+      const uploadedAssets: string[] = [];
       try {
-        const imageData = await Promise.all(files.map(async (file, index) => ({
-          postId: post.id,
-          imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
-          isPrimary: index === 0,
-        })));
+        const imageData = await Promise.all(files.map(async (file, index) => {
+          const imageUrl = await storageService.uploadImage(file, 'rental-management/posts');
+          uploadedAssets.push(imageUrl);
+          return { postId: post.id, imageUrl, isPrimary: index === 0 };
+        }));
         await prisma.postImage.createMany({ data: imageData });
       } catch (error) {
-        await Promise.all(files.map((file) => fs.unlink(file.path).catch(() => undefined)));
+        await Promise.all(uploadedAssets.map((asset) => storageService.deleteImage(asset)));
         await prisma.post.delete({ where: { id: post.id } }).catch(() => undefined);
         throw error;
       }
@@ -265,16 +265,17 @@ export const postService = {
 
     // Nếu có up thêm ảnh mới
     if (files && files.length > 0) {
+      const uploadedAssets: string[] = [];
       try {
         await prisma.postImage.createMany({
-          data: await Promise.all(files.map(async (file, index) => ({
-            postId,
-            imageUrl: await storageService.uploadImage(file, 'rental-management/posts'),
-            isPrimary: index === 0,
-          })))
+          data: await Promise.all(files.map(async (file, index) => {
+            const imageUrl = await storageService.uploadImage(file, 'rental-management/posts');
+            uploadedAssets.push(imageUrl);
+            return { postId, imageUrl, isPrimary: index === 0 };
+          }))
         });
       } catch (error) {
-        await Promise.all(files.map((file) => fs.unlink(file.path).catch(() => undefined)));
+        await Promise.all(uploadedAssets.map((asset) => storageService.deleteImage(asset)));
         throw error;
       }
     }
@@ -284,7 +285,7 @@ export const postService = {
 
   // Xóa bài đăng
   deletePost: async (userId: string, role: string, postId: string) => {
-    const post = await prisma.post.findUnique({ where: { id: postId } });
+    const post = await prisma.post.findUnique({ where: { id: postId }, include: { images: { select: { imageUrl: true } } } });
     if (!post) throw new AppError('Bài đăng không tồn tại', 404);
     
     // Admin hoặc chủ bài đăng mới được xóa
@@ -292,7 +293,8 @@ export const postService = {
       throw new AppError('Bạn không có quyền xóa bài này', 403);
     }
 
-    // (Lưu ý: Prisma sẽ tự xóa ảnh trong DB nhờ onDelete Cascade, nhưng file vật lý trong thư mục uploads sẽ cần code thêm để xóa nếu muốn sạch sẽ)
-    return await prisma.post.delete({ where: { id: postId } });
+    const deleted = await prisma.post.delete({ where: { id: postId } });
+    await Promise.all(post.images.map((image) => storageService.deleteImage(image.imageUrl)));
+    return deleted;
   }
 };
