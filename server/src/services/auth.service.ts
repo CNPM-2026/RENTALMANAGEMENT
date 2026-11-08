@@ -1,12 +1,72 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
-import { signShortToken } from '../utils/jwt';
+import { signGoogleOAuthState, signShortToken, verifyGoogleOAuthState } from '../utils/jwt';
 import { createOpaqueToken, createOtp, hashToken } from '../utils/tokens';
 import { mailService } from './mail.service';
 import { Role } from '@prisma/client';
+import { OAuth2Client } from 'google-auth-library';
+import { env } from '../config/env';
 
 export const authService = {
+  googleAuthorizationUrl: () => {
+    const client = getGoogleClient();
+    return client.generateAuthUrl({
+      access_type: 'online',
+      scope: ['openid', 'email', 'profile'],
+      prompt: 'select_account',
+      state: signGoogleOAuthState(),
+    });
+  },
+
+  loginWithGoogle: async (code: string, state: string) => {
+    try {
+      verifyGoogleOAuthState(state);
+    } catch {
+      throw new AppError('Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn', 401);
+    }
+    const client = getGoogleClient();
+    const { tokens } = await client.getToken(code);
+    if (!tokens.id_token) throw new AppError('Google không trả về thông tin xác thực', 401);
+    const ticket = await client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: env.GOOGLE_CLIENT_ID || env.CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.sub || !payload.email || payload.email_verified !== true) {
+      throw new AppError('Tài khoản Google chưa xác minh email', 401);
+    }
+
+    const user = await prisma.user.upsert({
+      where: { email: payload.email.toLowerCase() },
+      update: {
+        isActive: true,
+        isEmailVerified: true,
+        avatarUrl: payload.picture,
+        fullName: payload.name || payload.email,
+      },
+      create: {
+        email: payload.email.toLowerCase(),
+        passwordHash: hashToken(createOpaqueToken()),
+        fullName: payload.name || payload.email,
+        avatarUrl: payload.picture,
+        role: Role.TENANT,
+        isEmailVerified: true,
+      },
+    });
+
+    const token = signShortToken({ id: user.id, role: user.role });
+    const refreshToken = createOpaqueToken();
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(refreshToken),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    const { passwordHash, ...userWithoutPassword } = user;
+    return { user: userWithoutPassword, token, refreshToken };
+  },
   // 1. Đăng ký
   register: async (data: any) => {
     const { email, password, fullName, phone, role } = data;
@@ -189,3 +249,12 @@ export const authService = {
     });
   },
 };
+
+function getGoogleClient() {
+  const clientId = env.GOOGLE_CLIENT_ID || env.CLIENT_ID;
+  const clientSecret = env.GOOGLE_CLIENT_SECRET || env.CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new AppError('Google OAuth chưa được cấu hình đầy đủ', 503);
+  }
+  return new OAuth2Client(clientId, clientSecret, env.GOOGLE_REDIRECT_URI);
+}

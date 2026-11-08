@@ -23,6 +23,12 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
+  CLIENT_ID: z.string().optional(),
+  CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().url().default('http://localhost:3000/api/v1/auth/google/callback'),
+  FRONTEND_URL: z.string().url().default('http://localhost:3001'),
 });
 
 // Thử parse các biến môi trường, nếu thiếu hay sai định dạng sẽ báo đỏ ngay lúc khởi động
