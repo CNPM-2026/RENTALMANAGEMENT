@@ -19,6 +19,8 @@ router.post('/forgot-password', validate(forgotPasswordSchema), authController.f
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 router.post('/verify-email', validate(verifyEmailSchema), authController.verifyEmail);
 router.post('/resend-verification', validate(forgotPasswordSchema), authController.resendVerification);
+router.get('/google', authController.googleRedirect);
+router.get('/google/callback', authController.googleCallback);
 router.get('/me', authenticate, authController.getMe);
 
 export default router;

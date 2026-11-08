@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
 import { auditService } from '../services/audit.service';
 import prisma from '../config/db';
+import { env } from '../config/env';
 
 export const authController = {
   register: async (
@@ -108,6 +109,26 @@ export const authController = {
       if (user) await authService.sendEmailVerification(user.id, user.email);
       return res.json({ success: true, message: 'Nếu email tồn tại, mã xác minh mới đã được gửi' });
     } catch (error) { return next(error); }
+  },
+
+  googleRedirect: (req: Request, res: Response) => {
+    res.redirect(authService.googleAuthorizationUrl());
+  },
+
+  googleCallback: async (req: Request, res: Response) => {
+    try {
+      const result = await authService.loginWithGoogle(
+        String(req.query.code || ''),
+        String(req.query.state || ''),
+      );
+      const params = new URLSearchParams({
+        token: result.token,
+        refreshToken: result.refreshToken,
+      });
+      res.redirect(`${env.FRONTEND_URL}/login#google=${encodeURIComponent(params.toString())}`);
+    } catch {
+      res.redirect(`${env.FRONTEND_URL}/login?googleError=1`);
+    }
   },
 
   getMe: (req: Request, res: Response) => {

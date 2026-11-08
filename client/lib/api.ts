@@ -203,14 +203,14 @@ async function refreshAccessToken(): Promise<string | null> {
  * Centralized low-level fetch request wrapper.
  */
 export async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { params, body, skipAuth, skipAutoRefresh, ...fetchOptions } = options;
+  const { params, body, skipAuth, skipAutoRefresh, authToken, ...fetchOptions } = options;
   const url = resolveUrl(path, params);
 
   const headers: Record<string, string> = {};
 
   // Inject Bearer token unless explicitly skipped
   if (!skipAuth) {
-    const token = getAuthToken();
+    const token = authToken ?? getAuthToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -338,6 +338,8 @@ export const apiClient = {
       apiClient.post<{ message: string }>('/auth/resend-verification', payload, { skipAuth: true }),
     getMe: () =>
       apiClient.get<User>('/auth/me'),
+    getMeWithToken: (token: string) =>
+      apiClient.get<User>('/auth/me', undefined, { authToken: token, skipAutoRefresh: true }),
   },
 
   // 2. User Profile

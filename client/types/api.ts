@@ -59,6 +59,7 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   skipAuth?: boolean;
   skipAutoRefresh?: boolean;
+  authToken?: string;
 }
 
 /**
