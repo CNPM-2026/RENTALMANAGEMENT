@@ -31,11 +31,14 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     // Lấy user từ DB (để check xem user có bị khóa không)
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, fullName: true, role: true, isActive: true }
+      select: { id: true, email: true, fullName: true, role: true, isActive: true, isEmailVerified: true }
     });
 
     if (!user || !user.isActive) {
       throw new AppError('Tài khoản không tồn tại hoặc đã bị khóa', 401);
+    }
+    if (!user.isEmailVerified) {
+      throw new AppError('Vui lòng xác minh email trước khi sử dụng hệ thống', 403);
     }
 
     // A landlord account always owns its own resources. Staff context is only
