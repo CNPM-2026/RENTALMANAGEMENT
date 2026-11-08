@@ -9,8 +9,22 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     fullName: string;
+    phone: string | null;
+    avatarUrl: string | null;
     role: string;
     isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    profile?: {
+      id: string;
+      userId: string;
+      gender: string | null;
+      dob: Date | null;
+      bio: string | null;
+      occupation: string | null;
+      emergencyContact: string | null;
+      createdAt: Date;
+    } | null;
     landlordId?: string;
     staffPermissions?: string[];
   };
@@ -31,7 +45,19 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     // Lấy user từ DB (để check xem user có bị khóa không)
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, fullName: true, role: true, isActive: true, isEmailVerified: true }
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        isActive: true,
+        isEmailVerified: true,
+        createdAt: true,
+        updatedAt: true,
+        profile: true,
+      }
     });
 
     if (!user || !user.isActive) {
@@ -72,7 +98,11 @@ export const authenticate: RequestHandler = async (req, res, next) => {
 export const authorize = (...roles: string[]): RequestHandler => {
   return (req, res, next) => {
     const authReq = req as AuthRequest;
-    if (!authReq.user || !roles.includes(authReq.user.role)) {
+    const role = authReq.user?.role?.toUpperCase();
+    const allowedRoles = roles.map((item) => item.toUpperCase());
+    const isAdminAlias = role === 'ADMIN' || role === 'SUPER_ADMIN';
+    const isAllowed = allowedRoles.includes(role ?? '') || (isAdminAlias && allowedRoles.includes('ADMIN'));
+    if (!authReq.user || !isAllowed) {
       return next(new AppError('Bạn không có quyền thực hiện hành động này', 403));
     }
     next();

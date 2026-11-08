@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const uuid = z.string().uuid('ID không hợp lệ');
 const positiveNumber = z.coerce.number().finite().nonnegative();
+const moneyAmount = positiveNumber.lt(100_000_000, 'Số tiền phải nhỏ hơn 100.000.000');
 
 export const propertySchema = z.object({
   name: z.string().trim().min(2).max(150),
@@ -18,12 +19,27 @@ export const propertySchema = z.object({
 export const roomSchema = z.object({
   propertyId: uuid,
   roomNumber: z.string().trim().min(1).max(30),
-  priceMonthly: positiveNumber,
-  priceYearly: positiveNumber.optional(),
-  depositAmount: positiveNumber.optional(),
+  priceMonthly: moneyAmount,
+  priceYearly: moneyAmount.optional(),
+  depositAmount: moneyAmount.optional(),
+  electricityRate: moneyAmount.optional(),
+  waterRate: moneyAmount.optional(),
+  internetFee: moneyAmount.optional(),
+  serviceFee: moneyAmount.optional(),
+  parkingFee: moneyAmount.optional(),
   area: z.coerce.number().finite().positive(),
   maxOccupants: z.coerce.number().int().positive().max(50).optional(),
   amenityIds: z.array(uuid).max(50).optional(),
+});
+
+export const amenitySchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  iconUrl: z.string().trim().url().max(500).optional().or(z.literal('')),
+});
+
+export const kycSubmissionSchema = z.object({
+  idNumber: z.string().trim().min(9).max(20),
+  permanentAddress: z.string().trim().min(5).max(300),
 });
 
 export const contractSchema = z.object({
@@ -85,14 +101,26 @@ export const reportStatusSchema = z.object({
   status: z.enum(['PENDING', 'RESOLVED']),
 });
 
-export const postWriteSchema = z.object({
+const postWriteFields = {
   title: z.string().trim().min(3).max(200),
   description: z.string().trim().min(10).max(10000),
   price: positiveNumber.optional(),
   postType: z.enum(['RENT_OUT', 'FIND_ROOM', 'FIND_ROOMMATE']),
   propertyId: uuid.optional(),
   roomId: uuid.optional(),
-});
+};
+
+const validateRentOutPost = (value: z.infer<z.ZodObject<typeof postWriteFields>>, ctx: z.RefinementCtx) => {
+  if (value.postType === 'RENT_OUT' && !value.roomId) {
+    ctx.addIssue({ code: 'custom', message: 'Tin cho thuê phải gắn với một phòng', path: ['roomId'] });
+  }
+  if (value.postType === 'RENT_OUT' && !value.propertyId) {
+    ctx.addIssue({ code: 'custom', message: 'Tin cho thuê phải gắn với nhà trọ', path: ['propertyId'] });
+  }
+};
+
+export const postWriteSchema = z.object(postWriteFields).superRefine(validateRentOutPost);
+export const postUpdateSchema = z.object(postWriteFields).partial();
 
 export const supportCreateSchema = z.object({
   roomId: uuid.optional(),
@@ -141,7 +169,7 @@ export const rentalRequestCreateSchema = z.object({
 });
 
 export const rentalRequestStatusSchema = z.object({
-  status: z.enum(['APPROVED', 'REJECTED', 'CANCELLED']),
+  status: z.enum(['APPROVED', 'REJECTED', 'CANCELLED', 'SIGNED']),
 });
 
 export const roommateInvitationCreateSchema = z.object({

@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { apiClient } from "@/lib/api";
+import { Avatar } from "@/components/ui/avatar";
 import { formatCurrency } from "@/lib/utils";
 import { SuggestedRoommate } from "@/types/models";
 
@@ -110,8 +111,7 @@ function RoommateDetailContent() {
               {/* Avatar & Basic Info */}
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="relative size-[110px] rounded-full overflow-hidden bg-[#eaf2ed] border-3 border-[#15594f] shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Avatar
                     src={candidate.avatarUrl}
                     alt={candidate.fullName}
                     className="size-full object-cover"

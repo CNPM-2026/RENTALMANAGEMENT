@@ -7,7 +7,7 @@ import fs from 'fs/promises';
 export const postService = {
   getById: async (postId: string) => {
     const post = await prisma.post.findFirst({
-      where: { id: postId, status: 'APPROVED', OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }] },
+      where: { id: postId, OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }] },
       include: {
         images: true,
         author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
@@ -19,10 +19,18 @@ export const postService = {
     return post;
   },
   createPost: async (authorId: string, data: any, files: Express.Multer.File[]) => {
-    const { title, description, price, postType, propertyId, roomId } = data;
+    const { title, description, postType, propertyId, roomId } = data;
+    const bannedKeywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } });
+    const content = `${title ?? ""} ${description ?? ""}`.toLocaleLowerCase("vi-VN");
+    const matchedKeyword = bannedKeywords.find(({ keyword }) => content.includes(keyword));
+    if (matchedKeyword) {
+      throw new AppError(`Nội dung chứa từ khóa bị cấm: "${matchedKeyword.keyword}"`, 400);
+    }
+    let roomPrice: number | null = null;
 
     if (propertyId || roomId) {
       const room = roomId ? await prisma.room.findUnique({ where: { id: roomId }, include: { property: true } }) : null;
+      if (room) roomPrice = Number(room.priceMonthly);
       if (room && room.property.landlordId !== authorId) {
         throw new AppError('Bạn không có quyền đăng tin cho phòng này', 403);
       }
@@ -43,7 +51,7 @@ export const postService = {
         authorId,
         title,
         description,
-        price: price ? parseFloat(price) : null,
+        price: roomPrice,
         postType: postType as PostType,
         propertyId: propertyId || null,
         roomId: roomId || null,
@@ -70,7 +78,7 @@ export const postService = {
     // 3. Trả về post kèm ảnh
     return await prisma.post.findUnique({
       where: { id: post.id },
-      include: { images: true },
+      include: { images: true, room: true, property: true },
     });
   },
 
@@ -88,9 +96,9 @@ export const postService = {
       },
       include: {
         images: true,
-        author: { select: { fullName: true, avatarUrl: true, phone: true } },
+        author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
         property: { select: { name: true, address: true, province: true, district: true } },
-        room: { select: { roomNumber: true, priceMonthly: true, area: true } }
+        room: { include: { roomAmenities: { include: { amenity: true } } } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -192,9 +200,9 @@ export const postService = {
       where: whereClause,
       include: {
         images: true,
-        author: { select: { fullName: true, avatarUrl: true, phone: true } },
+        author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
         property: { select: { name: true, address: true, province: true, district: true, latitude: true, longitude: true } },
-        room: { select: { roomNumber: true, priceMonthly: true, area: true } }
+        room: { include: { roomAmenities: { include: { amenity: true } } } }
       },
       orderBy,
       skip,
@@ -227,10 +235,22 @@ export const postService = {
     if (!post) throw new AppError('Bài đăng không tồn tại', 404);
     if (post.authorId !== userId) throw new AppError('Bạn không có quyền sửa bài này', 403);
 
-    const { title, description, price, status } = data;
+    const { title, description, status } = data;
+    const bannedKeywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } });
+    const content = `${title ?? post.title} ${description ?? post.description}`.toLocaleLowerCase("vi-VN");
+    const matchedKeyword = bannedKeywords.find(({ keyword }) => content.includes(keyword));
+    if (matchedKeyword) {
+      throw new AppError(`Nội dung chứa từ khóa bị cấm: "${matchedKeyword.keyword}"`, 400);
+    }
+    let roomPrice: number | null | undefined;
+    if (post.roomId) {
+      const room = await prisma.room.findUnique({ where: { id: post.roomId }, select: { priceMonthly: true } });
+      if (!room) throw new AppError('Phòng của bài đăng không còn tồn tại', 400);
+      roomPrice = Number(room.priceMonthly);
+    }
 
     // Nếu sửa thông tin -> Đưa về trạng thái PENDING để Admin duyệt lại
-    const newStatus = (title || description || price) ? 'PENDING' : post.status;
+    const newStatus = (title || description) ? 'PENDING' : post.status;
 
     // Cập nhật
     const updatedPost = await prisma.post.update({
@@ -238,7 +258,7 @@ export const postService = {
       data: {
         ...(title && { title }),
         ...(description && { description }),
-        ...(price && { price: parseFloat(price) }),
+        ...(roomPrice !== undefined && { price: roomPrice }),
         status: newStatus,
       }
     });

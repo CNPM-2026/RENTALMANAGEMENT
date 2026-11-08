@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
+import { Post } from "@/types/models";
 
 const TIME_SLOTS = [
   "09:00 - 10:00",
@@ -49,6 +50,20 @@ function BookViewingContent() {
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [roomPrice, setRoomPrice] = React.useState(0);
+  const [post, setPost] = React.useState<Post | null>(null);
+
+  React.useEffect(() => {
+    void apiClient.posts.getById(roomId)
+      .then((loadedPost) => {
+        setPost(loadedPost);
+        setRoomPrice(Number(loadedPost.room?.priceMonthly ?? loadedPost.price ?? 0));
+      })
+      .catch(() => {
+        setPost(null);
+        setRoomPrice(0);
+      });
+  }, [roomId]);
 
   const currentDate = new Date();
   const currentMonthName = currentDate.toLocaleDateString("vi-VN", { month: "long", year: "numeric" });
@@ -96,7 +111,7 @@ function BookViewingContent() {
             </Link>
             <span>/</span>
             <Link href={`/rooms/${roomId}`} className="hover:text-[#15594f]">
-              Studio Ban Mai
+              {post?.title ?? "Phòng thuê"}
             </Link>
             <span>/</span>
             <span className="text-[#203c37] font-medium">Đặt lịch xem phòng</span>
@@ -298,19 +313,19 @@ function BookViewingContent() {
               {/* Room Card Mini */}
               <div className="flex gap-3 items-center">
                 <img
-                  src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=300&q=80"
-                  alt="Studio Ban Mai"
+                  src={post?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg"}
+                  alt={post?.title ?? "Phòng thuê"}
                   className="size-16 rounded-[8px] object-cover shrink-0"
                 />
                 <div className="min-w-0">
                   <h4 className="text-[13px] font-bold text-[#203c37] truncate">
-                    Studio Ban Mai — Ban Công Hướng Đông
+                    {post?.title ?? "Phòng thuê"}
                   </h4>
                   <p className="text-[11px] text-[#74817b] truncate">
-                    142 Điện Biên Phủ, P. 25, Bình Thạnh
+                    {post?.property?.address ?? "Chưa cập nhật địa chỉ"}
                   </p>
                   <p className="text-[12px] font-bold text-[#15594f] mt-0.5">
-                    4.500.000 đ/tháng
+                    {new Intl.NumberFormat("vi-VN").format(roomPrice)} đ/tháng
                   </p>
                 </div>
               </div>

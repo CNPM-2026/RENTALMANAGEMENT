@@ -53,6 +53,14 @@ export const adminService = {
     return updatedPost;
   },
 
+  deletePost: async (adminId: string, postId: string) => {
+    const post = await prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    if (!post) throw new AppError('Không tìm thấy bài đăng', 404);
+    const deleted = await prisma.post.delete({ where: { id: postId } });
+    await auditService.record({ userId: adminId, action: 'DELETE_REPORTED_POST', entityType: 'Post', entityId: postId });
+    return deleted;
+  },
+
   getUsers: async (query: { role?: string; search?: string }) => prisma.user.findMany({
     where: {
       ...(query.role && { role: query.role as never }),
@@ -132,5 +140,21 @@ export const adminService = {
     const existing = await prisma.contentFilterKeyword.findUnique({ where: { id } });
     if (!existing) throw new AppError('Không tìm thấy từ khóa', 404);
     return prisma.contentFilterKeyword.delete({ where: { id } });
+  },
+
+  getAmenities: () => prisma.amenity.findMany({ orderBy: { name: 'asc' } }),
+
+  createAmenity: async (name: string, iconUrl?: string) => {
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new AppError('Tên tiện ích không được để trống', 400);
+    return prisma.amenity.create({
+      data: { name: normalizedName, iconUrl: iconUrl?.trim() || null },
+    });
+  },
+
+  deleteAmenity: async (id: string) => {
+    const amenity = await prisma.amenity.findUnique({ where: { id } });
+    if (!amenity) throw new AppError('Không tìm thấy tiện ích', 404);
+    return prisma.amenity.delete({ where: { id } });
   },
 };

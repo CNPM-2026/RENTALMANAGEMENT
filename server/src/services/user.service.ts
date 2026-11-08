@@ -45,5 +45,18 @@ export const userService = {
         }
       });
     });
-  }
+  },
+
+  submitKyc: async (userId: string, data: {
+    idNumber: string;
+    permanentAddress: string;
+    frontIdUrl: string;
+    backIdUrl: string;
+  }) => prisma.kycSubmission.upsert({
+    where: { userId },
+    create: { userId, ...data, status: 'PENDING' },
+    update: { ...data, status: 'PENDING', rejectionReason: null, reviewedById: null, reviewedAt: null },
+  }),
+
+  getMyKyc: async (userId: string) => prisma.kycSubmission.findUnique({ where: { userId } }),
 };

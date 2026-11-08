@@ -23,6 +23,9 @@ import {
   Key,
   History,
   Settings,
+  Sparkles,
+  Search,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +72,16 @@ export function AdminSidebar() {
         { label: "Phân quyền RBAC", href: "/admin/roles", icon: Key },
         { label: "Nhật ký hoạt động (Logs)", href: "/admin/audit-logs", icon: History },
         { label: "Cấu hình hệ thống", href: "/admin/settings", icon: Settings },
+        { label: "Tiện ích phòng", href: "/admin/amenities", icon: Sparkles },
+      ],
+    },
+    {
+      title: "DÙNG CHUNG",
+      items: [
+        { label: "Tìm phòng", href: "/rooms", icon: Search },
+        { label: "Tìm bạn ở ghép", href: "/roommates", icon: Users },
+        { label: "Hồ sơ cá nhân", href: "/tenant/profile", icon: User },
+        { label: "Báo cáo vi phạm", href: "/tenant/safety/report", icon: ShieldAlert },
       ],
     },
   ];

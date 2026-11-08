@@ -33,6 +33,12 @@ export const adminController = {
     }
   },
 
+  deletePost: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.json({ success: true, data: await adminService.deletePost(req.user!.id, String(req.params.id)) });
+    } catch (error) { return next(error); }
+  },
+
   getUsers: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try { return res.json({ success: true, data: await adminService.getUsers({ role: req.query.role as string, search: req.query.search as string }) }); }
     catch (error) { return next(error); }
@@ -73,5 +79,25 @@ export const adminController = {
   removeContentFilterKeyword: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try { return res.json({ success: true, data: await adminService.removeContentFilterKeyword(String(req.params.id)) }); }
     catch (error) { return next(error); }
+  },
+
+  getAmenities: async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try { return res.json({ success: true, data: await adminService.getAmenities() }); }
+    catch (error) { return next(error); }
+  },
+
+  createAmenity: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.status(201).json({
+        success: true,
+        data: await adminService.createAmenity(req.body.name, req.body.iconUrl),
+      });
+    } catch (error) { return next(error); }
+  },
+
+  deleteAmenity: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.json({ success: true, data: await adminService.deleteAmenity(String(req.params.id)) });
+    } catch (error) { return next(error); }
   },
 };

@@ -14,11 +14,13 @@ import {
   Heart,
   Bell,
   User,
+  ShieldCheck,
   LogOut,
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
 
 interface PublicNavbarProps {
   currentUser?: {
@@ -126,9 +128,11 @@ export function PublicNavbar({
                   onClick={() => setProfileDropdownOpen((prev) => !prev)}
                   className="flex items-center gap-2.5 p-1.5 pr-3 rounded-[100px] border border-[#e2e7e1] bg-[#f7f6f2] hover:bg-[#f2ede3] transition-colors cursor-pointer"
                 >
-                  <div className="size-[32px] rounded-full bg-[#15594f] text-white font-semibold text-[12px] flex items-center justify-center">
-                    {currentUser.fullName ? currentUser.fullName[0].toUpperCase() : "U"}
-                  </div>
+                  <Avatar
+                    src={currentUser.avatar}
+                    alt={currentUser.fullName || "Ảnh đại diện"}
+                    className="size-[32px] rounded-full object-cover"
+                  />
                   <div className="text-left">
                     <p className="text-[13px] font-semibold text-[#203c37] leading-none">
                       {currentUser.fullName}
@@ -160,6 +164,39 @@ export function PublicNavbar({
                       <span>Không gian cá nhân</span>
                     </Link>
 
+                    {currentUser.role === "LANDLORD" && (
+                      <Link
+                        href="/landlord/dashboard"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
+                      >
+                        <Home className="size-4" />
+                        <span>Không gian chủ trọ</span>
+                      </Link>
+                    )}
+
+                    {currentUser.role === "ADMIN" && (
+                      <Link
+                        href="/admin/dashboard"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
+                      >
+                        <ShieldCheck className="size-4" />
+                        <span>Không gian quản trị</span>
+                      </Link>
+                    )}
+
+                    {currentUser.role === "AGENT" && (
+                      <Link
+                        href="/landlord/dashboard"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
+                      >
+                        <Users className="size-4" />
+                        <span>Không gian nhân viên</span>
+                      </Link>
+                    )}
+
                     <Link
                       href="/tenant/profile"
                       onClick={() => setProfileDropdownOpen(false)}
@@ -167,6 +204,15 @@ export function PublicNavbar({
                     >
                       <Info className="size-4 text-[#74817b]" />
                       <span>Chỉnh sửa hồ sơ</span>
+                    </Link>
+
+                    <Link
+                      href="/tenant/safety/report"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[#203c37] hover:bg-[#f7f6f2]"
+                    >
+                      <ShieldCheck className="size-4 text-[#74817b]" />
+                      <span>Báo cáo vi phạm</span>
                     </Link>
 
                     <div className="h-px bg-[#e2e7e1] my-1" />

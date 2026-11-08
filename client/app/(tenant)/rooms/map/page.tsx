@@ -35,7 +35,8 @@ interface MapRoom {
   landmark: string;
 }
 
-const MAP_ROOMS: MapRoom[] = [
+const MAP_ROOMS: MapRoom[] = [];
+/*
   {
     id: "studio-ban-mai",
     title: "Studio Ban Mai — Ban Công Hướng Đông",
@@ -127,6 +128,7 @@ const MAP_ROOMS: MapRoom[] = [
     landmark: "Gần Hồ Bán Nguyệt & Cầu Ánh Sao",
   },
 ];
+*/
 
 export default function RoomsMapPage() {
   const [rooms, setRooms] = React.useState<MapRoom[]>([]);
@@ -139,8 +141,8 @@ export default function RoomsMapPage() {
       const mapped = posts.map((post: Post, index) => ({
         id: post.id,
         title: post.title,
-        price: post.price ?? 0,
-        formattedPrice: `${((post.price ?? 0) / 1000000).toFixed(1)} tr`,
+        price: post.room?.priceMonthly ?? post.price ?? 0,
+        formattedPrice: `${((post.room?.priceMonthly ?? post.price ?? 0) / 1000000).toFixed(1)} tr`,
         area: post.room?.area ?? 0,
         floor: 0,
         hasBalcony: false,

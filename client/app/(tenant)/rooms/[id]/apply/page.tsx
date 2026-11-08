@@ -4,23 +4,22 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  FileCheck,
   Calendar,
-  Users,
   IdCard,
   Phone,
   User,
   ShieldCheck,
   CheckCircle2,
   Clock,
-  ArrowRight,
   Send,
-  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
+import { apiClient } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
+import { Post } from "@/types/models";
 
 function ApplyRentalContent() {
   const params = useParams();
@@ -29,44 +28,103 @@ function ApplyRentalContent() {
 
   // Form State
   const [fullName, setFullName] = React.useState("");
-  const [phone, setPhone] = React.useState("0987654321");
-  const [citizenId, setCitizenId] = React.useState("079198001234");
-  const [email, setEmail] = React.useState("linh.nguyen@gmail.com");
+  const [phone, setPhone] = React.useState("");
+  const [citizenId, setCitizenId] = React.useState("");
+  const [email, setEmail] = React.useState("");
 
-  const [moveInDate, setMoveInDate] = React.useState("2026-11-15");
+  const [moveInDate, setMoveInDate] = React.useState("");
   const [leaseTermMonths, setLeaseTermMonths] = React.useState<number>(12);
   const [occupantsCount, setOccupantsCount] = React.useState<number>(1);
   const [motorcyclesCount, setMotorcyclesCount] = React.useState<number>(1);
   const [hasPet, setHasPet] = React.useState<boolean>(false);
-  const [occupation, setOccupation] = React.useState("Sinh viên năm 3 / Thực tập sinh thiết kế");
-  const [note, setNote] = React.useState("Tôi muốn chuyển vào vào giữa tháng 11, mong muốn giữ phòng và hoàn tất hợp đồng sớm.");
-  const [agreeTerms, setAgreeTerms] = React.useState<boolean>(true);
+  const [occupation, setOccupation] = React.useState("");
+  const [note, setNote] = React.useState("");
+  const [agreeTerms, setAgreeTerms] = React.useState<boolean>(false);
 
   const [loading, setLoading] = React.useState<boolean>(false);
   const [success, setSuccess] = React.useState<boolean>(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [roomPrice, setRoomPrice] = React.useState(0);
+  const [post, setPost] = React.useState<Post | null>(null);
+  const [roomIdForRequest, setRoomIdForRequest] = React.useState("");
+
+  React.useEffect(() => {
+    const initializationTimer = window.setTimeout(() => {
+      const user = getCurrentUser();
+      if (user) {
+        setFullName(user.fullName ?? "");
+        setPhone(user.phone ?? "");
+        setEmail(user.email ?? "");
+      }
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setMoveInDate(tomorrow.toISOString().slice(0, 10));
+    }, 0);
+
+    void apiClient.posts
+      .getById(roomId)
+      .then((loadedPost) => {
+        setPost(loadedPost);
+        setRoomPrice(Number(loadedPost.room?.priceMonthly ?? loadedPost.price ?? 0));
+        setRoomIdForRequest(loadedPost.room?.id ?? "");
+      })
+      .catch(() => {
+        setPost(null);
+        setRoomPrice(0);
+        setRoomIdForRequest("");
+      });
+    return () => window.clearTimeout(initializationTimer);
+  }, [roomId]);
 
   // Financial summary
-  const monthlyRent = 4500000;
-  const depositAmount = 4500000;
+  const monthlyRent = roomPrice;
+  const depositAmount = monthlyRent;
   const totalFirstMonth = monthlyRent + depositAmount;
 
-  function handleSubmitApplication(e: React.FormEvent) {
+  async function handleSubmitApplication(e: React.FormEvent) {
     e.preventDefault();
     if (!agreeTerms) {
       setErrorMsg("Vui lòng đồng ý với cam kết xác thực thông tin thuê phòng.");
       return;
     }
+    if (!roomIdForRequest) {
+      setErrorMsg("Không xác định được phòng cần thuê. Vui lòng quay lại trang phòng và thử lại.");
+      return;
+    }
+    const selectedDate = new Date(`${moveInDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!moveInDate || Number.isNaN(selectedDate.getTime()) || selectedDate <= today) {
+      setErrorMsg("Ngày dọn vào phải sau ngày hiện tại.");
+      return;
+    }
     setErrorMsg(null);
     setLoading(true);
 
-    setTimeout(() => {
+    try {
+      const details = [
+        occupation.trim() ? `Nghề nghiệp: ${occupation.trim()}` : "",
+        `Xe máy: ${motorcyclesCount}`,
+        `Thú cưng: ${hasPet ? "Có" : "Không"}`,
+        note.trim(),
+      ].filter(Boolean).join(" | ");
+      await apiClient.rentalRequests.create({
+        roomId: roomIdForRequest,
+        moveInDate,
+        leaseTermMonths,
+        occupantsCount,
+        note: details || undefined,
+      });
       setLoading(false);
       setSuccess(true);
       setTimeout(() => {
         router.push("/tenant/rental-requests");
       }, 1500);
-    }, 800);
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Không thể gửi yêu cầu thuê phòng.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -82,7 +140,7 @@ function ApplyRentalContent() {
             </Link>
             <span>/</span>
             <Link href={`/rooms/${roomId}`} className="hover:text-[#15594f]">
-              Studio Ban Mai
+              {post?.title ?? "Phòng thuê"}
             </Link>
             <span>/</span>
             <span className="text-[#203c37] font-medium">Gửi yêu cầu thuê</span>
@@ -102,7 +160,7 @@ function ApplyRentalContent() {
             <CheckCircle2 className="size-5 shrink-0" />
             <div className="text-[13px]">
               <strong className="font-semibold block">Gửi yêu cầu thuê phòng thành công!</strong>
-              Hồ sơ của bạn đã được chuyển đến anh Minh An. Đang chuyển hướng đến trang Theo dõi yêu cầu thuê...
+              Hồ sơ của bạn đã được chuyển đến chủ trọ. Đang chuyển hướng đến trang Theo dõi yêu cầu thuê...
             </div>
           </div>
         )}
@@ -329,24 +387,30 @@ function ApplyRentalContent() {
               </h3>
 
               <div className="relative w-full h-40 rounded-[10px] overflow-hidden bg-gray-100">
-                <img
-                  src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80"
-                  alt="Studio Ban Mai"
-                  className="w-full h-full object-cover"
-                />
+                {post?.images?.[0]?.imageUrl ? (
+                  <img
+                    src={post.images[0].imageUrl}
+                    alt={post.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-[#74817b]">
+                    Chưa có ảnh phòng
+                  </div>
+                )}
                 <div className="absolute top-2 left-2">
                   <Badge variant="success" size="sm">
-                    Phòng 302 • Tầng 3
+                    Phòng {post?.room?.roomNumber ?? "---"}
                   </Badge>
                 </div>
               </div>
 
               <div className="space-y-1">
                 <h4 className="text-[14px] font-bold text-[#203c37]">
-                  Studio Ban Mai — Ban Công Hướng Đông
+                  {post?.title ?? "Phòng thuê"}
                 </h4>
                 <p className="text-[12px] text-[#74817b]">
-                  142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP.HCM
+                  {post?.property?.address ?? "Chưa cập nhật địa chỉ"}
                 </p>
               </div>
 

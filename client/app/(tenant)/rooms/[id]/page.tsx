@@ -31,6 +31,8 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { apiClient } from "@/lib/api";
 import { Post } from "@/types/models";
+import { formatCurrency } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
 
 function RoomDetailContent() {
   const params = useParams();
@@ -43,11 +45,13 @@ function RoomDetailContent() {
   const [copiedShare, setCopiedShare] = React.useState(false);
   const [post, setPost] = React.useState<Post | null>(null);
   const [roomImages, setRoomImages] = React.useState<string[]>([]);
+  const [reviewSummary, setReviewSummary] = React.useState<{ averageRating: number; totalReviews: number; reviews: import("@/types/models").Review[] } | null>(null);
 
   React.useEffect(() => {
     apiClient.posts.getById(roomId).then((value) => {
       setPost(value);
       setRoomImages(value.images?.map((image) => image.imageUrl) ?? []);
+      void apiClient.reviews.getByTarget("POST", value.id).then(setReviewSummary).catch(() => setReviewSummary(null));
     }).catch(() => setPost(null));
   }, [roomId]);
   const roomName = post?.title ?? "Tin đăng";
@@ -237,15 +241,7 @@ function RoomDetailContent() {
                 Mô tả chi tiết căn phòng
               </h2>
               <div className="text-[14px] text-[#203c37] leading-relaxed space-y-3">
-                <p>
-                  Studio Ban Mai tọa lạc tại tầng 3 của tòa nhà văn minh trên đường Điện Biên Phủ, Phường 25, Quận Bình Thạnh. Căn phòng được thiết kế theo phong cách tối giản hiện đại với cửa sổ kính lớn sát đất và ban công riêng biệt hướng Đông, giúp căn phòng luôn ngập tràn ánh sáng tự nhiên và gió mát.
-                </p>
-                <p>
-                  Phòng được trang bị đầy đủ nội thất cao cấp: Điều hòa Inverter tiết kiệm điện, Tủ lạnh 150L, Bếp từ đôi riêng biệt, Giường nệm lò xo túi cao cấp, Tủ quần áo âm tường và Bàn làm việc tiêu chuẩn. Phòng vệ sinh khép kín có vách kính tắm đứng và bình nước nóng năng lượng mặt trời.
-                </p>
-                <p>
-                  Tòa nhà có thang máy tốc độ cao, hệ thống khóa cửa vân tay bảo mật 2 lớp, camera an ninh 24/7 và khu vực để xe máy rộng rãi ở tầng trệt. Môi trường sống văn minh, yên tĩnh, ưu tiên sinh viên và nhân viên văn phòng lịch sự.
-                </p>
+                <p>{post?.description || "Chủ trọ chưa cập nhật mô tả cho tin đăng này."}</p>
               </div>
             </div>
 
@@ -261,17 +257,10 @@ function RoomDetailContent() {
                     Trong phòng riêng
                   </h3>
                   <div className="space-y-2 text-[#203c37]">
-                    {[
-                      "Điều hòa không khí Inverter",
-                      "Tủ lạnh 2 cánh 150L",
-                      "Khu bếp nấu riêng biệt có hút mùi",
-                      "Ban công riêng phơi đồ thoáng",
-                      "Máy nước nóng tắm đứng khép kín",
-                      "Giường đệm 1m6 & tủ quần áo",
-                    ].map((item) => (
-                      <div key={item} className="flex items-center gap-2">
+                    {(post?.room?.roomAmenities ?? []).map((item) => (
+                      <div key={`${item.roomId}-${item.amenityId}`} className="flex items-center gap-2">
                         <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
-                        <span>{item}</span>
+                        <span>{item.amenity?.name}</span>
                       </div>
                     ))}
                   </div>
@@ -283,19 +272,7 @@ function RoomDetailContent() {
                     Tiện ích chung tòa nhà
                   </h3>
                   <div className="space-y-2 text-[#203c37]">
-                    {[
-                      "Thang máy di chuyển tiện lợi",
-                      "Khóa vân tay ra vào cổng chính",
-                      "Camera giám sát an ninh 24/7",
-                      "Khu giặt sấy đồ chung trên sân thượng",
-                      "Nhà để xe máy tầng trệt miễn phí",
-                      "Giờ giấc tự do 24/24 không chung chủ",
-                    ].map((item) => (
-                      <div key={item} className="flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
+                    <p className="text-[#74817b]">Chưa cập nhật tiện ích chung.</p>
                   </div>
                 </div>
               </div>
@@ -309,27 +286,41 @@ function RoomDetailContent() {
               <div className="divide-y divide-[#e2e7e1] text-[14px]">
                 <div className="py-2.5 flex items-center justify-between">
                   <span className="text-[#203c37]">Tiền thuê phòng cố định</span>
-                  <span className="font-bold text-[#15594f]">4.500.000 đ/tháng</span>
+                  <span className="font-bold text-[#15594f]">{formatCurrency(Number(post?.room?.priceMonthly ?? post?.price ?? 0))}/tháng</span>
                 </div>
                 <div className="py-2.5 flex items-center justify-between">
                   <span className="text-[#203c37]">Tiền điện sinh hoạt</span>
-                  <span className="font-semibold text-[#203c37]">3.500 đ / kWh (Công tơ riêng)</span>
+                  <span className="font-semibold text-[#203c37]">
+                    {post?.room?.electricityRate ? `${formatCurrency(Number(post.room.electricityRate))} / kWh` : "Chưa cập nhật"}
+                  </span>
                 </div>
                 <div className="py-2.5 flex items-center justify-between">
                   <span className="text-[#203c37]">Tiền nước sinh hoạt</span>
-                  <span className="font-semibold text-[#203c37]">15.000 đ / m³ (Đồng hồ riêng)</span>
+                  <span className="font-semibold text-[#203c37]">
+                    {post?.room?.waterRate ? `${formatCurrency(Number(post.room.waterRate))} / m³` : "Chưa cập nhật"}
+                  </span>
                 </div>
                 <div className="py-2.5 flex items-center justify-between">
-                  <span className="text-[#203c37]">Phí quản lý tòa nhà, rác & thang máy</span>
-                  <span className="font-semibold text-[#203c37]">120.000 đ / phòng / tháng</span>
+                  <span className="text-[#203c37]">Phí dịch vụ</span>
+                  <span className="font-semibold text-[#203c37]">
+                    {post?.room?.serviceFee ? `${formatCurrency(Number(post.room.serviceFee))} / tháng` : "Chưa cập nhật"}
+                  </span>
                 </div>
                 <div className="py-2.5 flex items-center justify-between">
                   <span className="text-[#203c37]">Internet cáp quang Wifi tốc độ cao</span>
-                  <span className="font-semibold text-[#203c37]">100.000 đ / phòng / tháng</span>
+                  <span className="font-semibold text-[#203c37]">
+                    {post?.room?.internetFee ? `${formatCurrency(Number(post.room.internetFee))} / tháng` : "Chưa cập nhật"}
+                  </span>
+                </div>
+                <div className="py-2.5 flex items-center justify-between">
+                  <span className="text-[#203c37]">Phí gửi xe</span>
+                  <span className="font-semibold text-[#203c37]">
+                    {post?.room?.parkingFee ? `${formatCurrency(Number(post.room.parkingFee))} / tháng` : "Chưa cập nhật"}
+                  </span>
                 </div>
                 <div className="py-2.5 flex items-center justify-between">
                   <span className="text-[#203c37]">Tiền đặt cọc giữ phòng (Cam kết)</span>
-                  <span className="font-bold text-[#15594f]">4.500.000 đ (1 tháng tiền phòng)</span>
+                  <span className="font-bold text-[#15594f]">{formatCurrency(Number(post?.room?.priceMonthly ?? post?.price ?? 0))} (1 tháng tiền phòng)</span>
                 </div>
               </div>
 
@@ -362,7 +353,7 @@ function RoomDetailContent() {
                     <MapPin className="size-5" />
                   </div>
                   <p className="text-[13px] font-bold text-[#203c37]">
-                    142 Điện Biên Phủ, P. 25, Q. Bình Thạnh
+                    {roomAddress}
                   </p>
                   <p className="text-[12px] text-[#74817b]">
                     500m đến ĐH Ngoại Thương • 700m đến ĐH HUTECH • 5 phút đến Landmark 81
@@ -374,7 +365,7 @@ function RoomDetailContent() {
                 <span className="text-[12px] text-[#74817b]">
                   Nếu phát hiện tin giả mạo hoặc sai lệch địa chỉ, vui lòng báo cáo.
                 </span>
-                <Link href="/tenant/safety/report">
+                <Link href={`/tenant/safety/report?targetType=POST&targetId=${encodeURIComponent(post?.id ?? "")}&targetUrl=${encodeURIComponent(`/rooms/${roomId}`)}`}>
                   <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#991b1b] hover:underline">
                     <Flag className="size-3" />
                     Báo cáo tin đăng
@@ -396,30 +387,28 @@ function RoomDetailContent() {
                         <Star key={i} className="size-4 fill-amber-500 text-amber-500" />
                       ))}
                     </div>
-                    <span className="text-[14px] font-bold text-[#203c37]">4.9 / 5.0</span>
-                    <span className="text-[12px] text-[#74817b]">(12 đánh giá thực tế)</span>
+                    <span className="text-[14px] font-bold text-[#203c37]">{(reviewSummary?.averageRating ?? 0).toFixed(1)} / 5.0</span>
+                    <span className="text-[12px] text-[#74817b]">({reviewSummary?.totalReviews ?? 0} đánh giá)</span>
                   </div>
                 </div>
               </div>
 
               {/* Sample Review */}
-              <div className="pt-3 border-t border-[#e2e7e1] space-y-2">
+              {reviewSummary?.reviews.map((review) => <div key={review.id} className="pt-3 border-t border-[#e2e7e1] space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="size-8 rounded-full bg-[#15594f] text-white font-bold text-[12px] flex items-center justify-center">
-                      TL
-                    </div>
+                    <Avatar src={review.reviewer?.avatarUrl} alt={review.reviewer?.fullName ?? "Người thuê"} className="size-8 rounded-full object-cover" />
                     <div>
-                      <h4 className="text-[13px] font-bold text-[#203c37]">Trần Linh</h4>
-                      <p className="text-[11px] text-[#74817b]">Thuê 1 năm (2025 - 2026)</p>
+                      <h4 className="text-[13px] font-bold text-[#203c37]">{review.reviewer?.fullName ?? "Người thuê"}</h4>
+                      <p className="text-[11px] text-[#74817b]">{new Date(review.createdAt).toLocaleDateString("vi-VN")}</p>
                     </div>
                   </div>
-                  <span className="text-[11px] text-[#74817b]">1 tháng trước</span>
+                  <span className="text-[11px] text-[#74817b]">{review.rating}/5</span>
                 </div>
                 <p className="text-[13px] text-[#203c37] leading-relaxed">
-                  Phòng đúng y như ảnh chụp, ban công rất thoáng và mát vào buổi chiều. Anh Minh An chủ nhà hỗ trợ cực kỳ nhiệt tình, có lần máy lạnh bị chảy nước báo là trong vòng 2 tiếng thợ đến xử lý xong ngay.
+                  {review.comment ?? "Người thuê chưa để lại nội dung đánh giá."}
                 </p>
-              </div>
+              </div>)}
             </div>
           </div>
 
@@ -435,12 +424,12 @@ function RoomDetailContent() {
                 </span>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-3xl font-extrabold text-[#15594f]">
-                    4.500.000 đ
+                    {formatCurrency(Number(post?.room?.priceMonthly ?? post?.price ?? 0))}
                   </span>
                   <span className="text-[14px] text-[#74817b]">/ tháng</span>
                 </div>
                 <p className="text-[12px] text-[#74817b]">
-                  Tiền cọc: 1 tháng tiền phòng (4.500.000 đ)
+                  Tiền cọc: 1 tháng tiền phòng ({formatCurrency(Number(post?.room?.priceMonthly ?? post?.price ?? 0))})
                 </p>
               </div>
 
@@ -448,27 +437,20 @@ function RoomDetailContent() {
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                <Link href={`/rooms/${roomId}/book-viewing`} className="block">
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full font-bold shadow-md h-[48px]"
-                    leftIcon={<CalendarDays className="size-4.5" />}
-                  >
-                    Đặt lịch xem phòng
-                  </Button>
-                </Link>
-
-                <Link href={`/rooms/${roomId}/apply`} className="block">
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    className="w-full font-bold h-[48px] border border-[#d2e4d7]"
-                    leftIcon={<FileCheck className="size-4.5" />}
-                  >
-                    Gửi yêu cầu thuê phòng
-                  </Button>
-                </Link>
+                {post?.status === "APPROVED" && (
+                  <>
+                    <Link href={`/rooms/${roomId}/book-viewing`} className="block">
+                      <Button variant="primary" size="lg" className="w-full font-bold shadow-md h-[48px]" leftIcon={<CalendarDays className="size-4.5" />}>
+                        Đặt lịch xem phòng
+                      </Button>
+                    </Link>
+                    <Link href={`/rooms/${roomId}/apply`} className="block">
+                      <Button variant="secondary" size="lg" className="w-full font-bold h-[48px] border border-[#d2e4d7]" leftIcon={<FileCheck className="size-4.5" />}>
+                        Gửi yêu cầu thuê phòng
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
 
               <p className="text-[11px] text-center text-[#74817b]">
@@ -479,12 +461,10 @@ function RoomDetailContent() {
             {/* Landlord Profile Card (Figma Node 44:63208) */}
             <div className="bg-white p-5 rounded-[14px] border border-[#e2e7e1] shadow-xs space-y-4">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-full bg-[#15594f] text-white font-bold flex items-center justify-center text-[15px] shadow-xs">
-                  MA
-                </div>
+                <Avatar src={post?.author?.avatarUrl} alt={post?.author?.fullName ?? "Chủ trọ"} className="size-12 rounded-full object-cover shadow-xs" />
                 <div className="space-y-0.5">
                   <h3 className="text-[14px] font-bold text-[#203c37]">
-                    Nguyễn Minh An
+                    {post?.author?.fullName ?? "Chủ trọ"}
                   </h3>
                   <Badge variant="success" size="sm">
                     CHỦ TRỌ ĐÃ XÁC MINH KYC
@@ -503,15 +483,19 @@ function RoomDetailContent() {
                 </div>
               </div>
 
-              <Button
+              {post?.status === "APPROVED" && <Button
                 variant="outline"
                 size="sm"
                 className="w-full font-medium"
                 leftIcon={<MessageCircle className="size-4 text-[#15594f]" />}
-                onClick={() => router.push(`/tenant/messages?contact=landlord&name=Minh+An`)}
+                onClick={async () => {
+                  if (!post?.author?.id) return;
+                  const conversation = await apiClient.chats.getOrCreateConversation({ targetUserId: post.author.id });
+                  router.push(`/tenant/messages?conversation=${conversation.id}`);
+                }}
               >
                 Nhắn tin với chủ trọ
-              </Button>
+              </Button>}
             </div>
 
             {/* Trust Assurance Card */}

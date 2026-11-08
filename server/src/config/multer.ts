@@ -50,7 +50,8 @@ const extensionToSignature: Record<string, keyof typeof imageSignatures> = {
 };
 
 export const validateUploadedImages = async (req: any, res: any, next: any) => {
-  const files = (req.files ?? []) as Express.Multer.File[];
+  const uploaded = req.files ?? [];
+  const files = (Array.isArray(uploaded) ? uploaded : Object.values(uploaded).flat()) as Express.Multer.File[];
   try {
     for (const file of files) {
       const signature = extensionToSignature[path.extname(file.originalname).toLowerCase()];

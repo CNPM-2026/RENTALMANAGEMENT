@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
 import { RoommateInvitation as ApiInvitation } from "@/types/models";
+import { Avatar } from "@/components/ui/avatar";
 
 interface Invitation {
   id: string;
@@ -150,8 +151,7 @@ export default function TenantRoommateInvitationsPage() {
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <div className="size-14 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#e2e7e1]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.avatarUrl} alt={item.userName} className="size-full object-cover" />
+                    <Avatar src={item.avatarUrl} alt={item.userName} className="size-full object-cover" />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2.5 flex-wrap">

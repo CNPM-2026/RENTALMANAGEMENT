@@ -71,7 +71,7 @@ export default function AdminListingModerationPage() {
 
               <div className="flex items-center gap-2 shrink-0">
                 <Link
-                  href={`/rooms/${post.roomId}`}
+                  href={`/rooms/${post.id}`}
                   className="px-3 py-2 rounded-[8px] border border-[#e2e7e1] text-[#203c37] text-[12px] font-semibold hover:bg-[#f7f6f2] transition-colors"
                 >
                   <Eye className="size-3.5 inline mr-1" />

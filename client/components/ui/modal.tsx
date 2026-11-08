@@ -29,6 +29,11 @@ export function Modal({
 }: ModalProps) {
   const modalRef = React.useRef<HTMLDivElement>(null);
   const previousActiveElementRef = React.useRef<HTMLElement | null>(null);
+  const onCloseRef = React.useRef(onClose);
+
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -41,7 +46,7 @@ export function Modal({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -112,7 +117,7 @@ export function Modal({
         previousActiveElementRef.current.focus();
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

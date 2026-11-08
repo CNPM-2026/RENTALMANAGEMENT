@@ -3,16 +3,23 @@
 import * as React from "react";
 import { Wrench, Plus, CheckCircle2, Clock, AlertTriangle, DoorOpen } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { MaintenanceRequest } from "@/types/models";
+import { MaintenanceRequest, Room } from "@/types/models";
 import { Modal } from "@/components/ui/modal";
 
 export default function LandlordMaintenancePage() {
   const [items, setItems] = React.useState<MaintenanceRequest[]>([]);
+  const [rooms, setRooms] = React.useState<Room[]>([]);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [form, setForm] = React.useState({ roomId: "", title: "", description: "", priority: "MEDIUM" });
 
   React.useEffect(() => {
     apiClient.maintenance.getMine().then(setItems).catch(() => setItems([]));
+    apiClient.properties.getMyProperties()
+      .then(async (properties) => {
+        const roomLists = await Promise.all((properties ?? []).map((property) => apiClient.rooms.getByProperty(property.id)));
+        setRooms(roomLists.flat());
+      })
+      .catch(() => setRooms([]));
   }, []);
 
   const handleUpdateStatus = async (id: string, newStatus: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED") => {
@@ -72,7 +79,10 @@ export default function LandlordMaintenancePage() {
               </div>
               <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Tạo phiếu bảo trì">
                 <form onSubmit={handleCreate} className="space-y-3">
-                  <input required placeholder="ID phòng" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="w-full rounded border p-2 text-sm" />
+                  <select required value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="w-full rounded border p-2 text-sm">
+                    <option value="">Chọn phòng</option>
+                    {rooms.map((room) => <option key={room.id} value={room.id}>Phòng {room.roomNumber}</option>)}
+                  </select>
                   <input required placeholder="Tiêu đề" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded border p-2 text-sm" />
                   <textarea required placeholder="Mô tả sự cố" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded border p-2 text-sm" />
                   <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="w-full rounded border p-2 text-sm">

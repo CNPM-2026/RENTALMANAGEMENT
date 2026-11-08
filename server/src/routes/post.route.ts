@@ -5,7 +5,7 @@ import { authenticate } from '../middlewares/auth.middleware';
 import { upload, validateUploadedImages } from '../config/multer';
 import { validate } from '../middlewares/validate.middleware';
 import { searchPostSchema } from '../validations/post.validation';
-import { postWriteSchema } from '../validations/resource.validation';
+import { postWriteSchema, postUpdateSchema } from '../validations/resource.validation';
 
 const router = Router();
 
@@ -35,7 +35,7 @@ router.put(
   authenticate,
   upload.array('images', 10),
   validateUploadedImages,
-  validate(postWriteSchema.partial()),
+  validate(postUpdateSchema),
   postController.update
 );
 router.delete('/:id', authenticate, postController.delete);

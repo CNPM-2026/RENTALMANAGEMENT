@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Plus, DoorOpen, Search, Filter, Home, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { Property, Room, RoomStatus } from "@/types/models";
+import { Amenity, Property, Room, RoomStatus } from "@/types/models";
 import { Modal } from "@/components/ui/modal";
 
 const STATUS_CONFIG: Record<RoomStatus, { label: string; bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -25,9 +25,24 @@ export default function LandlordRoomsPage() {
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
-  const [form, setForm] = React.useState({ roomNumber: "", priceMonthly: "", area: "", maxOccupants: "1" });
+  const [amenities, setAmenities] = React.useState<Amenity[]>([]);
+  const [createError, setCreateError] = React.useState("");
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [form, setForm] = React.useState({
+    roomNumber: "",
+    priceMonthly: "",
+    area: "",
+    maxOccupants: "1",
+    electricityRate: "",
+    waterRate: "",
+    internetFee: "",
+    serviceFee: "",
+    parkingFee: "",
+    amenityIds: [] as string[],
+  });
 
   React.useEffect(() => {
+    apiClient.rooms.getAllAmenities().then((data) => setAmenities(data ?? [])).catch(() => setAmenities([]));
     apiClient.properties
       .getMyProperties()
       .then((props) => {
@@ -46,7 +61,10 @@ export default function LandlordRoomsPage() {
     apiClient.rooms
       .getByProperty(selectedPropertyId)
       .then((data) => {
-        if (!isCancelled) setRooms(data ?? []);
+        if (!isCancelled) {
+          const uniqueRooms = Array.from(new Map((data ?? []).map((room) => [room.id, room])).values());
+          setRooms(uniqueRooms);
+        }
       })
       .catch(() => {
         if (!isCancelled) setRooms([]);
@@ -63,20 +81,49 @@ export default function LandlordRoomsPage() {
     const matchSearch = r.roomNumber.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
     return matchSearch && matchStatus;
-  });
+  }).filter((room, index, list) => list.findIndex((candidate) => candidate.id === room.id) === index);
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedPropertyId) return;
-    const created = await apiClient.rooms.create({
-      propertyId: selectedPropertyId,
-      roomNumber: form.roomNumber,
-      priceMonthly: Number(form.priceMonthly),
-      area: Number(form.area),
-      maxOccupants: Number(form.maxOccupants),
-    });
-    setRooms((prev) => [...prev, created]);
-    setForm({ roomNumber: "", priceMonthly: "", area: "", maxOccupants: "1" });
-    setIsCreateOpen(false);
+    if (!selectedPropertyId || isCreating) return;
+    setCreateError("");
+    setIsCreating(true);
+    try {
+      const priceMonthly = Number(form.priceMonthly);
+      if (!Number.isFinite(priceMonthly) || priceMonthly < 0 || priceMonthly >= 100_000_000) {
+        setCreateError("Giá thuê phải nhỏ hơn 100.000.000.");
+        return;
+      }
+      const created = await apiClient.rooms.create({
+        propertyId: selectedPropertyId,
+        roomNumber: form.roomNumber,
+        priceMonthly,
+        area: Number(form.area),
+        maxOccupants: Number(form.maxOccupants),
+        electricityRate: Number(form.electricityRate) || undefined,
+        waterRate: Number(form.waterRate) || undefined,
+        internetFee: Number(form.internetFee) || undefined,
+        serviceFee: Number(form.serviceFee) || undefined,
+        parkingFee: Number(form.parkingFee) || undefined,
+        amenityIds: form.amenityIds,
+      });
+      setRooms((prev) => Array.from(new Map([...prev, created].map((room) => [room.id, room])).values()));
+      setForm({ roomNumber: "", priceMonthly: "", area: "", maxOccupants: "1", electricityRate: "", waterRate: "", internetFee: "", serviceFee: "", parkingFee: "", amenityIds: [] });
+      setIsCreateOpen(false);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Không thể tạo phòng.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDelete = async (room: Room) => {
+    if (!window.confirm(`Xóa phòng ${room.roomNumber}? Hành động này không thể hoàn tác.`)) return;
+    try {
+      await apiClient.rooms.delete(room.id);
+      setRooms((current) => current.filter((item) => item.id !== room.id));
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Không thể xóa phòng.");
+    }
   };
 
   return (
@@ -98,12 +145,44 @@ export default function LandlordRoomsPage() {
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Thêm phòng mới">
         <form onSubmit={handleCreate} className="space-y-3">
           <input required placeholder="Số phòng" value={form.roomNumber} onChange={(e) => setForm({ ...form, roomNumber: e.target.value })} className="w-full rounded border p-2 text-sm" />
-          <input required type="number" min="0" placeholder="Giá thuê/tháng" value={form.priceMonthly} onChange={(e) => setForm({ ...form, priceMonthly: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <input required type="number" min="0" max="99999999.99" step="0.01" placeholder="Giá thuê/tháng" value={form.priceMonthly} onChange={(e) => setForm({ ...form, priceMonthly: e.target.value })} className="w-full rounded border p-2 text-sm" />
           <div className="grid grid-cols-2 gap-3">
             <input required type="number" min="1" placeholder="Diện tích (m²)" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className="rounded border p-2 text-sm" />
             <input required type="number" min="1" placeholder="Số người tối đa" value={form.maxOccupants} onChange={(e) => setForm({ ...form, maxOccupants: e.target.value })} className="rounded border p-2 text-sm" />
           </div>
-          <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Thêm phòng</button>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" min="0" placeholder="Điện (đ/kWh)" value={form.electricityRate} onChange={(e) => setForm({ ...form, electricityRate: e.target.value })} className="rounded border p-2 text-sm" />
+            <input type="number" min="0" placeholder="Nước (đ/m³)" value={form.waterRate} onChange={(e) => setForm({ ...form, waterRate: e.target.value })} className="rounded border p-2 text-sm" />
+            <input type="number" min="0" placeholder="Internet/tháng" value={form.internetFee} onChange={(e) => setForm({ ...form, internetFee: e.target.value })} className="rounded border p-2 text-sm" />
+            <input type="number" min="0" placeholder="Dịch vụ/tháng" value={form.serviceFee} onChange={(e) => setForm({ ...form, serviceFee: e.target.value })} className="rounded border p-2 text-sm" />
+            <input type="number" min="0" placeholder="Gửi xe/tháng" value={form.parkingFee} onChange={(e) => setForm({ ...form, parkingFee: e.target.value })} className="rounded border p-2 text-sm" />
+          </div>
+          {amenities.length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Tiện ích phòng</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {amenities.map((amenity) => (
+                  <label key={amenity.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.amenityIds.includes(amenity.id)}
+                      onChange={(event) => setForm((current) => ({
+                        ...current,
+                        amenityIds: event.target.checked
+                          ? [...current.amenityIds, amenity.id]
+                          : current.amenityIds.filter((id) => id !== amenity.id),
+                      }))}
+                    />
+                    {amenity.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          {createError && <p className="text-sm text-red-600">{createError}</p>}
+          <button type="submit" disabled={isCreating} className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+            {isCreating ? "Đang tạo..." : "Thêm phòng"}
+          </button>
         </form>
       </Modal>
 
@@ -191,13 +270,11 @@ export default function LandlordRoomsPage() {
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-[#e2e7e1] flex items-center justify-between text-[12px]">
-                  <span className="text-[#74817b]">Cọc: {formatCurrency(room.depositAmount)}</span>
-                  <Link
-                    href={`/rooms/${room.id}`}
-                    className="text-[#15594f] font-semibold hover:underline"
-                  >
-                    Chi tiết
-                  </Link>
+                  <span className="text-[#74817b]">Cọc: {formatCurrency(room.priceMonthly)}</span>
+                  <div className="flex items-center gap-3">
+                    <Link href={`/rooms/${room.id}`} className="text-[#15594f] font-semibold hover:underline">Chi tiết</Link>
+                    <button type="button" onClick={() => void handleDelete(room)} className="font-semibold text-red-600 hover:underline">Xóa</button>
+                  </div>
                 </div>
               </div>
             );

@@ -4,9 +4,10 @@ import { AppError } from '../utils/AppError';
 export const roomService = {
   // Tạo phòng mới
   createRoom: async (landlordId: string, data: any) => {
-    const { 
-      propertyId, roomNumber, priceMonthly, priceYearly, 
-      depositAmount, area, maxOccupants, amenityIds 
+    const {
+      propertyId, roomNumber, priceMonthly, priceYearly,
+      depositAmount, electricityRate, waterRate, internetFee, serviceFee, parkingFee,
+      area, maxOccupants, amenityIds
     } = data;
 
     // 1. Kiểm tra nhà trọ này có tồn tại và thuộc quyền sở hữu của landlord không
@@ -34,6 +35,11 @@ export const roomService = {
         priceMonthly,
         priceYearly,
         depositAmount: depositAmount || 0,
+        electricityRate,
+        waterRate,
+        internetFee,
+        serviceFee,
+        parkingFee,
         area,
         maxOccupants: maxOccupants || 2,
         // Nếu có truyền amenityIds, tạo các bản ghi trung gian RoomAmenity
@@ -69,5 +75,17 @@ export const roomService = {
   // Lấy danh sách tất cả tiện ích (để chủ trọ chọn khi tạo phòng)
   getAllAmenities: async () => {
     return await prisma.amenity.findMany();
+  },
+
+  deleteRoom: async (landlordId: string, roomId: string) => {
+    const room = await prisma.room.findFirst({
+      where: { id: roomId, property: { landlordId } },
+      select: { id: true, status: true },
+    });
+    if (!room) throw new AppError('Không tìm thấy phòng hoặc bạn không có quyền xóa', 404);
+    if (room.status === 'RENTED') {
+      throw new AppError('Không thể xóa phòng đang có người thuê', 400);
+    }
+    return prisma.room.delete({ where: { id: roomId } });
   }
 };

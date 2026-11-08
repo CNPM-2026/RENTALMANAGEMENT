@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Plus, Receipt, Search, CheckCircle2, Clock, AlertTriangle, Eye } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { Invoice, InvoiceStatus } from "@/types/models";
+import { Invoice, InvoiceStatus, Room } from "@/types/models";
 import { Modal } from "@/components/ui/modal";
 
 const STATUS_MAP: Record<InvoiceStatus, { label: string; bg: string; text: string }> = {
@@ -17,6 +17,7 @@ function formatCurrency(val: number) {
 
 export default function LandlordInvoicesPage() {
   const [invoices, setInvoices] = React.useState<Invoice[]>([]);
+  const [rooms, setRooms] = React.useState<Room[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
@@ -38,6 +39,12 @@ export default function LandlordInvoicesPage() {
       .then((data) => setInvoices(data ?? []))
       .catch(() => setInvoices([]))
       .finally(() => setIsLoading(false));
+    apiClient.properties.getMyProperties()
+      .then(async (properties) => {
+        const roomLists = await Promise.all((properties ?? []).map((property) => apiClient.rooms.getByProperty(property.id)));
+        setRooms(roomLists.flat());
+      })
+      .catch(() => setRooms([]));
   }, []);
 
   const filtered = invoices.filter((inv) => statusFilter === "ALL" || inv.status === statusFilter);
@@ -150,7 +157,10 @@ export default function LandlordInvoicesPage() {
       )}
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Tạo hóa đơn mới">
         <form onSubmit={handleCreate} className="space-y-3">
-          <input required placeholder="ID phòng" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="w-full rounded border p-2 text-sm" />
+          <select required value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="w-full rounded border p-2 text-sm">
+            <option value="">Chọn phòng</option>
+            {rooms.map((room) => <option key={room.id} value={room.id}>Phòng {room.roomNumber}</option>)}
+          </select>
           <div className="grid grid-cols-2 gap-3">
             <input required type="number" min="1" max="12" placeholder="Tháng" value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} className="rounded border p-2 text-sm" />
             <input required type="number" min="2020" placeholder="Năm" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="rounded border p-2 text-sm" />

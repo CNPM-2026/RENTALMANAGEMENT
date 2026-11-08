@@ -17,8 +17,11 @@ if (cloudinaryEnabled) {
 export const storageService = {
   uploadImage: async (file: Express.Multer.File, folder: string) => {
     if (!cloudinaryEnabled) return `/uploads/${file.filename}`;
-    const result = await cloudinary.uploader.upload(file.path, { folder, resource_type: 'image' });
-    await fs.unlink(file.path).catch(() => undefined);
-    return result.secure_url;
+    try {
+      const result = await cloudinary.uploader.upload(file.path, { folder, resource_type: 'image' });
+      return result.secure_url;
+    } finally {
+      await fs.unlink(file.path).catch(() => undefined);
+    }
   },
 };

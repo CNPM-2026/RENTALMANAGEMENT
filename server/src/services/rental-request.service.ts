@@ -23,9 +23,20 @@ export const rentalRequestService = {
     include: { room: { include: { property: true } }, tenant: { select: { fullName: true, phone: true, email: true } } },
     orderBy: { updatedAt: 'desc' },
   }),
-  updateStatus: async (userId: string, role: string, id: string, status: 'APPROVED' | 'REJECTED' | 'CANCELLED') => {
+  updateStatus: async (userId: string, role: string, id: string, status: 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'SIGNED') => {
     const request = await prisma.rentalRequest.findUnique({ where: { id } });
     if (!request) throw new AppError('Không tìm thấy yêu cầu thuê phòng', 404);
+    if (role === 'TENANT' && status === 'SIGNED') {
+      if (request.tenantId !== userId || !['APPROVED', 'CONTRACT_READY'].includes(request.status)) {
+        throw new AppError('Yêu cầu chưa đủ điều kiện xác nhận bàn giao', 400);
+      }
+      const contract = await prisma.contract.findFirst({
+        where: { roomId: request.roomId, tenantId: request.tenantId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!contract) throw new AppError('Bạn cần có hợp đồng đang hiệu lực trước khi xác nhận bàn giao', 400);
+      return prisma.rentalRequest.update({ where: { id }, data: { status: 'SIGNED' } });
+    }
     const allowed = role === 'LANDLORD'
       ? request.landlordId === userId
       : role === 'TENANT'

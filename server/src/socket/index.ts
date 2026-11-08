@@ -4,6 +4,7 @@ import prisma from '../config/db';
 import { verifyToken } from '../utils/jwt';
 import { setIoInstance } from './socket.instance'; // Thêm import
 import { env } from '../config/env';
+import { findBannedChatKeyword } from '../services/chat.service';
 
 // Mở rộng kiểu dữ liệu của Socket để lưu thông tin user
 interface AuthSocket extends Socket {
@@ -64,6 +65,12 @@ export const initSocket = (server: HttpServer) => {
         if (typeof content !== 'string' || content.trim().length === 0 || content.length > 5000) {
           acknowledge?.({ success: false, message: 'Nội dung tin nhắn không hợp lệ' });
           return socket.emit('error_message', 'Nội dung tin nhắn không hợp lệ');
+        }
+        const matchedKeyword = await findBannedChatKeyword(content);
+        if (matchedKeyword) {
+          const warning = `Tin nhắn chứa từ khóa bị cấm "${matchedKeyword.keyword}". Vui lòng chỉnh sửa nội dung trước khi gửi.`;
+          acknowledge?.({ success: false, message: warning });
+          return socket.emit('error_message', warning);
         }
         const member = await prisma.conversationMember.findUnique({
           where: { conversationId_userId: { conversationId, userId } }

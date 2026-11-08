@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, Settings, LogOut, HelpCircle } from "lucide-react";
+import { Bell, ChevronDown, Settings, LogOut, HelpCircle, UserRound } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { clearAuthSession, getCurrentUser } from "@/lib/auth";
+import { Avatar } from "@/components/ui/avatar";
 
 export function LandlordTopbar() {
   const pathname = usePathname();
@@ -14,9 +15,13 @@ export function LandlordTopbar() {
   const router = useRouter();
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
-  const currentUser = getCurrentUser();
-  const initials = currentUser?.fullName?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
-
+  const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setCurrentUser(getCurrentUser());
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
   // Generate readable breadcrumb segment
   function getBreadcrumb() {
     if (currentPath.includes("dashboard")) return "Tổng quan";
@@ -67,6 +72,13 @@ export function LandlordTopbar() {
             <HelpCircle className="size-4" />
             <span>Trợ giúp</span>
           </Link>
+          <Link
+            href="/rooms"
+            className="hidden sm:flex items-center gap-1.5 text-[12px] font-medium text-[#74817b] hover:text-[#15594f] transition-colors"
+          >
+            <UserRound className="size-4" />
+            <span>Khu người thuê</span>
+          </Link>
 
           {/* Notification Bell */}
           <Link
@@ -86,9 +98,7 @@ export function LandlordTopbar() {
               onClick={() => setProfileOpen((prev) => !prev)}
               className="flex items-center gap-2.5 p-1 rounded-[100px] hover:bg-[#f7f6f2] transition-colors cursor-pointer"
             >
-              <div className="bg-[#f2ede3] rounded-full size-[34px] text-[#203c37] text-[11px] font-semibold flex items-center justify-center border border-[#e2e7e1]">
-                {initials}
-              </div>
+              <Avatar src={currentUser?.avatarUrl} alt={currentUser?.fullName ?? "Chủ trọ"} className="size-[34px] rounded-full object-cover border border-[#e2e7e1]" />
               <div className="hidden md:flex flex-col text-left">
                 <span className="text-[13px] font-semibold text-[#203c37] leading-tight">
                   {currentUser?.fullName ?? "Chủ trọ"}
@@ -112,12 +122,39 @@ export function LandlordTopbar() {
                 </div>
 
                 <Link
+                  href="/landlord/dashboard"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-[12px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
+                >
+                  <Settings className="size-4" />
+                  <span>Không gian chủ trọ</span>
+                </Link>
+
+                <Link
+                  href="/rooms"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
+                >
+                  <HelpCircle className="size-4 text-[#74817b]" />
+                  <span>Tìm phòng & đọc bài</span>
+                </Link>
+
+                <Link
                   href="/landlord/settings"
                   onClick={() => setProfileOpen(false)}
                   className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
                 >
                   <Settings className="size-4 text-[#74817b]" />
                   <span>Cài đặt tài khoản</span>
+                </Link>
+
+                <Link
+                  href="/tenant/profile"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
+                >
+                  <Settings className="size-4 text-[#74817b]" />
+                  <span>Hồ sơ cá nhân</span>
                 </Link>
 
                 <div className="h-px bg-[#e2e7e1] my-1" />

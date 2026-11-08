@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, FileText, Eye, Search } from "lucide-react";
-import { apiClient } from "@/lib/api";
+import { Plus, FileText, Eye, Search, Trash2 } from "lucide-react";
+import { apiClient, ApiError } from "@/lib/api";
 import { Post, PostStatus, Property, Room } from "@/types/models";
 import { Modal } from "@/components/ui/modal";
 
@@ -26,7 +26,9 @@ export default function LandlordListingsPage() {
   const [properties, setProperties] = React.useState<Property[]>([]);
   const [rooms, setRooms] = React.useState<Room[]>([]);
   const [error, setError] = React.useState<string | null>(null);
-  const [form, setForm] = React.useState({ title: "", description: "", price: "", propertyId: "", roomId: "" });
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [images, setImages] = React.useState<File[]>([]);
+  const [form, setForm] = React.useState({ title: "", description: "", propertyId: "", roomId: "" });
 
   React.useEffect(() => {
     apiClient.posts
@@ -47,18 +49,49 @@ export default function LandlordListingsPage() {
   const filtered = posts.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
-    const created = await apiClient.posts.create({
-      title: form.title,
-      description: form.description,
-      price: Number(form.price),
-      postType: "RENT_OUT",
-      propertyId: form.propertyId,
-      roomId: form.roomId,
-    });
-    setPosts((prev) => [created, ...prev]);
-    setForm({ title: "", description: "", price: "", propertyId: "", roomId: "" });
-    setIsCreateOpen(false);
+    if (isSubmitting) return;
+    if (!form.propertyId || !form.roomId) {
+      setError("Vui lòng chọn nhà trọ và phòng cần đăng.");
+      return;
+    }
+    if (form.description.trim().length < 10) {
+      setError("Mô tả phải có ít nhất 10 ký tự.");
+      return;
+    }
+    setIsSubmitting(true);
     setError(null);
+    try {
+      const payload = new FormData();
+      payload.append("title", form.title.trim());
+      payload.append("description", form.description.trim());
+      payload.append("postType", "RENT_OUT");
+      payload.append("propertyId", form.propertyId);
+      payload.append("roomId", form.roomId);
+      images.forEach((image) => payload.append("images", image));
+      const created = await apiClient.posts.create(payload);
+      setPosts((prev) => [created, ...prev]);
+      setForm({ title: "", description: "", propertyId: "", roomId: "" });
+      setImages([]);
+      setIsCreateOpen(false);
+    } catch (createError) {
+      if (createError instanceof ApiError && createError.errors?.length) {
+        setError(createError.errors.map((item) => `${item.field}: ${item.message}`).join(" • "));
+      } else {
+        setError(createError instanceof Error ? createError.message : "Không thể đăng tin.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (post: Post) => {
+    if (!window.confirm(`Xóa bài đăng "${post.title}"? Hành động này không thể hoàn tác.`)) return;
+    try {
+      await apiClient.posts.delete(post.id);
+      setPosts((current) => current.filter((item) => item.id !== post.id));
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Không thể xóa bài đăng.");
+    }
   };
 
   return (
@@ -121,12 +154,12 @@ export default function LandlordListingsPage() {
                   return (
                     <tr key={post.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
                       <td className="py-3.5 px-4 font-medium">
-                        <Link href={`/rooms/${post.roomId}`} className="hover:text-[#15594f] hover:underline">
+                        <Link href={`/rooms/${post.id}`} className="hover:text-[#15594f] hover:underline">
                           {post.title}
                         </Link>
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-[#15594f]">
-                        {formatCurrency(post.room?.priceMonthly || 0)}
+                        {formatCurrency(Number(post.room?.priceMonthly ?? post.price ?? 0))}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${st.bg} ${st.text}`}>
@@ -138,12 +171,16 @@ export default function LandlordListingsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <Link
-                          href={`/rooms/${post.roomId}`}
+                          href={`/rooms/${post.id}`}
                           className="inline-flex items-center gap-1 text-[12px] font-medium text-[#15594f] hover:underline"
                         >
                           <Eye className="size-3.5" />
                           <span>Xem tin</span>
                         </Link>
+                        <button type="button" onClick={() => void handleDelete(post)} className="ml-3 inline-flex items-center gap-1 text-[12px] font-medium text-red-600 hover:underline">
+                          <Trash2 className="size-3.5" />
+                          <span>Xóa</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -156,9 +193,26 @@ export default function LandlordListingsPage() {
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Đăng tin cho thuê" size="lg">
         <form onSubmit={handleCreate} className="space-y-3">
           <input required placeholder="Tiêu đề" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded border p-2 text-sm" />
-          <textarea required placeholder="Mô tả" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded border p-2 text-sm" />
-          <div className="grid grid-cols-3 gap-3">
-            <input required type="number" min="0" placeholder="Giá thuê" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="rounded border p-2 text-sm" />
+          <textarea
+            required
+            minLength={10}
+            placeholder="Mô tả (ít nhất 10 ký tự)"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className="w-full rounded border p-2 text-sm"
+          />
+          <div>
+            <label className="block text-sm font-medium text-[#203c37] mb-1">Ảnh phòng (tối đa 10 ảnh)</label>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={(event) => setImages(Array.from(event.target.files ?? []).slice(0, 10))}
+              className="w-full rounded border p-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-[#74817b]">{images.length}/10 ảnh đã chọn</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <select required value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value, roomId: "" })} className="rounded border p-2 text-sm">
               <option value="">Chọn cơ sở</option>
               {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
@@ -168,7 +222,8 @@ export default function LandlordListingsPage() {
               {availableRooms.map((room) => <option key={room.id} value={room.id}>{room.roomNumber} · {formatCurrency(room.priceMonthly)}</option>)}
             </select>
           </div>
-          <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Gửi duyệt</button>
+          <p className="text-xs text-[#74817b]">Giá bài đăng được lấy tự động từ giá phòng đã thiết lập.</p>
+          <button type="submit" disabled={isSubmitting} className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Đang gửi..." : "Gửi duyệt"}</button>
         </form>
       </Modal>
     </div>

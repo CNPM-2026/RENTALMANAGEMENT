@@ -40,5 +40,14 @@ export const roomController = {
     } catch (error) {
       return next(error);
     }
+  },
+
+  delete: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      await roomService.deleteRoom(resourceOwnerId(req), String(req.params.id));
+      return res.status(200).json({ success: true, message: 'Xóa phòng thành công' });
+    } catch (error) {
+      return next(error);
+    }
   }
 };

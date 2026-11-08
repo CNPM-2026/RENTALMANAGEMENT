@@ -1,6 +1,12 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 
+export const findBannedChatKeyword = async (content: string) => {
+  const normalizedContent = content.trim().toLocaleLowerCase('vi-VN');
+  const keywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } });
+  return keywords.find(({ keyword }) => normalizedContent.includes(keyword));
+};
+
 export const chatService = {
   // Tạo hoặc lấy cuộc trò chuyện 1-1 giữa 2 người
   getOrCreateConversation: async (myId: string, targetUserId: string) => {

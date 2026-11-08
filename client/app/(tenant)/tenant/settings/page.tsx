@@ -13,6 +13,15 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/auth";
 
+const NOTIFICATION_SETTINGS_KEY = "5k_notification_settings";
+
+type NotificationSettings = {
+  emailAlerts: boolean;
+  pushAlerts: boolean;
+  messageAlerts: boolean;
+  contractAlerts: boolean;
+};
+
 export default function TenantSettingsPage() {
   const [sessionFeedback, setSessionFeedback] = React.useState<string | null>(null);
   // Password Change State
@@ -31,10 +40,78 @@ export default function TenantSettingsPage() {
   const [pushAlerts, setPushAlerts] = React.useState(true);
   const [messageAlerts, setMessageAlerts] = React.useState(true);
   const [contractAlerts, setContractAlerts] = React.useState(true);
+  const [notificationFeedback, setNotificationFeedback] = React.useState<string | null>(null);
 
   // Delete Account Modal
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
+
+  const saveNotificationSettings = (settings: NotificationSettings) => {
+    try {
+      localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      console.error("Không thể lưu tùy chọn thông báo.", error);
+      setNotificationFeedback("Không thể lưu tùy chọn thông báo trên thiết bị này.");
+    }
+  };
+
+  const getNotificationSettings = (): NotificationSettings | null => {
+    try {
+      const raw = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<NotificationSettings>;
+      if (
+        typeof parsed.emailAlerts !== "boolean" ||
+        typeof parsed.pushAlerts !== "boolean" ||
+        typeof parsed.messageAlerts !== "boolean" ||
+        typeof parsed.contractAlerts !== "boolean"
+      ) {
+        return null;
+      }
+      return parsed as NotificationSettings;
+    } catch (error) {
+      console.error("Không thể đọc tùy chọn thông báo.", error);
+      return null;
+    }
+  };
+
+  const updateNotificationSettings = (updates: Partial<NotificationSettings>) => {
+    const settings = {
+      emailAlerts,
+      pushAlerts,
+      messageAlerts,
+      contractAlerts,
+      ...updates,
+    };
+    saveNotificationSettings(settings);
+    setNotificationFeedback("Đã lưu tùy chọn thông báo.");
+  };
+
+  const handlePushAlertsChange = async (enabled: boolean) => {
+    if (enabled && typeof Notification !== "undefined" && Notification.permission !== "granted") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushAlerts(false);
+        updateNotificationSettings({ pushAlerts: false });
+        setNotificationFeedback("Bạn chưa cấp quyền thông báo trên trình duyệt.");
+        return;
+      }
+    }
+    setPushAlerts(enabled);
+    updateNotificationSettings({ pushAlerts: enabled });
+  };
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const saved = getNotificationSettings();
+      if (!saved) return;
+      setEmailAlerts(saved.emailAlerts);
+      setPushAlerts(saved.pushAlerts);
+      setMessageAlerts(saved.messageAlerts);
+      setContractAlerts(saved.contractAlerts);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -304,6 +381,11 @@ export default function TenantSettingsPage() {
               <Bell className="size-5 text-[#15594f]" />
               <h3 className="text-[16px] font-semibold">Tùy chọn thông báo</h3>
             </div>
+            {notificationFeedback && (
+              <p className="rounded-[8px] bg-[#eaf2ed] px-3 py-2 text-[12px] text-[#15594f]" role="status">
+                {notificationFeedback}
+              </p>
+            )}
 
             <div className="space-y-3.5 divide-y divide-[#e2e7e1] text-[13px]">
               <label className="flex items-center justify-between pt-2 first:pt-0 cursor-pointer">
@@ -311,7 +393,10 @@ export default function TenantSettingsPage() {
                 <input
                   type="checkbox"
                   checked={emailAlerts}
-                  onChange={(e) => setEmailAlerts(e.target.checked)}
+                  onChange={(e) => {
+                    setEmailAlerts(e.target.checked);
+                    updateNotificationSettings({ emailAlerts: e.target.checked });
+                  }}
                   className="size-4 accent-[#15594f]"
                 />
               </label>
@@ -321,7 +406,7 @@ export default function TenantSettingsPage() {
                 <input
                   type="checkbox"
                   checked={pushAlerts}
-                  onChange={(e) => setPushAlerts(e.target.checked)}
+                  onChange={(e) => void handlePushAlertsChange(e.target.checked)}
                   className="size-4 accent-[#15594f]"
                 />
               </label>
@@ -331,7 +416,10 @@ export default function TenantSettingsPage() {
                 <input
                   type="checkbox"
                   checked={messageAlerts}
-                  onChange={(e) => setMessageAlerts(e.target.checked)}
+                  onChange={(e) => {
+                    setMessageAlerts(e.target.checked);
+                    updateNotificationSettings({ messageAlerts: e.target.checked });
+                  }}
                   className="size-4 accent-[#15594f]"
                 />
               </label>
@@ -341,7 +429,10 @@ export default function TenantSettingsPage() {
                 <input
                   type="checkbox"
                   checked={contractAlerts}
-                  onChange={(e) => setContractAlerts(e.target.checked)}
+                  onChange={(e) => {
+                    setContractAlerts(e.target.checked);
+                    updateNotificationSettings({ contractAlerts: e.target.checked });
+                  }}
                   className="size-4 accent-[#15594f]"
                 />
               </label>

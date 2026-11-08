@@ -127,6 +127,11 @@ export interface Room {
   priceMonthly: number;
   priceYearly?: number | null;
   depositAmount: number;
+  electricityRate?: number | null;
+  waterRate?: number | null;
+  internetFee?: number | null;
+  serviceFee?: number | null;
+  parkingFee?: number | null;
   area: number;
   maxOccupants: number;
   status: RoomStatus;
@@ -357,6 +362,18 @@ export interface Report {
   status: ReportStatus;
   createdAt: string;
   reporter?: Partial<User>;
+  target?: {
+    id: string;
+    title?: string;
+    status?: PostStatus;
+    roomNumber?: string;
+    name?: string;
+    fullName?: string;
+    email?: string;
+    isActive?: boolean;
+    author?: Partial<User>;
+    property?: { name: string; landlordId: string };
+  } | null;
 }
 
 export interface AuditLog {
@@ -541,6 +558,11 @@ export interface CreateRoomPayload {
   area: number;
   maxOccupants?: number;
   amenityIds?: string[];
+  electricityRate?: number;
+  waterRate?: number;
+  internetFee?: number;
+  serviceFee?: number;
+  parkingFee?: number;
 }
 
 // --- Post Endpoints ---
@@ -551,6 +573,7 @@ export interface CreatePostPayload {
   postType: PostType;
   propertyId?: string;
   roomId?: string;
+  images?: File[];
 }
 
 export interface UpdatePostPayload {

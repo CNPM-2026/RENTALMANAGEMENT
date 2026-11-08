@@ -5,24 +5,44 @@ import {
   Sparkles,
   Save,
   Check,
-  Info,
-  Upload,
-  User,
-  Heart,
-  Moon,
-  Clock,
-  Dog,
-  Utensils,
   Eye,
-  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
 import { apiClient } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth";
 import { RoommatePreference, UserWithProfile } from "@/types/models";
+
+const DEFAULT_PREFERRED_DISTRICT = "Quận 1";
+const DEFAULT_SLEEP_SCHEDULE = "22:00";
+const DEFAULT_CLEANLINESS_LEVEL = 3;
+const DEFAULT_PET_ALLOWED = false;
+const DEFAULT_SMOKING_ALLOWED = false;
+const DEFAULT_PREFERRED_GENDER = "ANY";
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getTomorrowDateString() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return getLocalDateString(tomorrow);
+}
+
+function getSleepScheduleLabel(value: string) {
+  return {
+    "22:00": "< 22:00",
+    "22:30": "22:00 - 23:00",
+    "23:30": "23:00 - 00:00",
+    "01:00": "> 00:00",
+  }[value] ?? value;
+}
 
 export default function TenantRoommateProfilePage() {
   const [currentStep, setCurrentStep] = React.useState<1 | 2 | 3>(1);
@@ -32,22 +52,27 @@ export default function TenantRoommateProfilePage() {
   // Form State
   const [budgetMin, setBudgetMin] = React.useState("");
   const [budgetMax, setBudgetMax] = React.useState("");
-  const [preferredDistrict, setPreferredDistrict] = React.useState("");
+  const [preferredDistrict, setPreferredDistrict] = React.useState(DEFAULT_PREFERRED_DISTRICT);
   const [moveInDate, setMoveInDate] = React.useState("");
-  const [sleepSchedule, setSleepSchedule] = React.useState("");
-  const [cleanlinessLevel, setCleanlinessLevel] = React.useState<number | null>(null);
-  const [petAllowed, setPetAllowed] = React.useState<boolean | null>(null);
-  const [cookingHabit, setCookingHabit] = React.useState("");
-  const [smokingAllowed, setSmokingAllowed] = React.useState<boolean | null>(null);
-  const [guestPolicy, setGuestPolicy] = React.useState("");
-  const [preferredGender, setPreferredGender] = React.useState("");
+  const [sleepSchedule, setSleepSchedule] = React.useState(DEFAULT_SLEEP_SCHEDULE);
+  const [cleanlinessLevel, setCleanlinessLevel] = React.useState<number | null>(DEFAULT_CLEANLINESS_LEVEL);
+  const [petAllowed, setPetAllowed] = React.useState<boolean | null>(DEFAULT_PET_ALLOWED);
+  const [smokingAllowed, setSmokingAllowed] = React.useState<boolean | null>(DEFAULT_SMOKING_ALLOWED);
+  const [preferredGender, setPreferredGender] = React.useState(DEFAULT_PREFERRED_GENDER);
   const [bioNote, setBioNote] = React.useState("");
   const [isDiscoverable, setIsDiscoverable] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [currentUser, setCurrentUser] = React.useState<UserWithProfile | null>(getCurrentUser());
+  const [currentUser, setCurrentUser] = React.useState<UserWithProfile | null>(null);
+  const [minMoveInDate, setMinMoveInDate] = React.useState("");
+  const [todayDate, setTodayDate] = React.useState("");
 
   React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setTodayDate(getLocalDateString());
+      setMoveInDate(getTomorrowDateString());
+      setMinMoveInDate(getTomorrowDateString());
+    });
     Promise.all([apiClient.auth.getMe() as Promise<UserWithProfile>, apiClient.matching.getPreferences()])
       .then(([user, preferences]) => {
         setCurrentUser(user);
@@ -55,20 +80,58 @@ export default function TenantRoommateProfilePage() {
         if (!value) return;
         setBudgetMin(value.budgetMin == null ? "" : String(value.budgetMin));
         setBudgetMax(value.budgetMax == null ? "" : String(value.budgetMax));
-        setPreferredDistrict(value.preferredDistrict ?? "");
-        setSleepSchedule(value.sleepSchedule ?? "");
-        setCleanlinessLevel(value.cleanlinessLevel ?? null);
-        setPetAllowed(value.petAllowed ?? null);
-        setSmokingAllowed(value.smokingAllowed ?? null);
-        setPreferredGender(value.preferredGender ?? "");
+        setPreferredDistrict(value.preferredDistrict ?? DEFAULT_PREFERRED_DISTRICT);
+        setSleepSchedule(value.sleepSchedule ?? DEFAULT_SLEEP_SCHEDULE);
+        setCleanlinessLevel(value.cleanlinessLevel ?? DEFAULT_CLEANLINESS_LEVEL);
+        setPetAllowed(value.petAllowed ?? DEFAULT_PET_ALLOWED);
+        setSmokingAllowed(value.smokingAllowed ?? DEFAULT_SMOKING_ALLOWED);
+        setPreferredGender(value.preferredGender ?? DEFAULT_PREFERRED_GENDER);
         setBioNote(value.note ?? "");
       })
       .catch((error) => setErrorMessage(error instanceof Error ? error.message : "Không thể tải hồ sơ ở ghép."))
       .finally(() => setIsLoading(false));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  const validateProfile = () => {
+    const today = getLocalDateString();
+    const minBudget = Number(budgetMin);
+    const maxBudget = Number(budgetMax);
+
+    if (!moveInDate || moveInDate <= today) {
+      setErrorMessage("Ngày dự kiến dọn vào phải sau ngày hiện tại.");
+      return false;
+    }
+    if (!budgetMin || !budgetMax || !Number.isFinite(minBudget) || !Number.isFinite(maxBudget) || minBudget <= 0 || maxBudget <= 0) {
+      setErrorMessage("Vui lòng nhập ngân sách hợp lệ lớn hơn 0.");
+      return false;
+    }
+    if (minBudget > maxBudget) {
+      setErrorMessage("Ngân sách tối thiểu không được lớn hơn ngân sách tối đa.");
+      return false;
+    }
+
+    setErrorMessage(null);
+    return true;
+  };
+
+  const handleMoveInDateChange = (value: string) => {
+    setMoveInDate(value);
+    if (value && value <= getLocalDateString()) {
+      setErrorMessage("Ngày dự kiến dọn vào phải sau ngày hiện tại.");
+    } else {
+      setErrorMessage(null);
+    }
+  };
+
+  const continueToStep = (step: 2 | 3) => {
+    if (step === 2 && !validateProfile()) return;
+    setCurrentStep(step);
+  };
 
   const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!validateProfile()) return;
     setIsSaving(true);
     setErrorMessage(null);
     try {
@@ -83,14 +146,12 @@ export default function TenantRoommateProfilePage() {
         preferredGender,
         note: bioNote,
       });
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Không thể lưu hồ sơ.");
-      setIsSaving(false);
-      return;
-    } finally {
-      setIsSaving(false);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Không thể lưu hồ sơ.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -204,13 +265,15 @@ export default function TenantRoommateProfilePage() {
                     label="Ngày dự kiến dọn vào"
                     type="date"
                     value={moveInDate}
-                    onChange={(e) => setMoveInDate(e.target.value)}
+                    min={minMoveInDate}
+                    onChange={(e) => handleMoveInDateChange(e.target.value)}
+                    error={moveInDate && todayDate && moveInDate <= todayDate ? "Ngày phải sau ngày hiện tại." : undefined}
                     required
                   />
                 </div>
 
                 <div className="flex justify-end pt-2">
-                  <Button type="button" variant="primary" onClick={() => setCurrentStep(2)}>
+                  <Button type="button" variant="primary" onClick={() => continueToStep(2)}>
                     Tiếp tục: Thói quen sinh hoạt
                   </Button>
                 </div>
@@ -395,9 +458,8 @@ export default function TenantRoommateProfilePage() {
           <Card className="border border-[#e2e7e1] bg-white rounded-[12px] p-6 shadow-sm space-y-4">
             <div className="flex flex-col items-center text-center space-y-2">
               <div className="size-20 rounded-full overflow-hidden bg-[#eaf2ed] border-2 border-[#15594f]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={currentUser?.avatarUrl || "/images/default-avatar.svg"}
+                <Avatar
+                  src={currentUser?.avatarUrl}
                   alt="Ảnh của bạn"
                   className="size-full object-cover"
                 />
@@ -420,11 +482,15 @@ export default function TenantRoommateProfilePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[#74817b]">Giờ ngủ:</span>
-                <strong className="text-[#203c37]">{sleepSchedule || "Chưa cập nhật"}</strong>
+                <strong className="text-[#203c37]">{getSleepScheduleLabel(sleepSchedule)}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#74817b]">Thú cưng:</span>
-                <strong className="text-[#203c37]">{petAllowed === null ? "Chưa cập nhật" : petAllowed ? "Cho phép" : "Không nuôi"}</strong>
+                <strong className="text-[#203c37]">{petAllowed ? "Cho phép" : "Không nuôi"}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#74817b]">Dọn vào:</span>
+                <strong className="text-[#203c37]">{moveInDate || "Đang cập nhật"}</strong>
               </div>
             </div>
 
