@@ -15,6 +15,7 @@ function VerifyOtpForm() {
   const [countdown, setCountdown] = React.useState(60);
   const canResend = countdown === 0;
   const [isVerifying, setIsVerifying] = React.useState(false);
+  const [isResending, setIsResending] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -90,7 +91,9 @@ function VerifyOtpForm() {
   }
 
   async function handleResend() {
-    if (!canResend) return;
+    if (!canResend || isResending) return;
+    setIsResending(true);
+    setError(null);
     try {
       await apiClient.auth.resendVerification({ email: emailParam });
       setCountdown(60);
@@ -99,6 +102,8 @@ function VerifyOtpForm() {
       inputRefs.current[0]?.focus();
     } catch (resendError) {
       setError(resendError instanceof ApiError ? resendError.message : "Không thể gửi lại mã xác minh.");
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -152,9 +157,10 @@ function VerifyOtpForm() {
                 <button
                   type="button"
                   onClick={handleResend}
+                  disabled={isResending}
                   className="text-[#15594f] font-semibold hover:underline cursor-pointer"
                 >
-                  Gửi lại mã xác minh ngay
+                  {isResending ? "Đang gửi mã..." : "Gửi lại mã xác minh ngay"}
                 </button>
               ) : (
                 <span>Chưa nhận được mã? Gửi lại sau {countdown}s</span>

@@ -21,22 +21,32 @@ export const authService = {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Tạo user trong DB
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        fullName,
-        phone,
-        role: role as Role || Role.TENANT, // Mặc định là TENANT
-      },
-      select: {
-        id: true, email: true, fullName: true, role: true, createdAt: true
-      } // Không trả về passwordHash
+    // Keep registration and initial delivery atomic: a failed mail must not
+    // leave an account that can never complete the signup flow.
+    return prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          fullName,
+          phone,
+          role: role as Role || Role.TENANT,
+        },
+        select: {
+          id: true, email: true, fullName: true, role: true, createdAt: true
+        }
+      });
+      const code = createOtp();
+      await tx.emailVerificationCode.create({
+        data: {
+          userId: newUser.id,
+          codeHash: hashToken(code),
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+      await mailService.sendEmailVerification(newUser.email, code);
+      return newUser;
     });
-
-    await authService.sendEmailVerification(newUser.id, newUser.email);
-    return newUser;
   },
 
   // 2. Đăng nhập
@@ -45,6 +55,9 @@ export const authService = {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.isActive) {
       throw new AppError('Email hoặc mật khẩu không đúng', 401);
+    }
+    if (!user.isEmailVerified) {
+      throw new AppError('Vui lòng xác minh email trước khi đăng nhập', 403);
     }
 
     // So sánh mật khẩu
@@ -75,7 +88,7 @@ export const authService = {
     const nextRefreshToken = createOpaqueToken();
     const result = await prisma.$transaction(async (tx) => {
       const stored = await tx.refreshToken.findUnique({ where: { tokenHash }, include: { user: true } });
-      if (!stored || stored.revokedAt || stored.expiresAt <= new Date() || !stored.user.isActive) {
+      if (!stored || stored.revokedAt || stored.expiresAt <= new Date() || !stored.user.isActive || !stored.user.isEmailVerified) {
         throw new AppError('Refresh token không hợp lệ hoặc đã hết hạn', 401);
       }
 
@@ -110,33 +123,49 @@ export const authService = {
   },
 
   sendEmailVerification: async (userId: string, email?: string) => {
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, isEmailVerified: true } });
-    if (!user) throw new AppError('Không tìm thấy tài khoản', 404);
-    if (user.isEmailVerified) return;
-    const code = createOtp();
-    await prisma.emailVerificationCode.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: new Date() },
+    await prisma.$transaction(async (tx) => {
+      const lockedUsers = await tx.$queryRaw<Array<{ id: string; email: string; is_email_verified: boolean }>>`
+        SELECT id, email, is_email_verified
+        FROM users
+        WHERE id = ${userId}
+        FOR UPDATE
+      `;
+      const user = lockedUsers[0];
+      if (!user) throw new AppError('Không tìm thấy tài khoản', 404);
+      if (user.is_email_verified) return;
+
+      const code = createOtp();
+      await tx.emailVerificationCode.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      await tx.emailVerificationCode.create({
+        data: { userId: user.id, codeHash: hashToken(code), expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      });
+      await mailService.sendEmailVerification(email ?? user.email, code);
     });
-    await prisma.emailVerificationCode.create({
-      data: { userId: user.id, codeHash: hashToken(code), expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
-    });
-    await mailService.sendEmailVerification(email ?? user.email, code);
   },
 
   verifyEmail: async (email: string, code: string) => {
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true, isEmailVerified: true } });
     if (!user) throw new AppError('Mã xác minh không hợp lệ hoặc đã hết hạn', 400);
     if (user.isEmailVerified) return;
-    const record = await prisma.emailVerificationCode.findFirst({
-      where: { userId: user.id, codeHash: hashToken(code), usedAt: null, expiresAt: { gt: new Date() } },
-      orderBy: { createdAt: 'desc' },
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.emailVerificationCode.updateMany({
+        where: {
+          userId: user.id,
+          codeHash: hashToken(code),
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new AppError('Mã xác minh không hợp lệ hoặc đã hết hạn', 400);
+      await tx.user.update({
+        where: { id: user.id, isEmailVerified: false },
+        data: { isEmailVerified: true },
+      });
     });
-    if (!record) throw new AppError('Mã xác minh không hợp lệ hoặc đã hết hạn', 400);
-    await prisma.$transaction([
-      prisma.emailVerificationCode.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
-      prisma.user.update({ where: { id: user.id }, data: { isEmailVerified: true } }),
-    ]);
   },
 
   resetPassword: async (token: string, password: string) => {
