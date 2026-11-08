@@ -49,15 +49,18 @@ export default function TenantRentalRequestsPage() {
   const router = useRouter();
 
   React.useEffect(() => {
-    apiClient.rentalRequests.getMine().then((items: ApiRentalRequest[]) => {
-      setRequests(items.map((item) => ({
+    Promise.all([apiClient.rentalRequests.getMine(), apiClient.contracts.getMyContracts()]).then(([items, contracts]) => {
+      setRequests((items as ApiRentalRequest[]).map((item) => {
+        const contract = contracts.find((candidate) => candidate.roomId === item.roomId && candidate.tenantId === item.tenantId);
+        return {
         id: item.id,
+        contractId: contract?.id,
         roomTitle: item.room?.property?.name ?? "Phòng thuê",
         roomNumber: item.room?.roomNumber ?? "---",
         roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
         roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
         monthlyRent: item.room?.priceMonthly ?? 0,
-        depositAmount: item.room?.depositAmount ?? 0,
+        depositAmount: item.room?.priceMonthly ?? 0,
         moveInDate: item.moveInDate,
         leaseTermMonths: item.leaseTermMonths,
         occupantsCount: item.occupantsCount,
@@ -67,9 +70,21 @@ export default function TenantRentalRequestsPage() {
         status: item.status === "CANCELLED" ? "REJECTED" : item.status,
         currentStep: item.status === "SIGNED" ? 4 : item.status === "APPROVED" || item.status === "CONTRACT_READY" ? 3 : 1,
         createdAt: item.createdAt,
-      })));
+        };
+      }));
     }).catch(() => setRequests([]));
   }, []);
+
+  const handleHandoverConfirmation = async (requestId: string) => {
+    try {
+      await apiClient.rentalRequests.updateStatus(requestId, "SIGNED");
+      setRequests((current) => current.map((request) => request.id === requestId
+        ? { ...request, status: "SIGNED", currentStep: 4 }
+        : request));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Không thể xác nhận bàn giao.");
+    }
+  };
 
   const filteredRequests = requests.filter((r) => {
     if (activeTab === "PENDING") return r.status === "SUBMITTED";
@@ -140,8 +155,7 @@ export default function TenantRentalRequestsPage() {
             className="p-6 rounded-[16px] bg-white border border-[#e2e7e1] shadow-xs space-y-6"
           >
             {/* Top Card Row */}
-            <div className="flex flex-col md:flex-row gap-5 items-start justify-between">
-              <div className="flex gap-4 items-start min-w-0">
+            <div className="flex gap-4 items-start min-w-0">
                 <img
                   src={req.roomImage}
                   alt={req.roomTitle}
@@ -179,7 +193,7 @@ export default function TenantRentalRequestsPage() {
 
                   <div className="flex flex-wrap items-center gap-4 text-[12px] pt-1">
                     <span>
-                      Ngày dọn vào: <strong className="text-[#203c37]">{req.moveInDate}</strong>
+                      Ngày dọn vào: <strong className="text-[#203c37]">{new Date(req.moveInDate).toLocaleDateString("vi-VN")}</strong>
                     </span>
                     <span>
                       Thời hạn: <strong className="text-[#203c37]">{req.leaseTermMonths} tháng</strong>
@@ -192,10 +206,8 @@ export default function TenantRentalRequestsPage() {
                     </span>
                   </div>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2.5 self-end md:self-center shrink-0">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-[#e2e7e1] pt-4">
                 {req.status === "APPROVED" && req.contractId && (
                   <Link href={`/tenant/contracts/${req.contractId}`}>
                     <Button
@@ -209,6 +221,17 @@ export default function TenantRentalRequestsPage() {
                   </Link>
                 )}
 
+                {req.status === "APPROVED" && req.contractId && (
+                  <Button
+                    variant="outline"
+                    size="md"
+                    leftIcon={<CheckCircle2 className="size-4 text-[#15594f]" />}
+                    onClick={() => void handleHandoverConfirmation(req.id)}
+                  >
+                    Xác nhận đã nhận bàn giao
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   size="md"
@@ -217,7 +240,7 @@ export default function TenantRentalRequestsPage() {
                 >
                   Nhắn tin với chủ trọ
                 </Button>
-              </div>
+            </div>
             </div>
 
             {/* Stepper Progress Bar (Figma Node 44:65051) */}

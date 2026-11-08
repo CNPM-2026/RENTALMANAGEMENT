@@ -6,6 +6,6 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/admin', authorize('ADMIN'), statisticController.getAdminStats);
-router.get('/landlord', authorize('LANDLORD'), statisticController.getLandlordStats);
+router.get('/landlord', authorize('LANDLORD', 'ADMIN'), statisticController.getLandlordStats);
 
 export default router;

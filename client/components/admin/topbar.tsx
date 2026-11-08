@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, Bell, ChevronDown, Settings, LogOut, Shield } from "lucide-react";
+import { Search, Bell, ChevronDown, Settings, LogOut, Shield, UserRound } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { clearAuthSession } from "@/lib/auth";
+import { clearAuthSession, getCurrentUser } from "@/lib/auth";
+import { Avatar } from "@/components/ui/avatar";
 
 export function AdminTopbar() {
   const pathname = usePathname();
@@ -15,6 +16,17 @@ export function AdminTopbar() {
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
+
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setCurrentUser(getCurrentUser());
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const displayName = currentUser?.fullName?.trim() || "Quản trị viên";
+  const roleLabel = currentUser?.role === "ADMIN" ? "Admin" : (currentUser?.role || "Admin");
 
   function getBreadcrumb() {
     if (currentPath.includes("dashboard")) return "Tổng quan nền tảng";
@@ -73,6 +85,13 @@ export function AdminTopbar() {
               className="w-56 lg:w-72 h-[38px] pl-9 pr-3 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] placeholder:text-[#74817b] outline-none focus:border-[#15594f] focus:bg-white transition-all"
             />
           </div>
+          <Link
+            href="/rooms"
+            className="hidden sm:flex items-center gap-1.5 text-[12px] font-medium text-[#74817b] hover:text-[#15594f] transition-colors"
+          >
+            <UserRound className="size-4" />
+            <span>Khu người thuê</span>
+          </Link>
 
           {/* Security Alert Bell */}
           <Link
@@ -92,15 +111,13 @@ export function AdminTopbar() {
               onClick={() => setProfileOpen((prev) => !prev)}
               className="flex items-center gap-2.5 p-1 rounded-[100px] hover:bg-[#f7f6f2] transition-colors cursor-pointer"
             >
-              <div className="bg-[#15594f] text-white rounded-full size-[34px] text-[11px] font-bold flex items-center justify-center shadow-xs">
-                AD
-              </div>
+              <Avatar src={currentUser?.avatarUrl} alt={displayName} className="size-[34px] rounded-full object-cover shadow-xs" />
               <div className="hidden md:flex flex-col text-left">
                 <span className="text-[13px] font-semibold text-[#203c37] leading-tight">
-                  Quản trị viên Cấp cao
+                  {displayName}
                 </span>
                 <span className="text-[10px] text-[#74817b] leading-tight">
-                  Super Admin ⌄
+                  {roleLabel} ⌄
                 </span>
               </div>
               <ChevronDown className="size-3.5 text-[#74817b] hidden md:block" />
@@ -110,12 +127,30 @@ export function AdminTopbar() {
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-[10px] border border-[#e2e7e1] shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-4 py-2 border-b border-[#e2e7e1]">
                   <p className="text-[13px] font-semibold text-[#203c37]">
-                    Quản trị viên Cấp cao
+                    {displayName}
                   </p>
                   <p className="text-[11px] text-[#74817b]">
-                    admin@5krental.vn
+                    {currentUser?.email || "admin.test@rental.local"}
                   </p>
                 </div>
+
+                <Link
+                  href="/admin/dashboard"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-[12px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
+                >
+                  <Shield className="size-4" />
+                  <span>Không gian quản trị</span>
+                </Link>
+
+                <Link
+                  href="/rooms"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
+                >
+                  <Search className="size-4 text-[#74817b]" />
+                  <span>Tìm phòng & đọc bài</span>
+                </Link>
 
                 <Link
                   href="/admin/settings"
@@ -124,6 +159,15 @@ export function AdminTopbar() {
                 >
                   <Settings className="size-4 text-[#74817b]" />
                   <span>Cấu hình hệ thống</span>
+                </Link>
+
+                <Link
+                  href="/tenant/profile"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
+                >
+                  <Settings className="size-4 text-[#74817b]" />
+                  <span>Hồ sơ cá nhân</span>
                 </Link>
 
                 <Link
@@ -157,8 +201,8 @@ export function AdminTopbar() {
       <Modal
         isOpen={logoutModalOpen}
         onClose={() => setLogoutModalOpen(false)}
-        title="Xác nhận đăng xuất quản trị"
-        description="Bạn có chắc chắn muốn kết thúc phiên làm việc Quản trị viên cấp cao?"
+        title="Xác nhận đăng xuất"
+        description={`Bạn có chắc chắn muốn kết thúc phiên làm việc của ${displayName}?`}
         size="sm"
         footer={
           <>

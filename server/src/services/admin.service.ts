@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { PostStatus } from '@prisma/client';
 import { notificationService } from './notification.service';
 import { auditService } from './audit.service';
+import { storageService } from './storage.service';
 
 export const adminService = {
   // Lấy danh sách bài chờ duyệt
@@ -53,6 +54,15 @@ export const adminService = {
     return updatedPost;
   },
 
+  deletePost: async (adminId: string, postId: string) => {
+    const post = await prisma.post.findUnique({ where: { id: postId }, select: { id: true, images: { select: { imageUrl: true } } } });
+    if (!post) throw new AppError('Không tìm thấy bài đăng', 404);
+    const deleted = await prisma.post.delete({ where: { id: postId } });
+    await Promise.all(post.images.map((image) => storageService.deleteImage(image.imageUrl)));
+    await auditService.record({ userId: adminId, action: 'DELETE_REPORTED_POST', entityType: 'Post', entityId: postId });
+    return deleted;
+  },
+
   getUsers: async (query: { role?: string; search?: string }) => prisma.user.findMany({
     where: {
       ...(query.role && { role: query.role as never }),
@@ -86,11 +96,18 @@ export const adminService = {
     return updated;
   },
 
-  getKycSubmissions: (status?: string) => prisma.kycSubmission.findMany({
-    where: status ? { status: status as never } : undefined,
-    include: { user: { select: { id: true, fullName: true, email: true, phone: true } } },
-    orderBy: { createdAt: 'asc' },
-  }),
+  getKycSubmissions: async (status?: string) => {
+    const submissions = await prisma.kycSubmission.findMany({
+      where: status ? { status: status as never } : undefined,
+      include: { user: { select: { id: true, fullName: true, email: true, phone: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    return submissions.map((submission) => ({
+      ...submission,
+      frontIdUrl: storageService.getPrivateImageUrl(submission.frontIdUrl),
+      backIdUrl: storageService.getPrivateImageUrl(submission.backIdUrl),
+    }));
+  },
 
   updateKyc: async (adminId: string, id: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
     const submission = await prisma.kycSubmission.findUnique({ where: { id }, select: { id: true, userId: true } });
@@ -132,5 +149,21 @@ export const adminService = {
     const existing = await prisma.contentFilterKeyword.findUnique({ where: { id } });
     if (!existing) throw new AppError('Không tìm thấy từ khóa', 404);
     return prisma.contentFilterKeyword.delete({ where: { id } });
+  },
+
+  getAmenities: () => prisma.amenity.findMany({ orderBy: { name: 'asc' } }),
+
+  createAmenity: async (name: string, iconUrl?: string) => {
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new AppError('Tên tiện ích không được để trống', 400);
+    return prisma.amenity.create({
+      data: { name: normalizedName, iconUrl: iconUrl?.trim() || null },
+    });
+  },
+
+  deleteAmenity: async (id: string) => {
+    const amenity = await prisma.amenity.findUnique({ where: { id } });
+    if (!amenity) throw new AppError('Không tìm thấy tiện ích', 404);
+    return prisma.amenity.delete({ where: { id } });
   },
 };

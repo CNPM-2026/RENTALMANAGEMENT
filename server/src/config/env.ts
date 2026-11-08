@@ -29,6 +29,31 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().default('http://localhost:3000/api/v1/auth/google/callback'),
   FRONTEND_URL: z.string().url().default('http://localhost:3001'),
+}).superRefine((config, context) => {
+  const cloudinaryValues = [
+    config.CLOUDINARY_CLOUD_NAME,
+    config.CLOUDINARY_API_KEY,
+    config.CLOUDINARY_API_SECRET,
+  ];
+  const hasSomeCloudinaryConfig = cloudinaryValues.some(Boolean);
+  const hasAllCloudinaryConfig = cloudinaryValues.every(Boolean);
+
+  if (hasSomeCloudinaryConfig && !hasAllCloudinaryConfig) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['CLOUDINARY'],
+      message: 'CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY và CLOUDINARY_API_SECRET phải được cấu hình cùng nhau.',
+    });
+  }
+
+  if (config.CLOUDINARY_API_KEY && config.CLOUDINARY_API_SECRET
+    && config.CLOUDINARY_API_KEY === config.CLOUDINARY_API_SECRET) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['CLOUDINARY_API_SECRET'],
+      message: 'CLOUDINARY_API_SECRET phải là API secret riêng trong Cloudinary, không phải API key.',
+    });
+  }
 });
 
 // Thử parse các biến môi trường, nếu thiếu hay sai định dạng sẽ báo đỏ ngay lúc khởi động

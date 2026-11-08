@@ -5,45 +5,75 @@ import { storageService } from './storage.service';
 export const userService = {
   updateProfile: async (userId: string, data: any, file?: Express.Multer.File) => {
     const { fullName, phone, gender, dob, bio, occupation } = data;
-
-    // Sử dụng transaction để cập nhật cả bảng User và UserProfile
+    const previous = file ? await prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }) : null;
     const avatarUrl = file ? await storageService.uploadImage(file, 'rental-management/avatars') : undefined;
-    return await prisma.$transaction(async (tx) => {
-      // 1. Cập nhật thông tin cơ bản ở bảng User
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: {
-          ...(fullName && { fullName }),
-          ...(phone && { phone }),
-          // Nếu có upload file avatar mới thì cập nhật đường dẫn
-          ...(avatarUrl && { avatarUrl }),
-        }
-      });
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            ...(fullName && { fullName }),
+            ...(phone && { phone }),
+            ...(avatarUrl && { avatarUrl }),
+          }
+        });
 
-      // 2. Cập nhật thông tin chi tiết ở bảng UserProfile (Dùng upsert: có thì update, chưa có thì create)
-      await tx.userProfile.upsert({
-        where: { userId },
-        create: { 
-          userId, gender, bio, occupation,
-          dob: dob ? new Date(dob) : null
-        },
-        update: {
-          ...(gender && { gender }),
-          ...(bio && { bio }),
-          ...(occupation && { occupation }),
-          ...(dob && { dob: new Date(dob) }),
-        }
-      });
+        await tx.userProfile.upsert({
+          where: { userId },
+          create: {
+            userId, gender, bio, occupation,
+            dob: dob ? new Date(dob) : null
+          },
+          update: {
+            ...(gender && { gender }),
+            ...(bio && { bio }),
+            ...(occupation && { occupation }),
+            ...(dob && { dob: new Date(dob) }),
+          }
+        });
 
-      // Lấy lại thông tin full để trả về client
-      return await tx.user.findUnique({
-        where: { id: userId },
-
-        // Nhớ giấu password đi
-        select: {
-          id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true, profile: true
-        }
+        return await tx.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true, profile: true
+          }
+        });
       });
+      if (avatarUrl && previous?.avatarUrl && previous.avatarUrl !== avatarUrl) {
+        await storageService.deleteImage(previous.avatarUrl);
+      }
+      return result;
+    } catch (error) {
+      if (avatarUrl) await storageService.deleteImage(avatarUrl);
+      throw error;
+    }
+  },
+
+  submitKyc: async (userId: string, data: {
+    idNumber: string;
+    permanentAddress: string;
+    frontIdUrl: string;
+    backIdUrl: string;
+  }) => (async () => {
+    const previous = await prisma.kycSubmission.findUnique({ where: { userId }, select: { frontIdUrl: true, backIdUrl: true } });
+    const result = await prisma.kycSubmission.upsert({
+      where: { userId },
+      create: { userId, ...data, status: 'PENDING' },
+      update: { ...data, status: 'PENDING', rejectionReason: null, reviewedById: null, reviewedAt: null },
     });
-  }
+    await Promise.all([
+      previous?.frontIdUrl && storageService.deleteImage(previous.frontIdUrl, 'authenticated'),
+      previous?.backIdUrl && storageService.deleteImage(previous.backIdUrl, 'authenticated'),
+    ]);
+    return result;
+  })(),
+
+  getMyKyc: async (userId: string) => {
+    const result = await prisma.kycSubmission.findUnique({ where: { userId } });
+    return result && {
+      ...result,
+      frontIdUrl: storageService.getPrivateImageUrl(result.frontIdUrl),
+      backIdUrl: storageService.getPrivateImageUrl(result.backIdUrl),
+    };
+  },
 };

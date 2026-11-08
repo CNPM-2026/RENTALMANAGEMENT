@@ -2,16 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Camera, Save, User, ShieldCheck, Heart, Calendar, FileText, Info } from "lucide-react";
+import { Camera, Save, ShieldCheck, Heart, Calendar, FileText, Info } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api";
 import { getCurrentUser, updateStoredUser } from "@/lib/auth";
 import { UserWithProfile } from "@/types/models";
+import { Avatar } from "@/components/ui/avatar";
 
-const SAFE_IMAGE_URL = /^(blob:)?https?:\/\/[^\s"'<>`]+$/;
-
-function safeImageUrl(url: string | null | undefined): string | null {
-  if (!url || !SAFE_IMAGE_URL.test(url)) return null;
-  return url;
+function getLocalDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function AvatarImage({ file, url, className }: { file: File | null; url: string | null; className: string }) {
@@ -44,8 +45,7 @@ function AvatarImage({ file, url, className }: { file: File | null; url: string 
   if (file) {
     return <canvas ref={canvasRef} className={className} role="img" aria-label="Avatar" />;
   }
-  const src = safeImageUrl(url);
-  return src ? <img src={src} alt="Avatar" className={className} /> : null;
+  return <Avatar src={url} alt="Avatar" className={className} />;
 }
 
 export default function TenantProfilePage() {
@@ -62,8 +62,16 @@ export default function TenantProfilePage() {
   const [, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [feedback, setFeedback] = React.useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [activityCounts, setActivityCounts] = React.useState({ favorites: 0, appointments: 0, activeContracts: 0 });
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const dobInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    if (dobInputRef.current) {
+      dobInputRef.current.max = getLocalDateString(new Date());
+    }
+  }, []);
 
   // Load user data on mount
   React.useEffect(() => {
@@ -74,7 +82,7 @@ export default function TenantProfilePage() {
         setUser(currentUser as UserWithProfile);
         setFullName(currentUser.fullName || "");
         setPhone(currentUser.phone || "");
-        setAvatarPreview(safeImageUrl(currentUser.avatarUrl));
+        setAvatarPreview(currentUser.avatarUrl || null);
 
         const profile = (currentUser as UserWithProfile).profile;
         if (profile) {
@@ -83,6 +91,17 @@ export default function TenantProfilePage() {
           setOccupation(profile.occupation || "");
           setBio(profile.bio || "");
         }
+
+        const [favorites, appointments, contracts] = await Promise.all([
+          apiClient.favorites.getMyFavorites(),
+          apiClient.appointments.getMyAppointments(),
+          apiClient.contracts.getMyContracts(),
+        ]);
+        setActivityCounts({
+          favorites: favorites.length,
+          appointments: appointments.length,
+          activeContracts: contracts.filter((contract) => contract.status === "ACTIVE").length,
+        });
       } catch {
         // Fallback to local storage profile if offline
         const local = getCurrentUser();
@@ -116,6 +135,12 @@ export default function TenantProfilePage() {
     e.preventDefault();
     setIsSaving(true);
     setFeedback(null);
+
+    if (dob && dob > getLocalDateString(new Date())) {
+      setFeedback({ type: "error", message: "Ngày sinh không được là ngày trong tương lai." });
+      setIsSaving(false);
+      return;
+    }
 
     try {
       const formData = new FormData();
@@ -211,11 +236,7 @@ export default function TenantProfilePage() {
               {/* Avatar Uploader Section */}
               <div className="flex items-center gap-5">
                 <div className="relative size-[94px] rounded-full overflow-hidden bg-[#eaf2ed] border-2 border-[#15594f]/20 shrink-0 flex items-center justify-center text-[#15594f]">
-                  {avatarFile || avatarPreview ? (
-                    <AvatarImage file={avatarFile} url={avatarPreview} className="size-full object-cover" />
-                  ) : (
-                    <User className="size-10" />
-                  )}
+                  <AvatarImage file={avatarFile} url={avatarPreview} className="size-full object-cover" />
                 </div>
 
                 <div className="space-y-2">
@@ -260,9 +281,18 @@ export default function TenantProfilePage() {
                     Ngày sinh
                   </label>
                   <input
+                    ref={dobInputRef}
                     type="date"
                     value={dob}
-                    onChange={(e) => setDob(e.target.value)}
+                    onInvalid={(e) => e.currentTarget.setCustomValidity("Ngày sinh không được là ngày trong tương lai.")}
+                    onInput={(e) => e.currentTarget.setCustomValidity("")}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setDob(value);
+                      e.currentTarget.setCustomValidity(
+                        value > getLocalDateString(new Date()) ? "Ngày sinh không được là ngày trong tương lai." : "",
+                      );
+                    }}
                     className="w-full min-h-[46px] px-3.5 py-2.5 rounded-[8px] bg-white border border-[#e2e7e1] text-[14px] text-[#203c37] outline-none focus:border-[#15594f]"
                   />
                 </div>
@@ -386,11 +416,7 @@ export default function TenantProfilePage() {
           <div className="bg-white rounded-[12px] border border-[#e2e7e1] p-6 shadow-sm space-y-5">
             <div className="flex flex-col items-center text-center">
               <div className="size-[84px] rounded-full overflow-hidden bg-[#eaf2ed] border-2 border-[#15594f]/20 flex items-center justify-center text-[#15594f] mb-3">
-                {avatarFile || avatarPreview ? (
-                  <AvatarImage file={avatarFile} url={avatarPreview} className="size-full object-cover" />
-                ) : (
-                  <User className="size-9" />
-                )}
+                <AvatarImage file={avatarFile} url={avatarPreview} className="size-full object-cover" />
               </div>
 
               <h3 className="text-[17px] font-semibold text-[#203c37]">
@@ -413,7 +439,7 @@ export default function TenantProfilePage() {
                   <Heart className="size-4 text-[#15594f]" />
                   <span>Phòng đã lưu</span>
                 </span>
-                <span className="font-semibold text-[#203c37]">12 phòng</span>
+                <span className="font-semibold text-[#203c37]">{activityCounts.favorites} phòng</span>
               </div>
 
               <div className="flex items-center justify-between text-[#74817b]">
@@ -421,7 +447,7 @@ export default function TenantProfilePage() {
                   <Calendar className="size-4 text-[#15594f]" />
                   <span>Lịch xem phòng</span>
                 </span>
-                <span className="font-semibold text-[#203c37]">2 lịch hẹn</span>
+                <span className="font-semibold text-[#203c37]">{activityCounts.appointments} lịch hẹn</span>
               </div>
 
               <div className="flex items-center justify-between text-[#74817b]">
@@ -429,7 +455,7 @@ export default function TenantProfilePage() {
                   <FileText className="size-4 text-[#15594f]" />
                   <span>Hợp đồng hiệu lực</span>
                 </span>
-                <span className="font-semibold text-[#203c37]">1 hợp đồng</span>
+                <span className="font-semibold text-[#203c37]">{activityCounts.activeContracts} hợp đồng</span>
               </div>
             </div>
 

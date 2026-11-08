@@ -14,5 +14,6 @@ router.use(authenticate, authorizeStaff('PROPERTIES_ROOMS'));
 
 router.post('/', validate(roomSchema), roomController.create);
 router.get('/property/:propertyId', roomController.getByProperty);
+router.delete('/:id', roomController.delete);
 
 export default router;

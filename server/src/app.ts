@@ -40,7 +40,6 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(path.join(process.cwd(), 'public'))); // Nếu có
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'))); // Thêm dòng này để public ảnh
 // Health Check Route
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'Server is running 🚀' });

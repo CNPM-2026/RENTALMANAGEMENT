@@ -444,16 +444,21 @@ model PropertyImage {
 }
 
 model Room {
-  id            String     @id @default(uuid())
-  propertyId    String     @map("property_id")
-  roomNumber    String     @map("room_number") // Số phòng (Ví dụ: P.101)
-  priceMonthly  Decimal    @map("price_monthly") @db.Decimal(10, 2) // Giá thuê theo tháng
-  priceYearly   Decimal?   @map("price_yearly") @db.Decimal(10, 2) // Giá ưu đãi thuê dài hạn (nếu hợp đồng 1 năm)
-  depositAmount Decimal    @default(0) @map("deposit_amount") @db.Decimal(10, 2) // Tiền cọc bắt buộc
-  area          Float // Diện tích (m2)
-  maxOccupants  Int        @default(2) @map("max_occupants")
-  status        RoomStatus @default(AVAILABLE)
-  createdAt     DateTime   @default(now()) @map("created_at")
+  id              String     @id @default(uuid())
+  propertyId      String     @map("property_id")
+  roomNumber      String     @map("room_number") // Số phòng (Ví dụ: P.101)
+  priceMonthly    Decimal    @map("price_monthly") @db.Decimal(10, 2) // Giá thuê theo tháng
+  priceYearly     Decimal?   @map("price_yearly") @db.Decimal(10, 2) // Giá ưu đãi thuê dài hạn (nếu hợp đồng 1 năm)
+  depositAmount   Decimal    @default(0) @map("deposit_amount") @db.Decimal(10, 2) // Tiền cọc bắt buộc
+  electricityRate Decimal?   @map("electricity_rate") @db.Decimal(10, 2)
+  waterRate       Decimal?   @map("water_rate") @db.Decimal(10, 2)
+  internetFee     Decimal?   @map("internet_fee") @db.Decimal(10, 2)
+  serviceFee      Decimal?   @map("service_fee") @db.Decimal(10, 2)
+  parkingFee      Decimal?   @map("parking_fee") @db.Decimal(10, 2)
+  area            Float // Diện tích (m2)
+  maxOccupants    Int        @default(2) @map("max_occupants")
+  status          RoomStatus @default(AVAILABLE)
+  createdAt       DateTime   @default(now()) @map("created_at")
 
   property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   roomAmenities       RoomAmenity[]

@@ -20,6 +20,10 @@ import {
   MessageSquare,
   ChevronDown,
   ExternalLink,
+  Search,
+  User,
+  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
@@ -77,6 +81,16 @@ export function LandlordSidebar() {
         { label: "Sửa chữa & bảo trì", href: "/landlord/maintenance", icon: Wrench },
         { label: "Nhân viên & phân quyền", href: "/landlord/staff", icon: UserCog },
         { label: "Tin nhắn & thông báo", href: "/landlord/messages", icon: MessageSquare },
+      ],
+    },
+    {
+      title: "DÙNG CHUNG",
+      items: [
+        { label: "Tìm phòng", href: "/rooms", icon: Search },
+        { label: "Tìm bạn ở ghép", href: "/roommates", icon: Users },
+        { label: "Hồ sơ cá nhân", href: "/tenant/profile", icon: User },
+        { label: "Kiểm duyệt KYC", href: "/landlord/kyc", icon: ShieldCheck },
+        { label: "Báo cáo vi phạm", href: "/tenant/safety/report", icon: ShieldAlert },
       ],
     },
   ];

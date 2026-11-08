@@ -76,7 +76,7 @@ export default function TenantHomePage() {
         hasBalcony: false,
         address: post.property?.address ?? "Chưa cập nhật địa chỉ",
         price: post.room?.priceMonthly ?? post.price ?? 0,
-        deposit: post.room?.depositAmount ?? 0,
+        deposit: post.room?.priceMonthly ?? 0,
         image: post.images?.find((image) => image.isPrimary)?.imageUrl ?? post.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
         badge: "ĐANG CHO THUÊ",
         rating: 0,

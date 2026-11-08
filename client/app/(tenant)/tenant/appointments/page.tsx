@@ -36,67 +36,6 @@ interface AppointmentItem {
   note: string;
 }
 
-const INITIAL_APPOINTMENTS: AppointmentItem[] = [];
-/*
-  {
-    id: "apt-1",
-    roomTitle: "Studio Ban Mai — Ban Công Hướng Đông",
-    roomAddress: "142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP.HCM",
-    roomImage: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=400&q=80",
-    roomId: "studio-ban-mai",
-    landlordName: "Nguyễn Minh An",
-    landlordPhone: "0912345678",
-    appointmentTime: "2026-11-07T16:00:00Z",
-    dateStr: "Thứ Bảy, 07/11/2026",
-    timeSlot: "16:00 - 17:00",
-    status: "CONFIRMED",
-    note: "Khách muốn xem thêm chỗ để xe máy và khu giặt phơi.",
-  },
-  {
-    id: "apt-2",
-    roomTitle: "Căn Hộ Sunshine — Trung Tâm Quận 1",
-    roomAddress: "88 Nguyễn Du, Phường Bến Nghé, Quận 1, TP.HCM",
-    roomImage: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=400&q=80",
-    roomId: "can-ho-sunshine",
-    landlordName: "Trần Văn Bình",
-    landlordPhone: "0908123456",
-    appointmentTime: "2026-11-10T10:30:00Z",
-    dateStr: "Thứ Ba, 10/11/2026",
-    timeSlot: "10:30 - 11:30",
-    status: "PENDING",
-    note: "Chờ chủ nhà xác nhận khung giờ buổi sáng.",
-  },
-  {
-    id: "apt-3",
-    roomTitle: "Phòng Trọ Gác Lửng Xanh — TP. Thủ Đức",
-    roomAddress: "24 Đường số 6, Linh Trung, TP. Thủ Đức, TP.HCM",
-    roomImage: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=400&q=80",
-    roomId: "gac-lung-thu-duc",
-    landlordName: "Lê Hoàng Yến",
-    landlordPhone: "0934567890",
-    appointmentTime: "2026-10-28T14:00:00Z",
-    dateStr: "28/10/2026",
-    timeSlot: "14:00 - 15:00",
-    status: "COMPLETED",
-    note: "Đã đến xem phòng thực tế. Phòng đẹp và chủ trọ thân thiện.",
-  },
-  {
-    id: "apt-4",
-    roomTitle: "Phòng Mini Hiện Đại — Quận Phú Nhuận",
-    roomAddress: "45 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM",
-    roomImage: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=400&q=80",
-    roomId: "mini-phu-nhuan",
-    landlordName: "Đỗ Hải Đăng",
-    landlordPhone: "0945678901",
-    appointmentTime: "2026-10-20T09:00:00Z",
-    dateStr: "20/10/2026",
-    timeSlot: "09:00 - 10:00",
-    status: "CANCELLED",
-    note: "Người thuê bận công tác đột xuất nên đã hủy lịch hẹn.",
-  },
-];
-*/
-
 export default function TenantAppointmentsPage() {
   const [activeTab, setActiveTab] = React.useState<"UPCOMING" | "COMPLETED" | "CANCELLED">("UPCOMING");
   const [appointments, setAppointments] = React.useState<AppointmentItem[]>([]);

@@ -137,6 +137,11 @@ export function getUserRole(): Role | null {
   return user?.role ?? null;
 }
 
+export function isAdminRole(role?: string | null): boolean {
+  const normalizedRole = role?.trim().toUpperCase();
+  return normalizedRole === 'ADMIN' || normalizedRole === 'SUPER_ADMIN';
+}
+
 /**
  * Checks if the logged-in user matches any of the required roles.
  */

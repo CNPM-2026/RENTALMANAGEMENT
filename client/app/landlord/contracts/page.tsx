@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, FileCheck, Search, Eye, Download, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, FileCheck, Search, Eye } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { Contract, ContractStatus } from "@/types/models";
+import { Contract, ContractStatus, RentalRequest } from "@/types/models";
 import { Modal } from "@/components/ui/modal";
 
 const STATUS_MAP: Record<ContractStatus, { label: string; bg: string; text: string }> = {
@@ -21,15 +21,22 @@ function formatCurrency(val: number) {
 export default function LandlordContractsPage() {
   const [contracts, setContracts] = React.useState<Contract[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [rentalRequests, setRentalRequests] = React.useState<RentalRequest[]>([]);
   const [search, setSearch] = React.useState("");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [form, setForm] = React.useState({ roomId: "", tenantId: "", startDate: "", endDate: "", depositPaid: "", monthlyRent: "", terms: "" });
+  const [formError, setFormError] = React.useState("");
 
   React.useEffect(() => {
-    apiClient.contracts
-      .getMyContracts()
-      .then((data) => setContracts(data ?? []))
-      .catch(() => setContracts([]))
+    Promise.all([apiClient.contracts.getMyContracts(), apiClient.rentalRequests.getMine()])
+      .then(([contractData, requestData]) => {
+        setContracts(contractData ?? []);
+        setRentalRequests((requestData ?? []).filter((request) => request.status === "APPROVED"));
+      })
+      .catch(() => {
+        setContracts([]);
+        setRentalRequests([]);
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -39,9 +46,15 @@ export default function LandlordContractsPage() {
   );
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
-    const created = await apiClient.contracts.create({ ...form, depositPaid: Number(form.depositPaid), monthlyRent: Number(form.monthlyRent), endDate: form.endDate || undefined });
-    setContracts((prev) => [created, ...prev]);
-    setIsCreateOpen(false);
+    setFormError("");
+    try {
+      const created = await apiClient.contracts.create({ ...form, depositPaid: Number(form.depositPaid), monthlyRent: Number(form.monthlyRent), endDate: form.endDate || undefined });
+      setContracts((prev) => [created, ...prev]);
+      setRentalRequests((prev) => prev.filter((request) => request.roomId !== form.roomId || request.tenantId !== form.tenantId));
+      setIsCreateOpen(false);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Không thể tạo hợp đồng.");
+    }
   };
 
   return (
@@ -135,13 +148,36 @@ export default function LandlordContractsPage() {
       )}
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Lập hợp đồng mới" size="lg">
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
-          <input required placeholder="ID phòng" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="rounded border p-2 text-sm" />
-          <input required placeholder="ID khách thuê" value={form.tenantId} onChange={(e) => setForm({ ...form, tenantId: e.target.value })} className="rounded border p-2 text-sm" />
+          <select
+            required
+            value={`${form.roomId}:${form.tenantId}`}
+            onChange={(e) => {
+              const [roomId, tenantId] = e.target.value.split(":");
+              const request = rentalRequests.find((item) => item.roomId === roomId && item.tenantId === tenantId);
+              setForm({
+                ...form,
+                roomId,
+                tenantId,
+                startDate: request?.moveInDate?.slice(0, 10) ?? form.startDate,
+                depositPaid: request?.room?.priceMonthly != null ? String(request.room.priceMonthly) : form.depositPaid,
+                monthlyRent: request?.room?.priceMonthly != null ? String(request.room.priceMonthly) : form.monthlyRent,
+              });
+            }}
+            className="col-span-2 rounded border p-2 text-sm"
+          >
+            <option value="">Chọn yêu cầu thuê đã được duyệt</option>
+            {rentalRequests.map((request) => (
+              <option key={request.id} value={`${request.roomId}:${request.tenantId}`}>
+                Phòng {request.room?.roomNumber ?? request.roomId} · {request.tenant?.fullName ?? "Khách thuê"}
+              </option>
+            ))}
+          </select>
           <input required type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="rounded border p-2 text-sm" />
           <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="rounded border p-2 text-sm" />
-          <input required type="number" placeholder="Tiền cọc" value={form.depositPaid} onChange={(e) => setForm({ ...form, depositPaid: e.target.value })} className="rounded border p-2 text-sm" />
-          <input required type="number" placeholder="Tiền thuê/tháng" value={form.monthlyRent} onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })} className="rounded border p-2 text-sm" />
+          <input required readOnly type="number" placeholder="Tiền cọc (1 tháng thuê)" value={form.depositPaid} className="rounded border bg-[#f7f6f2] p-2 text-sm" />
+          <input required readOnly type="number" placeholder="Tiền thuê/tháng" value={form.monthlyRent} className="rounded border bg-[#f7f6f2] p-2 text-sm" />
           <textarea placeholder="Điều khoản" value={form.terms} onChange={(e) => setForm({ ...form, terms: e.target.value })} className="col-span-2 rounded border p-2 text-sm" />
+          {formError && <p className="col-span-2 text-sm text-red-600">{formError}</p>}
           <button type="submit" className="col-span-2 rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Tạo hợp đồng</button>
         </form>
       </Modal>

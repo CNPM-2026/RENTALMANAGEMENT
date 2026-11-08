@@ -26,10 +26,12 @@ function SafetyReportViolationContent() {
 
   const queryTargetType = (searchParams?.get("targetType") as ReportTargetType) || "POST";
   const queryTargetId = searchParams?.get("targetId") || "";
+  const queryTargetUrl = searchParams?.get("targetUrl") || "";
 
   // State
   const [targetType, setTargetType] = React.useState<ReportTargetType>(queryTargetType);
   const [targetIdentifier, setTargetIdentifier] = React.useState(queryTargetId);
+  const [targetUrl, setTargetUrl] = React.useState(queryTargetUrl);
   const [violationCategory, setViolationCategory] = React.useState("FAKE_LISTING");
   const [reasonDescription, setReasonDescription] = React.useState("");
   const [contactInfo, setContactInfo] = React.useState("");
@@ -88,7 +90,7 @@ function SafetyReportViolationContent() {
       await apiClient.reports.create({
         targetType,
         targetId: targetIdentifier.trim(),
-        reason: `[${violationCategory}] ${reasonDescription.trim()} (Liên hệ xác minh: ${contactInfo})`,
+        reason: `[${violationCategory}] ${reasonDescription.trim()} (URL: ${targetUrl || "Không có"}) (Liên hệ xác minh: ${contactInfo})`,
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Không thể gửi báo cáo. Vui lòng thử lại.");
@@ -193,11 +195,15 @@ function SafetyReportViolationContent() {
 
                 {/* Target Identifier / Link */}
                 <Input
-                  label="Link bài đăng hoặc Mã định danh đối tượng vi phạm"
-                  placeholder="Dán URL tin đăng hoặc nhập mã phòng/người dùng..."
-                  value={targetIdentifier}
-                  onChange={(e) => setTargetIdentifier(e.target.value)}
+                  label="Link bài đăng hoặc mã đối tượng"
+                  placeholder="Dán URL tin đăng hoặc nhập mã đối tượng..."
+                  value={targetUrl || targetIdentifier}
+                  onChange={(e) => {
+                    setTargetUrl(e.target.value);
+                    if (!queryTargetUrl) setTargetIdentifier(e.target.value);
+                  }}
                 />
+                {targetUrl && <p className="text-xs text-[#74817b]">Mã bài đăng đã được gắn tự động để hệ thống xử lý.</p>}
 
                 {/* Violation Category Selector (Figma 44:66842) */}
                 <div className="space-y-2 text-left">

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Home, ArrowRight, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { apiClient, ApiError, getBaseApiUrl } from "@/lib/api";
-import { setAuthSession, getCurrentUser } from "@/lib/auth";
+import { setAuthSession, getCurrentUser, isAdminRole } from "@/lib/auth";
 
 function LoginForm() {
   const router = useRouter();
@@ -60,7 +60,7 @@ function LoginForm() {
         router.replace(
           user.role === "LANDLORD"
             ? "/landlord/dashboard"
-            : user.role === "ADMIN"
+            : isAdminRole(user.role)
             ? "/admin/dashboard"
             : redirectUrl
         );
@@ -75,7 +75,7 @@ function LoginForm() {
     const user = getCurrentUser();
     if (user) {
       if (user.role === "LANDLORD") router.replace("/landlord/dashboard");
-      else if (user.role === "ADMIN") router.replace("/admin/dashboard");
+      else if (isAdminRole(user.role)) router.replace("/admin/dashboard");
       else router.replace(redirectUrl);
     }
   }, [router, redirectUrl]);
@@ -104,7 +104,7 @@ function LoginForm() {
 
       if (response.user.role === "LANDLORD") {
         router.push("/landlord/dashboard");
-      } else if (response.user.role === "ADMIN") {
+      } else if (isAdminRole(response.user.role)) {
         router.push("/admin/dashboard");
       } else {
         router.push(redirectUrl);

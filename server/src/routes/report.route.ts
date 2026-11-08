@@ -5,7 +5,7 @@ import { validate } from '../middlewares/validate.middleware';
 import { reportSchema, reportStatusSchema } from '../validations/resource.validation';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, authorize('TENANT', 'LANDLORD', 'ADMIN', 'AGENT'));
 
 // Ai cũng được gửi báo cáo
 router.post('/', validate(reportSchema), reportController.create);

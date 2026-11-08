@@ -17,7 +17,11 @@ export const contractService = {
     if (room.property.landlordId !== landlordId) {
       throw new AppError('Bạn không có quyền tạo hợp đồng cho phòng này', 403);
     }
-    if (room.status !== 'AVAILABLE') {
+    const approvedRequest = await prisma.rentalRequest.findFirst({
+      where: { roomId, tenantId, status: 'APPROVED' },
+      select: { id: true },
+    });
+    if (room.status !== 'AVAILABLE' && !approvedRequest) {
       throw new AppError('Phòng này hiện không ở trạng thái sẵn sàng cho thuê', 400);
     }
     const tenant = await prisma.user.findUnique({ where: { id: tenantId }, select: { id: true, role: true, isActive: true } });
@@ -31,7 +35,7 @@ export const contractService = {
         where: { id: roomId, status: 'AVAILABLE' },
         data: { status: 'RENTED' },
       });
-      if (claimedRoom.count !== 1) {
+      if (claimedRoom.count !== 1 && !approvedRequest) {
         throw new AppError('Phòng này vừa được tạo hợp đồng bởi người khác', 409);
       }
 
@@ -41,8 +45,8 @@ export const contractService = {
           tenantId,
           startDate: new Date(startDate),
           endDate: endDate ? new Date(endDate) : null,
-          depositPaid,
-          monthlyRent,
+          depositPaid: room.priceMonthly,
+          monthlyRent: room.priceMonthly,
           terms,
           status: 'ACTIVE',
         },

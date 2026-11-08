@@ -37,6 +37,11 @@ function TenantContractDetailContent() {
   const tenant = contract?.tenant;
   const property = contract?.room?.property;
   const room = contract?.room;
+  const landlordName = landlord?.fullName ?? "Chủ trọ";
+  const tenantName = tenant?.fullName ?? "Khách thuê";
+  const contractTimestamp = contract?.createdAt
+    ? new Date(contract.createdAt).toLocaleString("vi-VN")
+    : "Chưa cập nhật";
 
   React.useEffect(() => {
     apiClient.contracts.getMyContracts()
@@ -381,15 +386,15 @@ function TenantContractDetailContent() {
                       ✓ ĐÃ KÝ SỐ ĐIỆN TỬ
                     </p>
                     <p className="text-[10px] text-[#74817b]">
-                      Chủ sở hữu: Nguyễn Minh An
+                      Chủ sở hữu: {landlordName}
                     </p>
                     <p className="text-[9px] text-[#74817b]">
-                      Thời gian: 04/11/2026 14:20:10 UTC+7
+                      Thời gian: {contractTimestamp}
                     </p>
                   </div>
                 </div>
                 <p className="text-[14px] font-bold text-[#203c37]">
-                  Nguyễn Minh An
+                  {landlordName}
                 </p>
               </div>
 
@@ -405,10 +410,10 @@ function TenantContractDetailContent() {
                         ✓ ĐÃ KÝ SỐ ĐIỆN TỬ
                       </p>
                       <p className="text-[10px] text-[#74817b]">
-                        Khách thuê: Linh Nguyễn
+                        Khách thuê: {tenantName}
                       </p>
                       <p className="text-[9px] text-[#74817b]">
-                        Thời gian: {signatureTimestamp}
+                        Thời gian: {signatureTimestamp ?? contractTimestamp}
                       </p>
                     </div>
                   ) : (
@@ -425,13 +430,13 @@ function TenantContractDetailContent() {
                   )}
                 </div>
                 <p className="text-[14px] font-bold text-[#203c37]">
-                  Linh Nguyễn
+                  {tenantName}
                 </p>
               </div>
             </div>
 
             <p className="text-[11px] text-center text-[#74817b] italic pt-6">
-              Văn bản được tạo và lưu trữ bảo mật trên hệ thống 5K-Rental Manager (Mã đối soát: 5K-CT-894102-VN)
+              Văn bản được tạo và lưu trữ bảo mật trên hệ thống 5K-Rental Manager (Mã hợp đồng: {contract?.id ?? contractId})
             </p>
           </section>
         </main>

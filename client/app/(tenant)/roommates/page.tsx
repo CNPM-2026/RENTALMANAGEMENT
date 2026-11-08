@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api";
 import { SuggestedRoommate } from "@/types/models";
 import { getCurrentUser } from "@/lib/auth";
+import { Avatar } from "@/components/ui/avatar";
 
 /* Legacy design fixture retained only for type inference; candidates are loaded from the matching API.
 const LEGACY_CANDIDATES = [
@@ -408,8 +409,7 @@ export default function RoommateDiscoveryPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3.5">
                         <div className="relative size-[64px] rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#e2e7e1]">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <Avatar
                             src={candidate.avatarUrl}
                             alt={candidate.fullName}
                             className="size-full object-cover"

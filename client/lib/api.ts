@@ -13,6 +13,7 @@ import {
 } from '@/types/api';
 import {
   User,
+  UserWithProfile,
   RegisterPayload,
   RegisterResponse,
   LoginPayload,
@@ -73,6 +74,8 @@ import {
   StaffMembership,
   StaffPermission,
 } from '@/types/models';
+
+const inFlightWrites = new Map<string, Promise<unknown>>();
 import {
   getAuthToken,
   getRefreshToken,
@@ -202,7 +205,7 @@ async function refreshAccessToken(): Promise<string | null> {
 /**
  * Centralized low-level fetch request wrapper.
  */
-export async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+async function requestUncoalesced<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
   const { params, body, skipAuth, skipAutoRefresh, authToken, ...fetchOptions } = options;
   const url = resolveUrl(path, params);
 
@@ -214,6 +217,7 @@ export async function request<T = unknown>(path: string, options: RequestOptions
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
+
   }
 
   // Handle body content type
@@ -234,6 +238,7 @@ export async function request<T = unknown>(path: string, options: RequestOptions
 
   const response = await fetch(url, {
     ...fetchOptions,
+    cache: 'no-store',
     headers: mergedHeaders,
     body: formattedBody as BodyInit | null | undefined,
   });
@@ -295,6 +300,35 @@ export async function request<T = unknown>(path: string, options: RequestOptions
   return responseData as T;
 }
 
+export function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+  const method = String(options.method ?? 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || options.skipAutoRefresh) {
+    return requestUncoalesced<T>(path, options);
+  }
+
+  const body = options.body;
+  const bodyKey = typeof body === 'string'
+    ? body
+    : body && typeof FormData !== 'undefined' && body instanceof FormData
+      ? Array.from(body.entries()).map(([key, value]) => [
+          key,
+          typeof value === 'string'
+            ? value
+            : `${value.name}:${value.size}:${value.lastModified}`,
+        ]).sort().map(([key, value]) => `${key}=${value}`).join('&')
+      : JSON.stringify(body ?? null);
+
+  const key = `${method}:${path}:${bodyKey}`;
+  const existing = inFlightWrites.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const pending = requestUncoalesced<T>(path, options).finally(() => {
+    inFlightWrites.delete(key);
+  });
+  inFlightWrites.set(key, pending);
+  return pending;
+}
+
 /**
  * Standard HTTP Method wrappers
  */
@@ -337,15 +371,18 @@ export const apiClient = {
     resendVerification: (payload: { email: string }) =>
       apiClient.post<{ message: string }>('/auth/resend-verification', payload, { skipAuth: true }),
     getMe: () =>
-      apiClient.get<User>('/auth/me'),
+      apiClient.get<UserWithProfile>('/auth/me'),
     getMeWithToken: (token: string) =>
-      apiClient.get<User>('/auth/me', undefined, { authToken: token, skipAutoRefresh: true }),
+      apiClient.get<UserWithProfile>('/auth/me', undefined, { authToken: token, skipAutoRefresh: true }),
   },
 
   // 2. User Profile
   users: {
     updateProfile: (formData: FormData | UpdateProfilePayload) =>
       apiClient.put<User>('/users/profile', formData),
+    getMyKyc: () => apiClient.get<KycSubmission | null>('/users/kyc'),
+    submitKyc: (payload: FormData) =>
+      apiClient.post<KycSubmission>('/users/kyc', payload),
   },
 
   // 3. Properties
@@ -362,6 +399,8 @@ export const apiClient = {
       apiClient.post<Room>('/rooms', payload),
     getByProperty: (propertyId: string) =>
       apiClient.get<Room[]>(`/rooms/property/${propertyId}`),
+    delete: (id: string) =>
+      apiClient.delete<{ message: string }>(`/rooms/${id}`),
     getAllAmenities: () =>
       apiClient.get<Amenity[]>('/rooms/amenities', undefined, { skipAuth: true }),
   },
@@ -486,12 +525,22 @@ export const apiClient = {
       apiClient.get<Post[]>('/admin/posts/pending'),
     moderatePost: (id: string, payload: ModeratePostPayload) =>
       apiClient.patch<Post>(`/admin/posts/${id}/status`, payload),
+    deletePost: (id: string) =>
+      apiClient.delete<Post>(`/admin/posts/${id}`),
+    updateUserStatus: (id: string, isActive: boolean) =>
+      apiClient.patch<User>(`/admin/users/${id}/status`, { isActive }),
     getContentFilterKeywords: () =>
       apiClient.get<Array<{ id: string; keyword: string }>>('/admin/content-filter'),
     addContentFilterKeyword: (keyword: string) =>
       apiClient.post<{ id: string; keyword: string }>('/admin/content-filter', { keyword }),
     removeContentFilterKeyword: (id: string) =>
       apiClient.delete<{ id: string }>(`/admin/content-filter/${id}`),
+    getAmenities: () =>
+      apiClient.get<Amenity[]>('/admin/amenities'),
+    createAmenity: (payload: { name: string; iconUrl?: string }) =>
+      apiClient.post<Amenity>('/admin/amenities', payload),
+    deleteAmenity: (id: string) =>
+      apiClient.delete<Amenity>(`/admin/amenities/${id}`),
   },
 
   // 17. Statistics
