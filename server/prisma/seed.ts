@@ -14,6 +14,7 @@ async function main() {
       passwordHash,
       fullName: 'Test Admin',
       role: Role.ADMIN,
+      isEmailVerified: true,
     },
   });
 
@@ -26,6 +27,7 @@ async function main() {
       fullName: 'Test Landlord',
       phone: '0912345678',
       role: Role.LANDLORD,
+      isEmailVerified: true,
     },
   });
 
@@ -38,6 +40,7 @@ async function main() {
       fullName: 'Test Tenant',
       phone: '0987654321',
       role: Role.TENANT,
+      isEmailVerified: true,
     },
   });
 
