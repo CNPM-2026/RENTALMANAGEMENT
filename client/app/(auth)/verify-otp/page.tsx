@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Home, ShieldCheck, CheckCircle2, Info } from "lucide-react";
+import { apiClient, ApiError } from "@/lib/api";
 
 function VerifyOtpForm() {
   const router = useRouter();
@@ -75,26 +76,30 @@ function VerifyOtpForm() {
     setIsVerifying(true);
     setError(null);
 
-    // Simulate / Connect verification request
     try {
-      await new Promise((r) => setTimeout(r, 800)); // Handshake simulation
+      await apiClient.auth.verifyEmail({ email: emailParam, code: fullOtp });
       setIsSuccess(true);
       setTimeout(() => {
         router.push("/login?verified=true");
       }, 1500);
-    } catch {
-      setError("Mã xác minh không chính xác hoặc đã hết hạn.");
+    } catch (verificationError) {
+      setError(verificationError instanceof ApiError ? verificationError.message : "Mã xác minh không chính xác hoặc đã hết hạn.");
     } finally {
       setIsVerifying(false);
     }
   }
 
-  function handleResend() {
+  async function handleResend() {
     if (!canResend) return;
-    setCountdown(60);
-    setOtp(["", "", "", "", "", ""]);
-    setError(null);
-    inputRefs.current[0]?.focus();
+    try {
+      await apiClient.auth.resendVerification({ email: emailParam });
+      setCountdown(60);
+      setOtp(["", "", "", "", "", ""]);
+      setError(null);
+      inputRefs.current[0]?.focus();
+    } catch (resendError) {
+      setError(resendError instanceof ApiError ? resendError.message : "Không thể gửi lại mã xác minh.");
+    }
   }
 
   return (

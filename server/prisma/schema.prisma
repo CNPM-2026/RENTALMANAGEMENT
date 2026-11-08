@@ -144,16 +144,17 @@ enum ReviewTargetType {
 // ==========================================
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  fullName     String   @map("full_name")
-  phone        String?
-  avatarUrl    String?  @map("avatar_url")
-  role         Role     @default(TENANT)
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  fullName        String   @map("full_name")
+  phone           String?
+  avatarUrl       String?  @map("avatar_url")
+  role            Role     @default(TENANT)
+  isActive        Boolean  @default(true) @map("is_active")
+  isEmailVerified Boolean  @default(false) @map("is_email_verified")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   // Quan hệ
   profile                     UserProfile?
@@ -161,14 +162,14 @@ model User {
   properties                  Property[] // Dành cho Chủ trọ
   posts                       Post[] // Bài đăng của user
   lifestyleAnswers            UserLifestyleAnswer[]
-  tenantAppointments          Appointment[]         @relation("TenantAppointments")
-  landlordAppointments        Appointment[]         @relation("LandlordAppointments")
-  agentAppointments           Appointment[]         @relation("AgentAppointments")
-  contractsAsTenant           Contract[]            @relation("TenantContracts")
-  contractsAsAgent            Contract[]            @relation("AgentContracts")
+  tenantAppointments          Appointment[]           @relation("TenantAppointments")
+  landlordAppointments        Appointment[]           @relation("LandlordAppointments")
+  agentAppointments           Appointment[]           @relation("AgentAppointments")
+  contractsAsTenant           Contract[]              @relation("TenantContracts")
+  contractsAsAgent            Contract[]              @relation("AgentContracts")
   commissions                 Commission[] // Hoa hồng dành cho AGENT
   invoices                    Invoice[] // Hóa đơn của khách thuê
-  sentMessages                Message[]             @relation("SentMessages")
+  sentMessages                Message[]               @relation("SentMessages")
   conversationMembers         ConversationMember[]
   reports                     Report[]
   notifications               Notification[] // 🆕 Thông báo
@@ -176,18 +177,19 @@ model User {
   favorites                   Favorite[] // 🆕 Tin đăng yêu thích
   refreshTokens               RefreshToken[]
   passwordResetTokens         PasswordResetToken[]
+  emailVerificationCodes      EmailVerificationCode[]
   auditLogs                   AuditLog[]
   supportTickets              SupportTicket[]
-  maintenanceRequests         MaintenanceRequest[]  @relation("TenantMaintenanceRequests")
-  landlordMaintenanceRequests MaintenanceRequest[]  @relation("LandlordMaintenanceRequests")
+  maintenanceRequests         MaintenanceRequest[]    @relation("TenantMaintenanceRequests")
+  landlordMaintenanceRequests MaintenanceRequest[]    @relation("LandlordMaintenanceRequests")
   rentalRequests              RentalRequest[]
-  landlordRentalRequests      RentalRequest[]       @relation("LandlordRentalRequests")
-  sentRoommateInvitations     RoommateInvitation[]  @relation("SentRoommateInvitations")
-  receivedRoommateInvitations RoommateInvitation[]  @relation("ReceivedRoommateInvitations")
+  landlordRentalRequests      RentalRequest[]         @relation("LandlordRentalRequests")
+  sentRoommateInvitations     RoommateInvitation[]    @relation("SentRoommateInvitations")
+  receivedRoommateInvitations RoommateInvitation[]    @relation("ReceivedRoommateInvitations")
   kycSubmission               KycSubmission?
-  reviewedKycSubmissions      KycSubmission[]       @relation("KycReviewer")
-  staffMemberships            StaffMembership[]     @relation("StaffUser")
-  landlordStaff               StaffMembership[]     @relation("StaffLandlord")
+  reviewedKycSubmissions      KycSubmission[]         @relation("KycReviewer")
+  staffMemberships            StaffMembership[]       @relation("StaffUser")
+  landlordStaff               StaffMembership[]       @relation("StaffLandlord")
 
   @@index([role])
   @@map("users")
@@ -205,6 +207,20 @@ model RefreshToken {
 
   @@index([userId, revokedAt])
   @@map("refresh_tokens")
+}
+
+model EmailVerificationCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt, expiresAt])
+  @@map("email_verification_codes")
 }
 
 model PasswordResetToken {

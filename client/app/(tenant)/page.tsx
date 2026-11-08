@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 import {
   Search,
   MapPin,
@@ -231,7 +232,7 @@ export default function TenantHomePage() {
                 <h3 className="text-xl font-bold tracking-tight">{featuredRooms[0]?.title ?? "Chưa có tin đăng nổi bật"}</h3>
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-lg font-bold text-white">
-                    {featuredRooms[0] ? `${featuredRooms[0].price.toLocaleString("vi-VN")} đ` : "—"}<span className="text-[13px] font-normal text-white/80">/tháng</span>
+                    {featuredRooms[0] ? `${formatCurrency(featuredRooms[0].price, { showUnit: false })} đ` : "—"}<span className="text-[13px] font-normal text-white/80">/tháng</span>
                   </span>
                   <Link href={featuredRooms[0] ? `/rooms/${featuredRooms[0].id}` : "/rooms"}>
                     <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#eaf2ed] hover:underline">
@@ -465,7 +466,7 @@ export default function TenantHomePage() {
                     <div className="pt-2 border-t border-[#e2e7e1] flex items-center justify-between">
                       <div>
                         <span className="text-base font-bold text-[#15594f]">
-                          {room.price.toLocaleString("vi-VN")} đ
+                          {formatCurrency(room.price, { showUnit: false })} đ
                         </span>
                         <span className="text-[12px] text-[#74817b]">/tháng</span>
                       </div>

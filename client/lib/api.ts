@@ -332,6 +332,10 @@ export const apiClient = {
       apiClient.post<{ message: string }>('/auth/forgot-password', payload, { skipAuth: true }),
     resetPassword: (payload: ResetPasswordPayload) =>
       apiClient.post<{ message: string }>('/auth/reset-password', payload, { skipAuth: true }),
+    verifyEmail: (payload: { email: string; code: string }) =>
+      apiClient.post<{ message: string }>('/auth/verify-email', payload, { skipAuth: true }),
+    resendVerification: (payload: { email: string }) =>
+      apiClient.post<{ message: string }>('/auth/resend-verification', payload, { skipAuth: true }),
     getMe: () =>
       apiClient.get<User>('/auth/me'),
   },

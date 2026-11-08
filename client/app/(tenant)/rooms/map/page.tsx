@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 import { Post } from "@/types/models";
 
 interface MapRoom {
@@ -251,7 +252,7 @@ export default function RoomsMapPage() {
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[14px] font-bold text-[#15594f]">
-                        {room.price.toLocaleString("vi-VN")} đ
+                        {formatCurrency(room.price, { showUnit: false })} đ
                       </span>
                       {room.verified && (
                         <Badge variant="success" size="sm">
@@ -444,7 +445,7 @@ export default function RoomsMapPage() {
               <div className="pt-2 border-t border-[#e2e7e1] flex items-center justify-between">
                 <div>
                   <span className="text-base font-bold text-[#15594f]">
-                    {selectedRoom.price.toLocaleString("vi-VN")} đ
+                    {formatCurrency(selectedRoom.price, { showUnit: false })} đ
                   </span>
                   <span className="text-[11px] text-[#74817b]">/tháng</span>
                 </div>

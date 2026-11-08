@@ -24,3 +24,7 @@ export const resetPasswordSchema = z.object({
   token: z.string().min(20),
   password: z.string().min(6),
 });
+export const verifyEmailSchema = z.object({
+  email: z.string().email(),
+  code: z.string().regex(/^\d{6}$/, 'Mã OTP phải gồm 6 chữ số'),
+});
