@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { signShortToken } from '../utils/jwt';
-import { createOpaqueToken, hashToken } from '../utils/tokens';
+import { createOpaqueToken, createOtp, hashToken } from '../utils/tokens';
 import { mailService } from './mail.service';
 import { Role } from '@prisma/client';
 
@@ -35,6 +35,7 @@ export const authService = {
       } // Không trả về passwordHash
     });
 
+    await authService.sendEmailVerification(newUser.id, newUser.email);
     return newUser;
   },
 
@@ -106,6 +107,36 @@ export const authService = {
       data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
     });
     await mailService.sendPasswordReset(user.email, token);
+  },
+
+  sendEmailVerification: async (userId: string, email?: string) => {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, isEmailVerified: true } });
+    if (!user) throw new AppError('Không tìm thấy tài khoản', 404);
+    if (user.isEmailVerified) return;
+    const code = createOtp();
+    await prisma.emailVerificationCode.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    await prisma.emailVerificationCode.create({
+      data: { userId: user.id, codeHash: hashToken(code), expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+    });
+    await mailService.sendEmailVerification(email ?? user.email, code);
+  },
+
+  verifyEmail: async (email: string, code: string) => {
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true, isEmailVerified: true } });
+    if (!user) throw new AppError('Mã xác minh không hợp lệ hoặc đã hết hạn', 400);
+    if (user.isEmailVerified) return;
+    const record = await prisma.emailVerificationCode.findFirst({
+      where: { userId: user.id, codeHash: hashToken(code), usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!record) throw new AppError('Mã xác minh không hợp lệ hoặc đã hết hạn', 400);
+    await prisma.$transaction([
+      prisma.emailVerificationCode.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      prisma.user.update({ where: { id: user.id }, data: { isEmailVerified: true } }),
+    ]);
   },
 
   resetPassword: async (token: string, password: string) => {

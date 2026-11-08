@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authController } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { registerSchema, loginSchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema } from '../validations/auth.validation';
+import { registerSchema, loginSchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema, verifyEmailSchema } from '../validations/auth.validation';
 import { authLimiter } from '../middlewares/rateLimit.middleware';
 
 const router = Router();
@@ -17,6 +17,8 @@ router.post('/refresh', validate(refreshTokenSchema), authController.refresh);
 router.post('/logout', validate(refreshTokenSchema), authController.logout);
 router.post('/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
+router.post('/verify-email', validate(verifyEmailSchema), authController.verifyEmail);
+router.post('/resend-verification', validate(forgotPasswordSchema), authController.resendVerification);
 router.get('/me', authenticate, authController.getMe);
 
 export default router;

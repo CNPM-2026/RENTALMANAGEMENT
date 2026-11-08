@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { apiClient } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 import { SuggestedRoommate } from "@/types/models";
 
 interface CompatibilityCriterion {
@@ -61,7 +62,7 @@ function RoommateDetailContent() {
     avatarUrl: suggestion.user.avatarUrl ?? "/placeholder-avatar.png",
     matchScore: suggestion.compatibilityPercent,
     statusNote: suggestion.post.title,
-    budgetMonthly: suggestion.post.price ? `${suggestion.post.price.toLocaleString("vi-VN")} đ/tháng` : "Chưa cập nhật",
+    budgetMonthly: suggestion.post.price ? `${formatCurrency(suggestion.post.price, { showUnit: false })} đ/tháng` : "Chưa cập nhật",
     targetLocation: suggestion.post.property?.district ?? "Chưa cập nhật",
     moveInDate: "Chưa cập nhật",
     bio: suggestion.post.description,

@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
 import { auditService } from '../services/audit.service';
+import prisma from '../config/db';
 
 export const authController = {
   register: async (
@@ -92,6 +93,21 @@ export const authController = {
     } catch (error) {
       return next(error);
     }
+  },
+
+  verifyEmail: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.verifyEmail(req.body.email, req.body.code);
+      return res.json({ success: true, message: 'Xác minh email thành công' });
+    } catch (error) { return next(error); }
+  },
+
+  resendVerification: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await prisma.user.findUnique({ where: { email: req.body.email }, select: { id: true, email: true } });
+      if (user) await authService.sendEmailVerification(user.id, user.email);
+      return res.json({ success: true, message: 'Nếu email tồn tại, mã xác minh mới đã được gửi' });
+    } catch (error) { return next(error); }
   },
 
   getMe: (req: Request, res: Response) => {

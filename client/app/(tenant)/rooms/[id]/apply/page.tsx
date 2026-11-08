@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 
 function ApplyRentalContent() {
   const params = useParams();
@@ -353,13 +354,13 @@ function ApplyRentalContent() {
                 <div className="py-2 flex justify-between">
                   <span className="text-[#74817b]">Giá thuê tháng</span>
                   <span className="font-bold text-[#15594f]">
-                    {monthlyRent.toLocaleString("vi-VN")} đ
+                    {formatCurrency(monthlyRent, { showUnit: false })} đ
                   </span>
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-[#74817b]">Tiền cọc giữ phòng</span>
                   <span className="font-semibold text-[#203c37]">
-                    {depositAmount.toLocaleString("vi-VN")} đ
+                    {formatCurrency(depositAmount, { showUnit: false })} đ
                   </span>
                 </div>
                 <div className="py-2 flex justify-between">
@@ -369,7 +370,7 @@ function ApplyRentalContent() {
                 <div className="py-2.5 flex justify-between bg-[#f7f6f2] -mx-5 px-5 font-bold">
                   <span className="text-[#203c37]">Tổng thanh toán đợt 1</span>
                   <span className="text-base text-[#15594f]">
-                    {totalFirstMonth.toLocaleString("vi-VN")} đ
+                    {formatCurrency(totalFirstMonth, { showUnit: false })} đ
                   </span>
                 </div>
               </div>

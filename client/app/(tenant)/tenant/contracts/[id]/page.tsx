@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 import { useParams, useRouter } from "next/navigation";
 import {
   Download,
@@ -190,11 +191,11 @@ function TenantContractDetailContent() {
               </div>
               <div className="pt-2 flex justify-between">
                 <span className="text-[#74817b]">Tiền thuê phòng:</span>
-                <span className="font-bold text-[#15594f]">{contract ? `${contract.monthlyRent.toLocaleString("vi-VN")} đ/tháng` : "—"}</span>
+                <span className="font-bold text-[#15594f]">{contract ? `${formatCurrency(contract.monthlyRent, { showUnit: false })} đ/tháng` : "—"}</span>
               </div>
               <div className="pt-2 flex justify-between">
                 <span className="text-[#74817b]">Tiền đặt cọc:</span>
-                <span className="font-bold text-[#203c37]">{contract ? `${contract.depositPaid.toLocaleString("vi-VN")} đ` : "—"}</span>
+                <span className="font-bold text-[#203c37]">{contract ? `${formatCurrency(contract.depositPaid, { showUnit: false })} đ` : "—"}</span>
               </div>
             </div>
 
@@ -295,7 +296,7 @@ function TenantContractDetailContent() {
                 2.1. Thời hạn thuê bắt đầu từ ngày <strong>{contract ? new Date(contract.startDate).toLocaleDateString("vi-VN") : "—"}</strong> đến hết ngày <strong>{contract?.endDate ? new Date(contract.endDate).toLocaleDateString("vi-VN") : "—"}</strong>.
               </p>
               <p>
-                2.2. Giá thuê phòng theo hợp đồng: <strong>{contract ? contract.monthlyRent.toLocaleString("vi-VN") : "—"} VNĐ / tháng</strong>.
+                2.2. Giá thuê phòng theo hợp đồng: <strong>{contract ? formatCurrency(contract.monthlyRent, { showUnit: false }) : "—"} VNĐ / tháng</strong>.
               </p>
               <p>
                 2.3. Chi phí dịch vụ sinh hoạt:
@@ -317,7 +318,7 @@ function TenantContractDetailContent() {
                 ĐIỀU 3: TIỀN ĐẶT CỌC GIỮ PHÒNG VÀ HOÀN CỌC
               </h3>
               <p>
-                3.1. Bên B đặt cọc cho Bên A số tiền: <strong>{contract ? contract.depositPaid.toLocaleString("vi-VN") : "—"} VNĐ</strong> để bảo đảm thực hiện đúng các điều khoản hợp đồng.
+                3.1. Bên B đặt cọc cho Bên A số tiền: <strong>{contract ? formatCurrency(contract.depositPaid, { showUnit: false }) : "—"} VNĐ</strong> để bảo đảm thực hiện đúng các điều khoản hợp đồng.
               </p>
               <p>
                 3.2. Tiền đặt cọc được giữ an toàn trên hệ thống đối soát của 5K-Rental Manager. Khi hợp đồng kết thúc đúng hạn, Bên A có trách nhiệm hoàn trả 100% tiền cọc cho Bên B sau khi trừ các khoản chi phí điện, nước hoặc hư hại tài sản (nếu có do lỗi của Bên B).

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
 
 type RoomCard = {
@@ -544,7 +545,7 @@ function RoomsDiscoveryContent() {
                         <div className="pt-2 border-t border-[#e2e7e1] flex items-center justify-between">
                           <div>
                             <span className="text-base font-bold text-[#15594f]">
-                              {room.price.toLocaleString("vi-VN")} đ
+                              {formatCurrency(room.price, { showUnit: false })} đ
                             </span>
                             <span className="text-[11px] text-[#74817b]">/tháng</span>
                           </div>

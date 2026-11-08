@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 import {
   FileText,
   Clock,
@@ -184,10 +185,10 @@ export default function TenantRentalRequestsPage() {
                       Thời hạn: <strong className="text-[#203c37]">{req.leaseTermMonths} tháng</strong>
                     </span>
                     <span>
-                      Giá thuê: <strong className="text-[#15594f]">{req.monthlyRent.toLocaleString("vi-VN")} đ/tháng</strong>
+                      Giá thuê: <strong className="text-[#15594f]">{formatCurrency(req.monthlyRent, { showUnit: false })} đ/tháng</strong>
                     </span>
                     <span>
-                      Tiền cọc: <strong className="text-[#203c37]">{req.depositAmount.toLocaleString("vi-VN")} đ</strong>
+                      Tiền cọc: <strong className="text-[#203c37]">{formatCurrency(req.depositAmount, { showUnit: false })} đ</strong>
                     </span>
                   </div>
                 </div>
