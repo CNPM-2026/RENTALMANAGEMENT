@@ -71,6 +71,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Runtime data
+server/uploads/
 pids
 *.pid
 *.seed
