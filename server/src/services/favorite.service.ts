@@ -29,7 +29,7 @@ export const favoriteService = {
         post: {
           include: {
             images: true,
-            room: { select: { priceMonthly: true, area: true } },
+            room: { select: { priceMonthly: true, area: true, status: true } },
             property: { select: { district: true, province: true } }
           }
         }

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Ảnh cơ sở mặc định</title>
+  <desc id="desc">Hình minh họa cơ sở cho thuê khi chưa có ảnh</desc>
+  <rect width="1200" height="800" fill="#f2ede3"/>
+  <rect x="220" y="130" width="760" height="520" rx="20" fill="#fff" stroke="#15594f" stroke-width="18"/>
+  <path d="M160 650h880" stroke="#15594f" stroke-width="22" stroke-linecap="round"/>
+  <path d="M300 650V260h600v390" fill="#eaf2ed"/>
+  <path d="M420 650V485h160v165M650 650V485h160v165" fill="#9fc6b3" stroke="#15594f" stroke-width="14"/>
+  <path d="M410 360h380M410 430h380" stroke="#15594f" stroke-width="14"/>
+  <text x="600" y="730" text-anchor="middle" fill="#15594f" font-family="Arial,sans-serif" font-size="32" font-weight="700">Chưa có ảnh cơ sở</text>
+</svg>

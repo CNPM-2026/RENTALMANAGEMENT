@@ -104,7 +104,9 @@ export default function LandlordContractsPage() {
               <thead>
                 <tr className="border-b border-[#e2e7e1] bg-[#f7f6f2] text-[#74817b] text-[12px] font-semibold">
                   <th className="py-3 px-4">Khách thuê</th>
+                  <th className="py-3 px-4">Nhà trọ / cơ sở</th>
                   <th className="py-3 px-4">Phòng</th>
+                  <th className="py-3 px-4">Địa chỉ</th>
                   <th className="py-3 px-4">Thời hạn</th>
                   <th className="py-3 px-4">Tiền thuê</th>
                   <th className="py-3 px-4">Tiền cọc</th>
@@ -118,7 +120,9 @@ export default function LandlordContractsPage() {
                   return (
                     <tr key={item.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
                       <td className="py-3.5 px-4 font-semibold">{item.tenant?.fullName || "Khách thuê"}</td>
+                      <td className="py-3.5 px-4 font-semibold">{item.room?.property?.name || "Chưa cập nhật"}</td>
                       <td className="py-3.5 px-4 font-medium">Phòng {item.room?.roomNumber || "---"}</td>
+                      <td className="py-3.5 px-4 text-[#74817b]">{item.room?.property?.address || "Chưa cập nhật"}</td>
                       <td className="py-3.5 px-4 text-[#74817b]">
                         {new Date(item.startDate).toLocaleDateString("vi-VN")} - {item.endDate ? new Date(item.endDate).toLocaleDateString("vi-VN") : "Vô thời hạn"}
                       </td>

@@ -1,6 +1,7 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { ContractStatus } from '@prisma/client';
+import { notificationService } from './notification.service';
 
 export const contractService = {
   // 1. Chủ trọ tạo hợp đồng mới
@@ -30,7 +31,7 @@ export const contractService = {
     }
 
     // Sử dụng Transaction để tạo hợp đồng VÀ đổi trạng thái phòng cùng lúc
-    return await prisma.$transaction(async (tx) => {
+    const contract = await prisma.$transaction(async (tx) => {
       const claimedRoom = await tx.room.updateMany({
         where: { id: roomId, status: 'AVAILABLE' },
         data: { status: 'RENTED' },
@@ -38,6 +39,10 @@ export const contractService = {
       if (claimedRoom.count !== 1 && !approvedRequest) {
         throw new AppError('Phòng này vừa được tạo hợp đồng bởi người khác', 409);
       }
+      await tx.post.updateMany({
+        where: { roomId, status: { in: ['PENDING', 'APPROVED'] } },
+        data: { status: 'CLOSED' },
+      });
 
       const contract = await tx.contract.create({
         data: {
@@ -58,6 +63,14 @@ export const contractService = {
 
       return contract;
     });
+    await notificationService.createNotification(
+      tenantId,
+      'Hợp đồng mới',
+      'Chủ trọ đã tạo hợp đồng thuê mới cho bạn.',
+      'CONTRACT',
+      contract.id
+    );
+    return contract;
   },
 
   // 2. Lấy danh sách hợp đồng (Dành cho cả Chủ trọ và Người thuê)
@@ -115,7 +128,7 @@ export const contractService = {
       throw new AppError(`Không thể chuyển hợp đồng từ ${contract.status} sang ${status}`, 400);
     }
 
-    return await prisma.$transaction(async (tx) => {
+    const updatedContract = await prisma.$transaction(async (tx) => {
       if (status === 'ACTIVE') {
         const claimedRoom = await tx.room.updateMany({
           where: { id: contract.roomId, status: 'AVAILABLE' },
@@ -124,6 +137,10 @@ export const contractService = {
         if (claimedRoom.count !== 1) {
           throw new AppError('Phòng không còn sẵn sàng để kích hoạt hợp đồng', 409);
         }
+        await tx.post.updateMany({
+          where: { roomId: contract.roomId, status: { in: ['PENDING', 'APPROVED'] } },
+          data: { status: 'CLOSED' },
+        });
       } else if (status === 'TERMINATED' || status === 'EXPIRED') {
         if (contract.status === 'ACTIVE') {
           const releasedRoom = await tx.room.updateMany({
@@ -146,5 +163,13 @@ export const contractService = {
 
       return tx.contract.findUniqueOrThrow({ where: { id: contractId } });
     });
+    await notificationService.createNotification(
+      contract.tenantId,
+      'Cập nhật hợp đồng',
+      `Hợp đồng thuê đã được cập nhật: ${status.toLowerCase()}.`,
+      'CONTRACT',
+      contract.id
+    );
+    return updatedContract;
   }
 };

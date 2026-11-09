@@ -6,20 +6,16 @@ import { useParams, useRouter } from "next/navigation";
 import {
   CalendarDays,
   Clock,
-  MapPin,
   User,
   Phone,
-  FileText,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Info,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { apiClient } from "@/lib/api";
+import { apiClient, resolveMediaUrl } from "@/lib/api";
 import { Post } from "@/types/models";
 
 const TIME_SLOTS = [
@@ -36,13 +32,13 @@ function BookViewingContent() {
   const roomId = (params?.id as string) || "room-ban-mai-1";
 
   // Selected Date & Time Slot
-  const [selectedDate, setSelectedDate] = React.useState<number>(new Date().getDate());
+  const [currentDate] = React.useState(() => new Date());
+  const [selectedDate, setSelectedDate] = React.useState<number>(() => new Date().getDate());
   const [selectedSlot, setSelectedSlot] = React.useState<string>("16:00 - 17:00");
 
   // Contact Info
   const [fullName, setFullName] = React.useState("");
   const [phone, setPhone] = React.useState("");
-  const [email, setEmail] = React.useState("");
   const [note, setNote] = React.useState("");
   const [agreeTerms, setAgreeTerms] = React.useState(true);
 
@@ -65,9 +61,16 @@ function BookViewingContent() {
       });
   }, [roomId]);
 
-  const currentDate = new Date();
   const currentMonthName = currentDate.toLocaleDateString("vi-VN", { month: "long", year: "numeric" });
   const daysInMonth = Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate() }, (_, i) => i + 1);
+  const isSlotAllowed = React.useCallback((slot: string, day = selectedDate) => {
+    const [start] = slot.split(" - ");
+    const [hours, minutes] = start.split(":").map(Number);
+    const appointmentStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), day, hours, minutes);
+    return appointmentStart.getTime() >= currentDate.getTime() + 60 * 60 * 1000;
+  }, [currentDate, selectedDate]);
+  const availableSlots = TIME_SLOTS.filter((slot) => isSlotAllowed(slot));
+  const activeSlot = isSlotAllowed(selectedSlot) ? selectedSlot : (availableSlots[0] ?? "");
 
   async function handleConfirmBooking(e: React.FormEvent) {
     e.preventDefault();
@@ -79,7 +82,12 @@ function BookViewingContent() {
     setLoading(true);
 
     try {
-      const formattedDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}T${selectedSlot.split(" - ")[0]}:00`;
+      if (!activeSlot || !isSlotAllowed(activeSlot)) {
+        setErrorMsg("Vui lòng chọn khung giờ cách thời điểm hiện tại ít nhất 1 tiếng.");
+        setLoading(false);
+        return;
+      }
+      const formattedDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}T${activeSlot.split(" - ")[0]}:00`;
 
       await apiClient.appointments.create({
         roomId,
@@ -224,16 +232,20 @@ function BookViewingContent() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {TIME_SLOTS.map((slot) => {
-                    const isSelected = slot === selectedSlot;
+                    const isSelected = slot === activeSlot;
+                    const isAllowed = isSlotAllowed(slot);
                     return (
                       <button
                         key={slot}
                         type="button"
+                        disabled={!isAllowed}
                         onClick={() => setSelectedSlot(slot)}
-                        className={`h-[42px] px-3 rounded-[8px] text-[13px] font-semibold border transition-all cursor-pointer flex items-center justify-center ${
+                        className={`h-[42px] px-3 rounded-[8px] text-[13px] font-semibold border transition-all flex items-center justify-center ${
                           isSelected
                             ? "bg-[#15594f] text-white border-[#15594f] shadow-xs"
-                            : "bg-[#f7f6f2] text-[#203c37] border-[#e2e7e1] hover:border-[#15594f]/50"
+                            : isAllowed
+                              ? "bg-[#f7f6f2] text-[#203c37] border-[#e2e7e1] hover:border-[#15594f]/50 cursor-pointer"
+                              : "bg-[#f1f2ef] text-[#9aa59f] border-[#e2e7e1] cursor-not-allowed line-through"
                         }`}
                       >
                         {slot}
@@ -241,6 +253,9 @@ function BookViewingContent() {
                     );
                   })}
                 </div>
+                <p className="text-[12px] text-[#74817b]">
+                  Chỉ có thể đặt lịch trước tối thiểu 1 tiếng so với thời điểm hiện tại.
+                </p>
               </div>
             </div>
 
@@ -313,7 +328,7 @@ function BookViewingContent() {
               {/* Room Card Mini */}
               <div className="flex gap-3 items-center">
                 <img
-                  src={post?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg"}
+                  src={resolveMediaUrl(post?.images?.[0]?.imageUrl) ?? "/images/default-room.svg"}
                   alt={post?.title ?? "Phòng thuê"}
                   className="size-16 rounded-[8px] object-cover shrink-0"
                 />
@@ -334,20 +349,31 @@ function BookViewingContent() {
                 <div className="py-2 flex justify-between">
                   <span className="text-[#74817b]">Ngày hẹn</span>
                   <span className="font-bold text-[#203c37]">
-                    Thứ Bảy, {selectedDate} Tháng 11, 2026
+                    {new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate).toLocaleDateString("vi-VN", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
                   </span>
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-[#74817b]">Khung giờ</span>
-                  <span className="font-bold text-[#15594f]">{selectedSlot}</span>
+                  <span className="font-bold text-[#15594f]">{activeSlot}</span>
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-[#74817b]">Người đón tiếp</span>
-                  <span className="font-semibold text-[#203c37]">Anh Minh An (Chủ trọ)</span>
+                  <span className="font-semibold text-[#203c37]">
+                    {post?.author?.fullName
+                      ? `${post.author.fullName} (Chủ trọ)`
+                      : "Chủ trọ"}
+                  </span>
                 </div>
                 <div className="py-2 flex justify-between">
-                  <span className="text-[#74817b]">Hotline hỗ trợ</span>
-                  <span className="font-semibold text-[#203c37]">0912 345 678</span>
+                  <span className="text-[#74817b]">Hotline liên hệ</span>
+                  <span className="font-semibold text-[#203c37]">
+                    {post?.author?.phone ?? "Xem trong mục liên hệ"}
+                  </span>
                 </div>
               </div>
 

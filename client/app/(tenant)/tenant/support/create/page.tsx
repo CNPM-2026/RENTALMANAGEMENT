@@ -223,11 +223,11 @@ export default function CreateSupportTicketPage() {
           </form>
         </div>
 
-        {/* Guidance & SLA Information (Figma 44:66659 - 320px) */}
+        {/* Hướng dẫn và cam kết thời gian xử lý */}
         <div className="lg:col-span-4 space-y-5">
           <Card className="border border-[#e2e7e1] bg-white rounded-[12px] p-5 shadow-sm space-y-4">
             <h3 className="text-[16px] font-bold text-[#203c37] flex items-center gap-2">
-              <Clock className="size-4.5 text-[#15594f]" /> Cam kết thời gian xử lý (SLA)
+              <Clock className="size-4.5 text-[#15594f]" /> Cam kết thời gian xử lý
             </h3>
             <p className="text-[13px] text-[#74817b] leading-relaxed">
               5K-Rental Manager cam kết tiếp nhận và phản hồi phiếu hỗ trợ trong vòng:

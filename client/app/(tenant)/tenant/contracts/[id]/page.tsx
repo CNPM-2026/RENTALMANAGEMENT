@@ -109,6 +109,20 @@ function TenantContractDetailContent() {
           <p className="text-[13px] text-[#74817b]">
             Văn bản pháp lý điện tử có giá trị ràng buộc quyền và nghĩa vụ hai bên theo quy định pháp luật
           </p>
+          <div className="mt-3 grid grid-cols-1 gap-2 text-[13px] text-[#203c37] sm:grid-cols-3">
+            <div className="rounded-[8px] border border-[#d2e4d7] bg-[#eaf2ed] px-3 py-2">
+              <span className="block text-[11px] text-[#74817b]">Nhà trọ / cơ sở</span>
+              <strong>{property?.name ?? "Chưa cập nhật"}</strong>
+            </div>
+            <div className="rounded-[8px] border border-[#d2e4d7] bg-[#eaf2ed] px-3 py-2">
+              <span className="block text-[11px] text-[#74817b]">Số phòng</span>
+              <strong>Phòng {room?.roomNumber ?? "Chưa cập nhật"}</strong>
+            </div>
+            <div className="rounded-[8px] border border-[#d2e4d7] bg-[#eaf2ed] px-3 py-2 sm:col-span-1">
+              <span className="block text-[11px] text-[#74817b]">Địa chỉ</span>
+              <strong>{property?.address ?? "Chưa cập nhật"}</strong>
+            </div>
+          </div>
         </div>
 
         {/* Print / Download PDF Toolbar */}

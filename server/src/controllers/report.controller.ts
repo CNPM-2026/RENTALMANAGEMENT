@@ -21,6 +21,15 @@ export const reportController = {
     }
   },
 
+  getMy: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await reportService.getMyReports(req.user!.id);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
   resolve: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await reportService.resolveReport(String(req.params.id), req.body.status);

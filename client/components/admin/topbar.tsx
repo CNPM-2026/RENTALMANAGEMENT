@@ -8,6 +8,8 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { clearAuthSession, getCurrentUser } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
+import { translateRole } from "@/lib/labels";
+import { useNotifications } from "@/hooks/use-notifications";
 
 export function AdminTopbar() {
   const pathname = usePathname();
@@ -17,6 +19,7 @@ export function AdminTopbar() {
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
+  const { unreadCount } = useNotifications(Boolean(currentUser));
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -26,7 +29,7 @@ export function AdminTopbar() {
   }, []);
 
   const displayName = currentUser?.fullName?.trim() || "Quản trị viên";
-  const roleLabel = currentUser?.role === "ADMIN" ? "Admin" : (currentUser?.role || "Admin");
+  const roleLabel = translateRole(currentUser?.role);
 
   function getBreadcrumb() {
     if (currentPath.includes("dashboard")) return "Tổng quan nền tảng";
@@ -100,7 +103,7 @@ export function AdminTopbar() {
             className="relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#991b1b] hover:bg-[#f7f6f2] transition-colors"
           >
             <Bell className="size-4.5" />
-            <span className="absolute top-1.5 right-1.5 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />
+            {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />}
           </Link>
 
           <div className="h-5 w-px bg-[#e2e7e1]" />

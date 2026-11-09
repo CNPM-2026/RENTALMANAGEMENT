@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { CreatePropertyPayload } from "@/types/models";
+import { AddressFields } from "@/components/address/address-fields";
 
 const initialForm: CreatePropertyPayload = {
   name: "",
@@ -90,35 +91,7 @@ export default function NewLandlordPropertyPage() {
             />
           </label>
 
-          <label className="space-y-1.5 sm:col-span-2">
-            <span className="text-[13px] font-semibold text-[#203c37]">Địa chỉ *</span>
-            <input
-              required
-              minLength={5}
-              maxLength={300}
-              value={form.address}
-              onChange={(event) => updateField("address", event.target.value)}
-              placeholder="Số nhà, tên đường"
-              className={inputClassName}
-            />
-          </label>
-
-          {([
-            ["province", "Tỉnh / thành phố *", "TP. Hồ Chí Minh"],
-            ["district", "Quận / huyện *", "Bình Thạnh"],
-            ["ward", "Phường / xã *", "Phường 25"],
-          ] as const).map(([field, label, placeholder]) => (
-            <label key={field} className="space-y-1.5">
-              <span className="text-[13px] font-semibold text-[#203c37]">{label}</span>
-              <input
-                required
-                value={form[field]}
-                onChange={(event) => updateField(field, event.target.value)}
-                placeholder={placeholder}
-                className={inputClassName}
-              />
-            </label>
-          ))}
+          <AddressFields value={form} onChange={(address) => setForm((current) => ({ ...current, ...address }))} required />
 
           <label className="space-y-1.5 sm:col-span-2">
             <span className="text-[13px] font-semibold text-[#203c37]">Mô tả</span>

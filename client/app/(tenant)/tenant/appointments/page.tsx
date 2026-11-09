@@ -47,7 +47,7 @@ export default function TenantAppointmentsPage() {
         id: item.id,
         roomTitle: item.room?.property?.name ?? "Phòng thuê",
         roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
-        roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
+        roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/images/default-room.svg",
         roomId: item.roomId ?? "",
         landlordName: item.landlord?.fullName ?? "Chủ trọ",
         landlordPhone: item.landlord?.phone ?? "",
@@ -100,7 +100,7 @@ export default function TenantAppointmentsPage() {
     const items = await apiClient.appointments.getMyAppointments();
     setAppointments(items.map((item) => ({
       id: item.id, roomTitle: item.room?.property?.name ?? "Phòng thuê", roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
-      roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg", roomId: item.roomId ?? "",
+      roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/images/default-room.svg", roomId: item.roomId ?? "",
       landlordName: item.landlord?.fullName ?? "Chủ trọ", landlordPhone: item.landlord?.phone ?? "", appointmentTime: item.appointmentTime,
       dateStr: new Date(item.appointmentTime).toLocaleDateString("vi-VN"), timeSlot: new Date(item.appointmentTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
       status: item.status, note: item.note ?? "",

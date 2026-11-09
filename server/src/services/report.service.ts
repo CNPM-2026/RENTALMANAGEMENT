@@ -38,6 +38,14 @@ export const reportService = {
     })));
   },
 
+  // Tenant lấy danh sách báo cáo của mình
+  getMyReports: async (reporterId: string) => {
+    return await prisma.report.findMany({
+      where: { reporterId },
+      orderBy: { createdAt: 'desc' }
+    });
+  },
+
   // Admin xử lý báo cáo
   resolveReport: async (reportId: string, status: string) => {
     const report = await prisma.report.findUnique({ where: { id: reportId } });

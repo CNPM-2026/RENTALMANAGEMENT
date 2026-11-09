@@ -21,8 +21,12 @@ export default function LandlordMessagesPage() {
   React.useEffect(() => {
     apiClient.chats.getMyConversations().then((items) => {
       setConversations(items);
-      const requested = new URLSearchParams(window.location.search).get("conversation");
-      setSelectedId(items.find((item) => item.id === requested)?.id ?? items[0]?.id ?? null);
+      const params = new URLSearchParams(window.location.search);
+      const requested = params.get("conversation");
+      const target = params.get("user");
+      const requestedConversation = items.find((item) => item.id === requested || (target && item.members.length === 2 && item.members.some((member) => member.userId === target)));
+      const latestConversation = items.find((item) => (item.messages?.length ?? 0) > 0) ?? items[0];
+      setSelectedId(requestedConversation?.id ?? (target ? null : latestConversation?.id ?? null));
     }).catch(() => setError("Không tải được danh sách hội thoại."));
   }, []);
 
@@ -74,7 +78,7 @@ export default function LandlordMessagesPage() {
       <div className="grid h-[min(680px,calc(100vh-190px))] min-h-[520px] grid-cols-1 overflow-hidden rounded-[16px] border border-[#dfe8e1] bg-white shadow-[0_12px_40px_rgba(32,60,55,0.08)] md:grid-cols-[300px_1fr]">
         <aside className="flex min-h-0 flex-col border-b border-[#e8eee9] bg-[#fbfcfa] md:border-b-0 md:border-r">
           <div className="border-b border-[#e8eee9] p-4"><div className="flex items-center gap-2 rounded-[10px] border border-[#dfe8e1] bg-white px-3 py-2.5"><Search className="size-4 text-[#74817b]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-sm outline-none placeholder:text-[#9aa8a0]" placeholder="Tìm cuộc trò chuyện" /></div></div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">{visible.length === 0 ? <div className="p-6 text-center text-sm text-[#74817b]">Chưa có cuộc trò chuyện.</div> : visible.map((conversation) => { const member = conversation.members.find((item) => item.userId !== currentUserId)?.user; const active = selectedId === conversation.id; return <button key={conversation.id} onClick={() => setSelectedId(conversation.id)} className={`flex w-full items-center gap-3 rounded-[10px] p-3 text-left transition ${active ? "bg-[#e6f1eb]" : "hover:bg-[#f1f5f2]"}`}><Avatar src={member?.avatarUrl} alt={member?.fullName ?? "Hội thoại"} className="size-10 shrink-0 rounded-full object-cover" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-[#203c37]">{member?.fullName ?? "Hội thoại"}</p><p className="mt-0.5 truncate text-xs text-[#74817b]">{conversation.messages?.[0]?.content ?? "Chưa có tin nhắn"}</p></div></button>; })}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">{visible.length === 0 ? <div className="p-6 text-center text-sm text-[#74817b]">Chưa có cuộc trò chuyện.</div> : visible.map((conversation) => { const member = conversation.members.find((item) => item.userId !== currentUserId)?.user; const active = selectedId === conversation.id; return <button key={conversation.id} onClick={() => { setSelectedId(conversation.id); setMessages([]); }} className={`flex w-full items-center gap-3 rounded-[10px] p-3 text-left transition ${active ? "bg-[#e6f1eb]" : "hover:bg-[#f1f5f2]"}`}><Avatar src={member?.avatarUrl} alt={member?.fullName ?? "Hội thoại"} className="size-10 shrink-0 rounded-full object-cover" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-[#203c37]">{member?.fullName ?? "Hội thoại"}</p><p className="mt-0.5 truncate text-xs text-[#74817b]">{conversation.messages?.[0]?.content ?? "Chưa có tin nhắn"}</p></div></button>; })}</div>
         </aside>
         <section className="flex min-h-0 flex-col">
           <header className="flex items-center gap-3 border-b border-[#e8eee9] px-5 py-4"><Avatar src={target?.avatarUrl} alt={target?.fullName ?? "Hội thoại"} className="size-10 rounded-full object-cover" /><div><h2 className="font-semibold text-[#203c37]">{target?.fullName ?? "Chọn cuộc trò chuyện"}</h2><p className="text-xs text-[#74817b]">{selected ? "Đang trao đổi trực tuyến" : "Chọn một hội thoại để bắt đầu"}</p></div></header>

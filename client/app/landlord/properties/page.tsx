@@ -86,6 +86,11 @@ export default function LandlordPropertiesPage() {
               key={property.id}
               className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs hover:border-[#15594f]/50 transition-all flex flex-col justify-between"
             >
+              <img
+                src="/images/default-property.svg"
+                alt="Ảnh cơ sở mặc định"
+                className="mb-4 h-32 w-full rounded-[8px] object-cover"
+              />
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="size-10 rounded-[8px] bg-[#eaf2ed] text-[#15594f] flex items-center justify-center shrink-0">

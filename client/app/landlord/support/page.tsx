@@ -37,7 +37,7 @@ export default function LandlordSupportPage() {
           </div>
           <h3 className="text-[16px] font-semibold text-[#203c37] mt-3">Zalo OA Hỗ trợ</h3>
           <p className="text-[13px] text-[#74817b] mt-1">Chat trực tiếp cùng tư vấn viên</p>
-          <p className="text-[15px] font-bold text-[#9a6a12] mt-3">5K-Rental Manager Official</p>
+          <p className="text-[15px] font-bold text-[#9a6a12] mt-3">Kênh hỗ trợ chính thức của 5K-Rental Manager</p>
         </div>
       </div>
 

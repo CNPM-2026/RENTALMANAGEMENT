@@ -3,10 +3,14 @@
 import * as React from "react";
 import { apiClient } from "@/lib/api";
 import { KycSubmission } from "@/types/models";
+import { AddressFields, AddressValue } from "@/components/address/address-fields";
 
 export default function LandlordKycPage() {
   const [kyc, setKyc] = React.useState<KycSubmission | null>(null);
   const [form, setForm] = React.useState({ idNumber: "", permanentAddress: "" });
+  const [permanentLocation, setPermanentLocation] = React.useState<AddressValue>({
+    address: "", province: "", district: "", ward: "",
+  });
   const [frontId, setFrontId] = React.useState<File | null>(null);
   const [backId, setBackId] = React.useState<File | null>(null);
   const [message, setMessage] = React.useState("");
@@ -17,6 +21,7 @@ export default function LandlordKycPage() {
       if (value) {
         setKyc(value);
         setForm({ idNumber: value.idNumber, permanentAddress: value.permanentAddress });
+        setPermanentLocation((current) => ({ ...current, address: value.permanentAddress }));
       }
     }).catch(() => setError("Không tải được hồ sơ KYC."));
   }, []);
@@ -32,7 +37,9 @@ export default function LandlordKycPage() {
       }
       const payload = new FormData();
       payload.append("idNumber", form.idNumber.trim());
-      payload.append("permanentAddress", form.permanentAddress.trim());
+      const locationText = [permanentLocation.address, permanentLocation.ward, permanentLocation.district, permanentLocation.province]
+        .filter(Boolean).join(", ");
+      payload.append("permanentAddress", (locationText || form.permanentAddress).trim());
       payload.append("frontId", frontId);
       payload.append("backId", backId);
       const result = await apiClient.users.submitKyc(payload);
@@ -55,7 +62,10 @@ export default function LandlordKycPage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
       <form onSubmit={submit} className="space-y-4 rounded-[12px] border bg-white p-6 shadow-sm">
         <input required placeholder="Số CCCD" value={form.idNumber} onChange={(e) => setForm({ ...form, idNumber: e.target.value })} className="w-full rounded border p-2 text-sm" />
-        <textarea required placeholder="Địa chỉ thường trú" value={form.permanentAddress} onChange={(e) => setForm({ ...form, permanentAddress: e.target.value })} className="w-full rounded border p-2 text-sm" />
+        <AddressFields value={permanentLocation} onChange={(value) => {
+          setPermanentLocation(value);
+          setForm((current) => ({ ...current, permanentAddress: value.address }));
+        }} required />
         <label className="block text-sm font-medium">Ảnh CCCD mặt trước<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setFrontId(e.target.files?.[0] ?? null)} className="mt-1 w-full rounded border p-2 text-sm" /></label>
         <label className="block text-sm font-medium">Ảnh CCCD mặt sau<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setBackId(e.target.files?.[0] ?? null)} className="mt-1 w-full rounded border p-2 text-sm" /></label>
         <button type="submit" className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white">Gửi yêu cầu kiểm duyệt</button>

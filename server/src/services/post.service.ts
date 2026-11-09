@@ -6,7 +6,14 @@ import { storageService } from './storage.service';
 export const postService = {
   getById: async (postId: string) => {
     const post = await prisma.post.findFirst({
-      where: { id: postId, OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }] },
+      where: {
+        id: postId,
+        status: 'APPROVED',
+        AND: [
+          { OR: [{ roomId: null }, { room: { status: 'AVAILABLE' } }] },
+          { OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }] },
+        ],
+      },
       include: {
         images: true,
         author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
@@ -89,6 +96,7 @@ export const postService = {
     return await prisma.post.findMany({
       where: {
         status: 'APPROVED',
+        AND: [{ OR: [{ roomId: null }, { room: { status: 'AVAILABLE' } }] }],
         OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
         ...(postType && { postType: postType as PostType }),
         // Nếu sau này muốn tìm theo tỉnh thành (thông qua property)
@@ -118,7 +126,10 @@ export const postService = {
     ];
     const whereClause: Prisma.PostWhereInput = {
       status: 'APPROVED',
-      AND: andConditions,
+      AND: [
+        ...andConditions,
+        { OR: [{ roomId: null }, { room: { status: 'AVAILABLE' } }] },
+      ],
     };
 
     // Tìm theo từ khóa (Title hoặc Description)
@@ -143,6 +154,7 @@ export const postService = {
     // Lọc theo Giá & Diện tích (Thông qua Room)
     if (minPrice || maxPrice || minArea || maxArea) {
       whereClause.room = {
+        status: 'AVAILABLE',
         ...(minPrice && { priceMonthly: { gte: minPrice } }),
         ...(maxPrice && { priceMonthly: { lte: maxPrice } }),
         ...(minArea && { area: { gte: minArea } }),

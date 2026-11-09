@@ -5,6 +5,7 @@ import { verifyToken } from '../utils/jwt';
 import { setIoInstance } from './socket.instance'; // Thêm import
 import { env } from '../config/env';
 import { findBannedChatKeyword } from '../services/chat.service';
+import { notificationService } from '../services/notification.service';
 
 // Mở rộng kiểu dữ liệu của Socket để lưu thông tin user
 interface AuthSocket extends Socket {
@@ -101,6 +102,23 @@ export const initSocket = (server: HttpServer) => {
 
         // 3. Phát tin nhắn tới tất cả những ai đang ở trong phòng chat này (kể cả người gửi)
         io.to(`conversation_${conversationId}`).emit('receive_message', newMessage);
+        const recipients = await prisma.conversationMember.findMany({
+          where: { conversationId, userId: { not: userId } },
+          select: { userId: true },
+        });
+        await Promise.all(recipients.map(async (recipient) => {
+          try {
+            await notificationService.createNotification(
+              recipient.userId,
+              'Tin nhắn mới',
+              'Bạn có tin nhắn mới trong cuộc trò chuyện.',
+              'MESSAGE',
+              conversationId,
+            );
+          } catch (notificationError) {
+            console.error('Không thể tạo thông báo tin nhắn:', notificationError);
+          }
+        }));
         acknowledge?.({ success: true });
 
       } catch (error) {

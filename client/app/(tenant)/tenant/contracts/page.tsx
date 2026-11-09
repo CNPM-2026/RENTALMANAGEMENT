@@ -31,7 +31,9 @@ export default function TenantContractsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-[#f7f6f2] text-xs text-[#74817b]">
               <tr>
-                <th className="p-4">Phòng</th>
+                <th className="p-4">Nhà trọ / cơ sở</th>
+                <th className="p-4">Số phòng</th>
+                <th className="p-4">Địa chỉ</th>
                 <th className="p-4">Thời hạn</th>
                 <th className="p-4">Tiền thuê</th>
                 <th className="p-4">Trạng thái</th>
@@ -41,7 +43,9 @@ export default function TenantContractsPage() {
             <tbody className="divide-y divide-[#eef3ef]">
               {contracts.map((contract) => (
                 <tr key={contract.id}>
+                  <td className="p-4 font-semibold">{contract.room?.property?.name ?? "Chưa cập nhật"}</td>
                   <td className="p-4 font-semibold">Phòng {contract.room?.roomNumber ?? contract.roomId}</td>
+                  <td className="p-4 text-[#74817b]">{contract.room?.property?.address ?? "Chưa cập nhật"}</td>
                   <td className="p-4 text-[#74817b]">
                     {new Date(contract.startDate).toLocaleDateString("vi-VN")} -{" "}
                     {contract.endDate ? new Date(contract.endDate).toLocaleDateString("vi-VN") : "Vô thời hạn"}

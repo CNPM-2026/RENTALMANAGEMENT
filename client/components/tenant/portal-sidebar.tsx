@@ -21,6 +21,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNotifications } from "@/hooks/use-notifications";
 
 interface PortalSidebarProps {
   onLogout?: () => void;
@@ -29,6 +30,7 @@ interface PortalSidebarProps {
 export function PortalSidebar({ onLogout }: PortalSidebarProps) {
   const pathname = usePathname();
   const currentPath = pathname ?? "";
+  const { unreadCount } = useNotifications();
 
   // 9 Functional Navigation Items (from Figma spec_miner_survey_3 handoff)
   const functionalItems = [
@@ -134,6 +136,9 @@ export function PortalSidebar({ onLogout }: PortalSidebarProps) {
                   )}
                 />
                 <span className="truncate">{item.label}</span>
+                {item.href === "/tenant/notifications" && unreadCount > 0 && (
+                  <span className="ml-auto rounded-full bg-[#991b1b] px-1.5 py-0.5 text-[10px] font-bold text-white">{unreadCount}</span>
+                )}
               </Link>
             );
           })}

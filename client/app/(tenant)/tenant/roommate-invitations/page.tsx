@@ -56,7 +56,7 @@ export default function TenantRoommateInvitationsPage() {
           userName: user?.fullName ?? "Người dùng",
           userAge: user?.profile?.dob ? new Date().getFullYear() - new Date(user.profile.dob).getFullYear() : 0,
           userOccupation: user?.profile?.occupation ?? "Chưa cập nhật",
-          avatarUrl: user?.avatarUrl ?? "/placeholder-avatar.png",
+          avatarUrl: user?.avatarUrl ?? "/images/default-avatar.svg",
           matchScore: 0,
           message: item.message ?? "",
           createdAt: new Date(item.createdAt).toLocaleString("vi-VN"),
@@ -205,7 +205,10 @@ export default function TenantRoommateInvitationsPage() {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => router.push(`/tenant/messages?user=${item.id}`)}
+                      onClick={async () => {
+                        const conversation = await apiClient.chats.getOrCreateConversationWithUser(item.id);
+                        router.push(`/tenant/messages?conversation=${conversation.id}`);
+                      }}
                       leftIcon={<MessageCircle className="size-3.5" />}
                     >
                       Bắt đầu chat

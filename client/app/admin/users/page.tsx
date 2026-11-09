@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api";
 import { User, Role } from "@/types/models";
 
 const ROLE_LABELS: Record<Role, { label: string; bg: string; text: string }> = {
-  ADMIN: { label: "Admin", bg: "bg-[#fbeae6]", text: "text-[#a4422c]" },
+  ADMIN: { label: "Quản trị viên", bg: "bg-[#fbeae6]", text: "text-[#a4422c]" },
   LANDLORD: { label: "Chủ trọ", bg: "bg-[#eaf2ed]", text: "text-[#15594f]" },
   TENANT: { label: "Người thuê", bg: "bg-[#e8f0fb]", text: "text-[#2d5d8c]" },
   AGENT: { label: "Môi giới", bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]" },

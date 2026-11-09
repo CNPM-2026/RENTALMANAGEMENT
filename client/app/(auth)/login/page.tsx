@@ -5,13 +5,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Home, ArrowRight, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { apiClient, ApiError, getBaseApiUrl } from "@/lib/api";
-import { setAuthSession, getCurrentUser, isAdminRole } from "@/lib/auth";
+import { setAuthSession, getCurrentUser } from "@/lib/auth";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get("redirect") || "/";
-
   const [emailOrPhone, setEmailOrPhone] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [rememberMe, setRememberMe] = React.useState(true);
@@ -57,28 +55,20 @@ function LoginForm() {
       .getMeWithToken(token)
       .then((user) => {
         setAuthSession(token, refreshToken, user);
-        router.replace(
-          user.role === "LANDLORD"
-            ? "/landlord/dashboard"
-            : isAdminRole(user.role)
-            ? "/admin/dashboard"
-            : redirectUrl
-        );
+        router.replace("/");
       })
       .catch(() =>
         setErrorMessage("Không thể hoàn tất đăng nhập Google.")
       );
-  }, [router, redirectUrl, searchParams]);
+  }, [router, searchParams]);
 
   // If already logged in, redirect away
   React.useEffect(() => {
     const user = getCurrentUser();
     if (user) {
-      if (user.role === "LANDLORD") router.replace("/landlord/dashboard");
-      else if (isAdminRole(user.role)) router.replace("/admin/dashboard");
-      else router.replace(redirectUrl);
+      router.replace("/");
     }
-  }, [router, redirectUrl]);
+  }, [router]);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -102,13 +92,7 @@ function LoginForm() {
 
       setAuthSession(response.token, response.refreshToken, response.user);
 
-      if (response.user.role === "LANDLORD") {
-        router.push("/landlord/dashboard");
-      } else if (isAdminRole(response.user.role)) {
-        router.push("/admin/dashboard");
-      } else {
-        router.push(redirectUrl);
-      }
+      router.push("/");
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setErrorMessage(err.message || "Tài khoản hoặc mật khẩu không chính xác.");

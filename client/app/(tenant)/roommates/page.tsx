@@ -5,26 +5,18 @@ import Link from "next/link";
 import {
   Users,
   Search,
-  SlidersHorizontal,
-  Moon,
-  Sun,
-  Dog,
-  Utensils,
   Sparkles,
-  MapPin,
   Check,
   UserPlus,
   ArrowRight,
   Info,
-  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api";
-import { SuggestedRoommate } from "@/types/models";
 import { getCurrentUser } from "@/lib/auth";
+import { User } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
 
 /* Legacy design fixture retained only for type inference; candidates are loaded from the matching API.
@@ -117,21 +109,33 @@ type CandidateShape = {
 };
 
 export default function RoommateDiscoveryPage() {
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [searchKeyword, setSearchKeyword] = React.useState("");
-  const [districtFilter, setDistrictFilter] = React.useState("ALL");
-  const [sleepFilter, setSleepFilter] = React.useState("ALL");
-  const [petFilter, setPetFilter] = React.useState("ALL");
-  const [budgetFilter, setBudgetFilter] = React.useState("ALL");
   const [activeTab, setActiveTab] = React.useState("best_match");
   const [invitedIds, setInvitedIds] = React.useState<string[]>([]);
   const [feedbackMessage, setFeedbackMessage] = React.useState<string | null>(null);
+  const [isPostFormOpen, setIsPostFormOpen] = React.useState(false);
+  const [isPosting, setIsPosting] = React.useState(false);
+  const [postError, setPostError] = React.useState<string | null>(null);
+  const [postForm, setPostForm] = React.useState({ title: "", description: "", price: "" });
+  const [profileReady, setProfileReady] = React.useState<boolean | null>(null);
 
   // Filter candidates
   const [candidates, setCandidates] = React.useState<CandidateShape[]>([]);
 
   React.useEffect(() => {
-    apiClient.matching.getSuggestions()
+    const frame = window.requestAnimationFrame(() => {
+      setCurrentUser(getCurrentUser());
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const loadSuggestions = React.useCallback(() => {
+    Promise.all([apiClient.matching.getPreferences(), apiClient.matching.getSuggestions()])
+      .then(([preferences, items]) => {
+        setProfileReady(Boolean(preferences));
+        return items;
+      })
       .then((items) => setCandidates(items.map((item) => ({
         id: item.user.id,
         fullName: item.user.fullName,
@@ -140,11 +144,11 @@ export default function RoommateDiscoveryPage() {
         occupation: item.user.occupation ?? "Chưa cập nhật",
         avatarUrl: item.user.avatarUrl ?? "/images/default-avatar.svg",
         matchScore: item.compatibilityPercent,
-        budgetMin: 0,
+        budgetMin: item.post.price ?? 0,
         budgetMax: item.post.price ?? 0,
         preferredDistrict: item.post.property?.district ?? "Chưa cập nhật",
         statusNote: item.post.title,
-        sleepSchedule: "Chưa cập nhật",
+        sleepSchedule: "",
         petAllowed: false,
         cooking: "Chưa cập nhật",
         cleanliness: 0,
@@ -152,8 +156,44 @@ export default function RoommateDiscoveryPage() {
         bio: item.post.description,
         tags: [],
       }))))
-      .catch(() => setCandidates([]));
+        .catch(() => {
+          setProfileReady(false);
+          setCandidates([]);
+        });
   }, []);
+
+  React.useEffect(() => {
+    loadSuggestions();
+  }, [loadSuggestions]);
+
+  const handleCreateRoommatePost = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isPosting) return;
+    if (postForm.description.trim().length < 10) {
+      setPostError("Mô tả nhu cầu phải có ít nhất 10 ký tự.");
+      return;
+    }
+
+    setIsPosting(true);
+    setPostError(null);
+    try {
+      await apiClient.posts.create({
+        title: postForm.title.trim(),
+        description: postForm.description.trim(),
+        postType: "FIND_ROOMMATE",
+        ...(postForm.price ? { price: Number(postForm.price) } : {}),
+      });
+      setPostForm({ title: "", description: "", price: "" });
+      setIsPostFormOpen(false);
+      setFeedbackMessage("Đã đăng nhu cầu tìm bạn ở ghép. Tin sẽ hiển thị sau khi được duyệt.");
+      setTimeout(() => setFeedbackMessage(null), 5000);
+      loadSuggestions();
+    } catch (error) {
+      setPostError(error instanceof Error ? error.message : "Không thể đăng nhu cầu ở ghép.");
+    } finally {
+      setIsPosting(false);
+    }
+  };
 
   const filteredCandidates = candidates.filter((candidate) => {
     if (
@@ -164,15 +204,6 @@ export default function RoommateDiscoveryPage() {
     ) {
       return false;
     }
-    if (districtFilter !== "ALL" && !candidate.preferredDistrict.includes(districtFilter)) {
-      return false;
-    }
-    if (sleepFilter === "EARLY" && !candidate.sleepSchedule.includes("sớm")) return false;
-    if (sleepFilter === "NIGHT" && !candidate.sleepSchedule.includes("Cú đêm")) return false;
-    if (petFilter === "YES" && !candidate.petAllowed) return false;
-    if (petFilter === "NO" && candidate.petAllowed) return false;
-    if (budgetFilter === "UNDER_3M" && candidate.budgetMax > 3500000) return false;
-    if (budgetFilter === "3M_5M" && (candidate.budgetMin > 5000000 || candidate.budgetMax < 3000000)) return false;
     return true;
   });
 
@@ -215,13 +246,90 @@ export default function RoommateDiscoveryPage() {
                 Thuật toán 5K-Rental Manager kết nối bạn với những người cùng nhịp sống, thói quen sinh hoạt và ngân sách tương thích.
               </p>
             </div>
-            <Link href="/tenant/roommate-profile">
-              <Button variant="primary" size="md" leftIcon={<Sparkles className="size-4" />}>
-                Cập nhật hồ sơ gu sống
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<UserPlus className="size-4" />}
+                onClick={() => {
+                  setPostError(null);
+                  setIsPostFormOpen((open) => !open);
+                }}
+              >
+                Đăng nhu cầu ở ghép
               </Button>
-            </Link>
+              <Link href="/tenant/roommate-profile">
+                <Button variant="outline" size="md" leftIcon={<Sparkles className="size-4" />}>
+                  Cập nhật hồ sơ gu sống
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
+
+        {isPostFormOpen && (
+          <Card className="border border-[#d2e4d7] bg-white rounded-[12px] shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-[17px] font-bold text-[#203c37]">Đăng nhu cầu tìm bạn ở ghép</h2>
+                  <p className="text-[13px] text-[#74817b] mt-1">
+                    Chia sẻ ngân sách và nhu cầu để người phù hợp có thể kết nối với bạn.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setIsPostFormOpen(false)} className="text-sm text-[#74817b] hover:text-[#203c37]">
+                  Đóng
+                </button>
+              </div>
+              {postError && <p className="mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{postError}</p>}
+              <form onSubmit={handleCreateRoommatePost} className="space-y-4">
+                <input
+                  required
+                  minLength={3}
+                  maxLength={200}
+                  value={postForm.title}
+                  onChange={(event) => setPostForm((form) => ({ ...form, title: event.target.value }))}
+                  placeholder="Tiêu đề (VD: Tìm bạn nữ ở ghép tại Bình Thạnh)"
+                  className="w-full h-11 rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] px-3 text-sm outline-none focus:border-[#15594f]"
+                />
+                <textarea
+                  required
+                  minLength={10}
+                  maxLength={10000}
+                  value={postForm.description}
+                  onChange={(event) => setPostForm((form) => ({ ...form, description: event.target.value }))}
+                  placeholder="Mô tả khu vực, thói quen sinh hoạt và mong muốn tìm bạn..."
+                  className="min-h-28 w-full rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] p-3 text-sm outline-none focus:border-[#15594f]"
+                />
+                <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                  <label className="flex-1 text-xs font-semibold text-[#74817b]">
+                    Ngân sách dự kiến (đ/tháng, không bắt buộc)
+                    <input
+                      type="number"
+                      min="0"
+                      max="99999999"
+                      value={postForm.price}
+                      onChange={(event) => setPostForm((form) => ({ ...form, price: event.target.value }))}
+                      className="mt-1 w-full h-11 rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] px-3 text-sm font-normal text-[#203c37] outline-none focus:border-[#15594f]"
+                    />
+                  </label>
+                  <Button type="submit" variant="primary" size="md" disabled={isPosting}>
+                    {isPosting ? "Đang đăng..." : "Đăng nhu cầu"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {profileReady === false && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-[10px] border border-[#f1c9bf] bg-[#fbeae6] px-4 py-3 text-sm text-[#7f1d1d]">
+            <span>Hãy hoàn thiện hồ sơ gu sống để hệ thống tự lọc bạn ở ghép phù hợp với bạn.</span>
+            <Link href="/tenant/roommate-profile" className="font-semibold underline">
+              Hoàn thiện hồ sơ
+            </Link>
+          </div>
+        )}
 
         {/* 2. My Profile Status Widget (Figma 44:63537) */}
         <Card className="border border-[#e2e7e1] bg-white rounded-[12px] shadow-sm overflow-hidden">
@@ -266,6 +374,10 @@ export default function RoommateDiscoveryPage() {
 
         {/* 3. Search and Lifestyle Filter Bar (Figma 44:63547) */}
         <Card className="border border-[#e2e7e1] bg-white rounded-[12px] p-5 shadow-sm">
+          <div className="mb-4 rounded-[8px] bg-[#eaf2ed] px-3 py-2 text-[13px] text-[#15594f]">
+            Danh sách bên dưới đã được tự động lọc theo hồ sơ gu sống, ngân sách và khu vực của bạn.
+            Bạn chỉ cần dùng ô tìm kiếm để thu hẹp kết quả.
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search Input */}
             <div className="space-y-1.5">
@@ -282,50 +394,9 @@ export default function RoommateDiscoveryPage() {
               </div>
             </div>
 
-            {/* District Selector */}
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-[#203c37] uppercase tracking-wider">Khu vực mong muốn</label>
-              <select
-                value={districtFilter}
-                onChange={(e) => setDistrictFilter(e.target.value)}
-                className="w-full h-[46px] px-3.5 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] focus:bg-white outline-none cursor-pointer"
-              >
-                <option value="ALL">Tất cả khu vực (TP.HCM)</option>
-                <option value="Quận 1">Quận 1</option>
-                <option value="Quận 3">Quận 3</option>
-                <option value="Quận 10">Quận 10</option>
-                <option value="Bình Thạnh">Bình Thạnh</option>
-                <option value="Phú Nhuận">Phú Nhuận</option>
-                <option value="Quận 7">Quận 7</option>
-              </select>
-            </div>
-
-            {/* Sleep Schedule */}
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-[#203c37] uppercase tracking-wider">Giờ giấc sinh hoạt</label>
-              <select
-                value={sleepFilter}
-                onChange={(e) => setSleepFilter(e.target.value)}
-                className="w-full h-[46px] px-3.5 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] focus:bg-white outline-none cursor-pointer"
-              >
-                <option value="ALL">Mọi khung giờ</option>
-                <option value="EARLY">Ngủ sớm (trước 23h)</option>
-                <option value="NIGHT">Cú đêm (sau 0h)</option>
-              </select>
-            </div>
-
-            {/* Budget Range */}
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-[#203c37] uppercase tracking-wider">Ngân sách mỗi người</label>
-              <select
-                value={budgetFilter}
-                onChange={(e) => setBudgetFilter(e.target.value)}
-                className="w-full h-[46px] px-3.5 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] focus:bg-white outline-none cursor-pointer"
-              >
-                <option value="ALL">Mọi mức ngân sách</option>
-                <option value="UNDER_3M">Dưới 3 triệu / tháng</option>
-                <option value="3M_5M">3 - 5 triệu / tháng</option>
-              </select>
+            <div className="md:col-span-3 flex items-center rounded-[8px] bg-[#f7f6f2] px-4 text-[13px] text-[#74817b]">
+              Khu vực, ngân sách và thói quen sinh hoạt được lấy trực tiếp từ hồ sơ của bạn.
+              Muốn thay đổi kết quả? Hãy cập nhật hồ sơ gu sống.
             </div>
           </div>
         </Card>
@@ -385,10 +456,6 @@ export default function RoommateDiscoveryPage() {
               size="sm"
               onClick={() => {
                 setSearchKeyword("");
-                setDistrictFilter("ALL");
-                setSleepFilter("ALL");
-                setPetFilter("ALL");
-                setBudgetFilter("ALL");
               }}
             >
               Xóa tất cả bộ lọc

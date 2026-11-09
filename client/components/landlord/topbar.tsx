@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { clearAuthSession, getCurrentUser } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
+import { useNotifications } from "@/hooks/use-notifications";
 
 export function LandlordTopbar() {
   const pathname = usePathname();
@@ -16,6 +17,7 @@ export function LandlordTopbar() {
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
+  const { unreadCount } = useNotifications();
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setCurrentUser(getCurrentUser());
@@ -87,7 +89,7 @@ export function LandlordTopbar() {
             className="relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors"
           >
             <Bell className="size-4.5" />
-            <span className="absolute top-1.5 right-1.5 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />
+            {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />}
           </Link>
 
           <div className="h-5 w-px bg-[#e2e7e1]" />
