@@ -6,19 +6,15 @@ import { useParams, useRouter } from "next/navigation";
 import {
   CalendarDays,
   Clock,
-  MapPin,
   User,
   Phone,
-  FileText,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Info,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { apiClient, resolveMediaUrl } from "@/lib/api";
 import { Post } from "@/types/models";
 
@@ -36,13 +32,13 @@ function BookViewingContent() {
   const roomId = (params?.id as string) || "room-ban-mai-1";
 
   // Selected Date & Time Slot
-  const [selectedDate, setSelectedDate] = React.useState<number>(new Date().getDate());
+  const [currentDate] = React.useState(() => new Date());
+  const [selectedDate, setSelectedDate] = React.useState<number>(() => new Date().getDate());
   const [selectedSlot, setSelectedSlot] = React.useState<string>("16:00 - 17:00");
 
   // Contact Info
   const [fullName, setFullName] = React.useState("");
   const [phone, setPhone] = React.useState("");
-  const [email, setEmail] = React.useState("");
   const [note, setNote] = React.useState("");
   const [agreeTerms, setAgreeTerms] = React.useState(true);
 
@@ -65,22 +61,16 @@ function BookViewingContent() {
       });
   }, [roomId]);
 
-  const currentDate = new Date();
   const currentMonthName = currentDate.toLocaleDateString("vi-VN", { month: "long", year: "numeric" });
   const daysInMonth = Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate() }, (_, i) => i + 1);
-  const isSlotAllowed = (slot: string, day = selectedDate) => {
+  const isSlotAllowed = React.useCallback((slot: string, day = selectedDate) => {
     const [start] = slot.split(" - ");
     const [hours, minutes] = start.split(":").map(Number);
     const appointmentStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), day, hours, minutes);
-    return appointmentStart.getTime() >= Date.now() + 60 * 60 * 1000;
-  };
+    return appointmentStart.getTime() >= currentDate.getTime() + 60 * 60 * 1000;
+  }, [currentDate, selectedDate]);
   const availableSlots = TIME_SLOTS.filter((slot) => isSlotAllowed(slot));
-
-  React.useEffect(() => {
-    if (!isSlotAllowed(selectedSlot)) {
-      setSelectedSlot(availableSlots[0] ?? "");
-    }
-  }, [selectedDate, availableSlots, selectedSlot]);
+  const activeSlot = isSlotAllowed(selectedSlot) ? selectedSlot : (availableSlots[0] ?? "");
 
   async function handleConfirmBooking(e: React.FormEvent) {
     e.preventDefault();
@@ -92,12 +82,12 @@ function BookViewingContent() {
     setLoading(true);
 
     try {
-      if (!selectedSlot || !isSlotAllowed(selectedSlot)) {
+      if (!activeSlot || !isSlotAllowed(activeSlot)) {
         setErrorMsg("Vui lòng chọn khung giờ cách thời điểm hiện tại ít nhất 1 tiếng.");
         setLoading(false);
         return;
       }
-      const formattedDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}T${selectedSlot.split(" - ")[0]}:00`;
+      const formattedDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}T${activeSlot.split(" - ")[0]}:00`;
 
       await apiClient.appointments.create({
         roomId,
@@ -242,7 +232,7 @@ function BookViewingContent() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {TIME_SLOTS.map((slot) => {
-                    const isSelected = slot === selectedSlot;
+                    const isSelected = slot === activeSlot;
                     const isAllowed = isSlotAllowed(slot);
                     return (
                       <button
@@ -369,7 +359,7 @@ function BookViewingContent() {
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-[#74817b]">Khung giờ</span>
-                  <span className="font-bold text-[#15594f]">{selectedSlot}</span>
+                  <span className="font-bold text-[#15594f]">{activeSlot}</span>
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-[#74817b]">Người đón tiếp</span>

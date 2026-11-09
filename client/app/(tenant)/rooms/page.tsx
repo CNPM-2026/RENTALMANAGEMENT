@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -566,10 +567,12 @@ function RoomsDiscoveryContent() {
                     >
                       {/* Thumbnail */}
                       <div className="relative w-full h-[200px] overflow-hidden bg-gray-100">
-                        <img
+                        <Image
                           src={room.image}
                           alt={room.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="absolute top-3 left-3">
                           {room.verified ? (

@@ -12,7 +12,6 @@ import {
   Users,
   Flag,
   ArrowRight,
-  HelpCircle,
   CheckCircle2,
   Clock,
   ChevronDown,
@@ -20,7 +19,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
 import { Report } from "@/types/models";
@@ -45,28 +44,38 @@ function MyReportsList() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = React.useState(0);
 
-  const loadReports = React.useCallback(() => {
-    setLoading(true);
-    setError(null);
+  React.useEffect(() => {
+    let cancelled = false;
     apiClient.reports
       .getMy()
       .then((data) => {
-        setReports(data);
+        if (!cancelled) setReports(data);
       })
       .catch((err) => {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Không thể tải danh sách báo cáo."
-        );
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Không thể tải danh sách báo cáo."
+          );
+        }
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  React.useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const targetTypeLabel = (type: string) => {
     if (type === "POST") return "Bài đăng";
@@ -90,7 +99,7 @@ function MyReportsList() {
         <AlertTriangle className="size-4 shrink-0" />
         <span>{error}</span>
         <button
-          onClick={loadReports}
+          onClick={handleRetry}
           className="ml-auto text-red-600 underline font-medium hover:text-red-800"
         >
           Thử lại
