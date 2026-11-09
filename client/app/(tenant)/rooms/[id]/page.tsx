@@ -29,7 +29,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
+import { getAuthToken } from "@/lib/auth";
 import { Post } from "@/types/models";
 import { formatCurrency } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -53,6 +54,15 @@ function RoomDetailContent() {
       setRoomImages(value.images?.map((image) => image.imageUrl) ?? []);
       void apiClient.reviews.getByTarget("POST", value.id).then(setReviewSummary).catch(() => setReviewSummary(null));
     }).catch(() => setPost(null));
+  }, [roomId]);
+
+  React.useEffect(() => {
+    if (!getAuthToken()) return;
+    apiClient.favorites.getMyFavorites()
+      .then((items) => setIsSaved(items.some((item) => item.postId === roomId)))
+      .catch((error) => {
+        if (!(error instanceof ApiError && error.status === 403)) setIsSaved(false);
+      });
   }, [roomId]);
   const roomName = post?.title ?? "Tin đăng";
   const roomAddress = post?.property?.address ?? "Chưa cập nhật địa chỉ";
@@ -101,7 +111,15 @@ function RoomDetailContent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsSaved(!isSaved)}
+                onClick={() => {
+                  if (!getAuthToken()) {
+                    router.push("/login");
+                    return;
+                  }
+                  const wasSaved = isSaved;
+                  setIsSaved(!wasSaved);
+                  apiClient.favorites.toggle(roomId).catch(() => setIsSaved(wasSaved));
+                }}
                 className="font-medium bg-white"
                 leftIcon={
                   <Heart
@@ -148,7 +166,7 @@ function RoomDetailContent() {
             }}
           >
             <img
-              src={roomImages[0] ?? "/placeholder-room.jpg"}
+              src={roomImages[0] ?? "/images/default-room.svg"}
               alt={roomName}
               className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
             />
@@ -165,7 +183,7 @@ function RoomDetailContent() {
               }}
             >
               <img
-                src={roomImages[1] ?? roomImages[0] ?? "/placeholder-room.jpg"}
+                src={roomImages[1] ?? roomImages[0] ?? "/images/default-room.svg"}
                 alt="Nội thất phòng"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
@@ -178,7 +196,7 @@ function RoomDetailContent() {
               }}
             >
               <img
-                src={roomImages[2] ?? roomImages[0] ?? "/placeholder-room.jpg"}
+                src={roomImages[2] ?? roomImages[0] ?? "/images/default-room.svg"}
                 alt="Góc làm việc"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
@@ -490,7 +508,7 @@ function RoomDetailContent() {
                 leftIcon={<MessageCircle className="size-4 text-[#15594f]" />}
                 onClick={async () => {
                   if (!post?.author?.id) return;
-                  const conversation = await apiClient.chats.getOrCreateConversation({ targetUserId: post.author.id });
+                  const conversation = await apiClient.chats.getOrCreateConversationWithUser(post.author.id);
                   router.push(`/tenant/messages?conversation=${conversation.id}`);
                 }}
               >

@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Clock,
   Send,
+  CalendarCheck,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
-import { Post } from "@/types/models";
+import { Post, Appointment } from "@/types/models";
 
 function ApplyRentalContent() {
   const params = useParams();
@@ -48,6 +50,11 @@ function ApplyRentalContent() {
   const [post, setPost] = React.useState<Post | null>(null);
   const [roomIdForRequest, setRoomIdForRequest] = React.useState("");
 
+  // Appointment check state
+  const [checkingAppointment, setCheckingAppointment] = React.useState(true);
+  const [hasCompletedVisit, setHasCompletedVisit] = React.useState(false);
+  const [relevantAppointment, setRelevantAppointment] = React.useState<Appointment | null>(null);
+
   React.useEffect(() => {
     const initializationTimer = window.setTimeout(() => {
       const user = getCurrentUser();
@@ -62,6 +69,7 @@ function ApplyRentalContent() {
       setMoveInDate(tomorrow.toISOString().slice(0, 10));
     }, 0);
 
+    // Load post info
     void apiClient.posts
       .getById(roomId)
       .then((loadedPost) => {
@@ -74,6 +82,33 @@ function ApplyRentalContent() {
         setRoomPrice(0);
         setRoomIdForRequest("");
       });
+
+    // Check if tenant has CONFIRMED or COMPLETED appointment for this room/post
+    void apiClient.appointments
+      .getMyAppointments()
+      .then((appointments) => {
+        // Look for appointment for this post or the room associated with the post
+        const qualifyingAppt = appointments.find((appt) => {
+          const matchesPost = appt.postId === roomId;
+          const isQualified =
+            appt.status === "CONFIRMED" || appt.status === "COMPLETED";
+          return matchesPost && isQualified;
+        });
+        if (qualifyingAppt) {
+          setHasCompletedVisit(true);
+          setRelevantAppointment(qualifyingAppt);
+        } else {
+          setHasCompletedVisit(false);
+        }
+      })
+      .catch(() => {
+        // If we can't check, default to blocking (safer)
+        setHasCompletedVisit(false);
+      })
+      .finally(() => {
+        setCheckingAppointment(false);
+      });
+
     return () => window.clearTimeout(initializationTimer);
   }, [roomId]);
 
@@ -84,6 +119,10 @@ function ApplyRentalContent() {
 
   async function handleSubmitApplication(e: React.FormEvent) {
     e.preventDefault();
+    if (!hasCompletedVisit) {
+      setErrorMsg("Bạn cần đặt lịch và xem phòng trực tiếp trước khi gửi yêu cầu thuê.");
+      return;
+    }
     if (!agreeTerms) {
       setErrorMsg("Vui lòng đồng ý với cam kết xác thực thông tin thuê phòng.");
       return;
@@ -161,6 +200,45 @@ function ApplyRentalContent() {
             <div className="text-[13px]">
               <strong className="font-semibold block">Gửi yêu cầu thuê phòng thành công!</strong>
               Hồ sơ của bạn đã được chuyển đến chủ trọ. Đang chuyển hướng đến trang Theo dõi yêu cầu thuê...
+            </div>
+          </div>
+        )}
+
+        {/* Appointment Check Banner */}
+        {!checkingAppointment && !hasCompletedVisit && !success && (
+          <div className="p-5 rounded-[14px] bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <AlertCircle className="size-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[14px] font-semibold text-amber-800">
+                  Bạn chưa xem phòng trực tiếp
+                </p>
+                <p className="text-[13px] text-amber-700 mt-0.5 leading-relaxed">
+                  Để đảm bảo quyền lợi, bạn cần đặt lịch và xem phòng thực tế trước khi gửi yêu cầu thuê. Chủ trọ cần xác nhận lịch hẹn của bạn.
+                </p>
+              </div>
+            </div>
+            <Link href={`/rooms/${roomId}/book-viewing`} className="shrink-0">
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<CalendarCheck className="size-4" />}
+                className="whitespace-nowrap"
+              >
+                Đặt lịch xem phòng
+              </Button>
+            </Link>
+          </div>
+        )}
+
+        {/* Appointment Confirmed Banner */}
+        {!checkingAppointment && hasCompletedVisit && relevantAppointment && !success && (
+          <div className="p-4 rounded-[12px] bg-[#eaf2ed] border border-[#d2e4d7] flex items-center gap-3 text-[#15594f]">
+            <CalendarCheck className="size-5 shrink-0" />
+            <div className="text-[13px]">
+              <strong className="font-semibold block">Đã xác nhận xem phòng</strong>
+              Lịch hẹn xem phòng của bạn đã được chủ trọ{" "}
+              {relevantAppointment.status === "COMPLETED" ? "hoàn tất" : "xác nhận"}. Bạn có thể gửi yêu cầu thuê phòng.
             </div>
           </div>
         )}
@@ -368,10 +446,15 @@ function ApplyRentalContent() {
                   variant="primary"
                   size="md"
                   loading={loading}
+                  disabled={!hasCompletedVisit || checkingAppointment}
                   className="font-bold shadow-md"
                   rightIcon={<Send className="size-4" />}
                 >
-                  Gửi yêu cầu thuê phòng
+                  {checkingAppointment
+                    ? "Đang kiểm tra..."
+                    : !hasCompletedVisit
+                      ? "Cần xem phòng trước"
+                      : "Gửi yêu cầu thuê phòng"}
                 </Button>
               </div>
             </div>
@@ -437,6 +520,39 @@ function ApplyRentalContent() {
                     {formatCurrency(totalFirstMonth, { showUnit: false })} đ
                   </span>
                 </div>
+              </div>
+
+              {/* Visit status indicator */}
+              <div className={`p-3 rounded-[8px] border text-[12px] space-y-1 ${
+                checkingAppointment
+                  ? "bg-gray-50 border-gray-200 text-gray-500"
+                  : hasCompletedVisit
+                    ? "bg-[#eaf2ed] border-[#d2e4d7] text-[#15594f]"
+                    : "bg-amber-50 border-amber-200 text-amber-700"
+              }`}>
+                <div className="flex items-center gap-1.5 font-semibold">
+                  {checkingAppointment ? (
+                    <Clock className="size-4 shrink-0 animate-spin" />
+                  ) : hasCompletedVisit ? (
+                    <CalendarCheck className="size-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="size-4 shrink-0" />
+                  )}
+                  <span>
+                    {checkingAppointment
+                      ? "Đang kiểm tra lịch hẹn..."
+                      : hasCompletedVisit
+                        ? "Đã xem phòng – Sẵn sàng thuê"
+                        : "Chưa đặt lịch xem phòng"}
+                  </span>
+                </div>
+                <p className="leading-relaxed" style={{ fontSize: "11px", opacity: 0.9 }}>
+                  {checkingAppointment
+                    ? "Đang xác nhận trạng thái lịch hẹn của bạn."
+                    : hasCompletedVisit
+                      ? "Chủ trọ đã xác nhận lịch hẹn. Bạn có thể gửi yêu cầu thuê phòng."
+                      : "Bạn cần đặt lịch và chờ chủ trọ xác nhận trước khi gửi yêu cầu thuê."}
+                </p>
               </div>
 
               <div className="p-3 rounded-[8px] bg-[#eaf2ed] border border-[#d2e4d7] text-[12px] text-[#15594f] space-y-1">

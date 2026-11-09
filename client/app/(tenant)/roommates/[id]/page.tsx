@@ -60,7 +60,7 @@ function RoommateDetailContent() {
     age: 0,
     gender: suggestion.user.gender ?? "Chưa cập nhật",
     occupation: suggestion.user.occupation ?? "Chưa cập nhật",
-    avatarUrl: suggestion.user.avatarUrl ?? "/placeholder-avatar.png",
+    avatarUrl: suggestion.user.avatarUrl ?? "/images/default-avatar.svg",
     matchScore: suggestion.compatibilityPercent,
     statusNote: suggestion.post.title,
     budgetMonthly: suggestion.post.price ? `${formatCurrency(suggestion.post.price, { showUnit: false })} đ/tháng` : "Chưa cập nhật",
@@ -69,7 +69,7 @@ function RoommateDetailContent() {
     bio: suggestion.post.description,
   } : {
     id: candidateId, fullName: "Đang tải hồ sơ", age: 0, gender: "Chưa cập nhật",
-    occupation: "Chưa cập nhật", avatarUrl: "/placeholder-avatar.png", matchScore: 0,
+    occupation: "Chưa cập nhật", avatarUrl: "/images/default-avatar.svg", matchScore: 0,
     statusNote: "Chưa có dữ liệu hồ sơ", budgetMonthly: "Chưa cập nhật",
     targetLocation: "Chưa cập nhật", moveInDate: "Chưa cập nhật", bio: "",
   };
@@ -180,7 +180,10 @@ function RoommateDetailContent() {
                   variant="outline"
                   size="md"
                   className="w-full"
-                  onClick={() => router.push(`/tenant/messages?user=${candidate.id}`)}
+                  onClick={async () => {
+                    const conversation = await apiClient.chats.getOrCreateConversationWithUser(candidate.id);
+                    router.push(`/tenant/messages?conversation=${conversation.id}`);
+                  }}
                   leftIcon={<MessageCircle className="size-4" />}
                 >
                   Nhắn tin trao đổi

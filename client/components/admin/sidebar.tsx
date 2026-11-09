@@ -70,7 +70,7 @@ export function AdminSidebar() {
       items: [
         { label: "Nhân viên quản trị", href: "/admin/staff", icon: UserCog },
         { label: "Phân quyền RBAC", href: "/admin/roles", icon: Key },
-        { label: "Nhật ký hoạt động (Logs)", href: "/admin/audit-logs", icon: History },
+        { label: "Nhật ký hoạt động", href: "/admin/audit-logs", icon: History },
         { label: "Cấu hình hệ thống", href: "/admin/settings", icon: Settings },
         { label: "Tiện ích phòng", href: "/admin/amenities", icon: Sparkles },
       ],
@@ -100,7 +100,7 @@ export function AdminSidebar() {
                 5K-Rental
               </span>
               <span className="text-[10px] font-bold text-[#991b1b] uppercase tracking-wider mt-0.5">
-                Admin Console
+                Cổng quản trị
               </span>
             </div>
           </Link>
@@ -163,7 +163,7 @@ export function AdminSidebar() {
           <div className="flex items-center gap-2">
             <span className="size-2 rounded-full bg-[#15594f] animate-pulse" />
             <p className="text-[11px] font-semibold text-[#203c37]">
-              Production
+              Hệ thống đang hoạt động
             </p>
           </div>
           <div className="flex items-center justify-between text-[10px] text-[#74817b]">

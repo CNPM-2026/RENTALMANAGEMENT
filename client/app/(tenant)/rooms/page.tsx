@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   MapPin,
@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
+import { getAuthToken } from "@/lib/auth";
+import { Amenity } from "@/types/models";
 
 type RoomCard = {
   id: string;
@@ -36,21 +38,9 @@ type RoomCard = {
   amenities: string[];
 };
 
-const AVAILABLE_AMENITIES = [
-  "Máy lạnh",
-  "Tủ lạnh",
-  "Máy giặt",
-  "Gác lửng",
-  "Ban công",
-  "Thang máy",
-  "Giờ tự do",
-  "Bảo vệ 24/7",
-  "Khóa vân tay",
-  "Chỗ để xe",
-];
-
 function RoomsDiscoveryContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Search and Filter States
   const [keyword, setKeyword] = React.useState(searchParams.get("location") || "");
@@ -58,39 +48,68 @@ function RoomsDiscoveryContent() {
   const [roomType, setRoomType] = React.useState(searchParams.get("type") || "");
   const initialPrice = searchParams.get("price")?.split("-");
   const [minPrice, setMinPrice] = React.useState(initialPrice && initialPrice.length === 2 ? Number(initialPrice[0]) || 0 : 0);
-  const [maxPrice, setMaxPrice] = React.useState(initialPrice && initialPrice.length === 2 ? Number(initialPrice[1]) || 12000000 : 12000000);
+  const [maxPrice, setMaxPrice] = React.useState(initialPrice && initialPrice.length === 2 ? Number(initialPrice[1]) || 0 : 12000000);
+  const [minArea, setMinArea] = React.useState(0);
+  const [maxArea, setMaxArea] = React.useState(500);
   const [selectedAmenities, setSelectedAmenities] = React.useState<string[]>([]);
+  const [amenities, setAmenities] = React.useState<Amenity[]>([]);
   const [petFriendly, setPetFriendly] = React.useState(false);
   const [sortBy, setSortBy] = React.useState("NEWEST");
   const [savedFavorites, setSavedFavorites] = React.useState<string[]>([]);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(1);
   const [rooms, setRooms] = React.useState<RoomCard[]>([]);
+
+  React.useEffect(() => {
+    apiClient.rooms.getAllAmenities()
+      .then(setAmenities)
+      .catch(() => setAmenities([]));
+  }, []);
+
+  React.useEffect(() => {
+    if (!getAuthToken()) return;
+    apiClient.favorites.getMyFavorites()
+      .then((items) => setSavedFavorites(items.map((item) => item.postId)))
+      .catch(() => undefined);
+  }, []);
 
   React.useEffect(() => {
     apiClient.posts.search({
       keyword: keyword || undefined,
       minPrice: minPrice || undefined,
       maxPrice: maxPrice || undefined,
+      minArea: minArea || undefined,
+      maxArea: maxArea || undefined,
+      amenityIds: selectedAmenities.length > 0 ? selectedAmenities : undefined,
       district: district || undefined,
       page: currentPage,
-      limit: 50,
-    }).then((response) => setRooms(response.data.map((post) => ({
-      id: post.id,
-      title: post.title,
-      type: post.room ? "ROOM" : "APARTMENT",
-      area: post.room?.area ?? 0,
-      floor: 0,
-      hasBalcony: false,
-      petFriendly: false,
-      address: post.property?.address ?? "Chưa cập nhật địa chỉ",
-      district: post.property?.district ?? "",
-      price: post.room?.priceMonthly ?? post.price ?? 0,
-      deposit: post.room?.priceMonthly ?? 0,
-      image: post.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
-      verified: post.status === "APPROVED",
-      amenities: post.room?.roomAmenities?.map((item) => item.amenity?.name ?? "").filter(Boolean) ?? [],
-    })))).catch(() => setRooms([]));
-  }, [keyword, district, minPrice, maxPrice, currentPage]);
+      limit: 10,
+    }).then((response) => {
+      setTotalPages(Math.max(1, response.meta.totalPages));
+      if (currentPage > response.meta.totalPages) {
+        setCurrentPage(Math.max(1, response.meta.totalPages));
+      }
+      setRooms(response.data.map((post) => ({
+        id: post.id,
+        title: post.title,
+        type: post.room ? "ROOM" : "APARTMENT",
+        area: post.room?.area ?? 0,
+        floor: 0,
+        hasBalcony: false,
+        petFriendly: false,
+        address: post.property?.address ?? "Chưa cập nhật địa chỉ",
+        district: post.property?.district ?? "",
+        price: post.room?.priceMonthly ?? post.price ?? 0,
+        deposit: post.room?.priceMonthly ?? 0,
+        image: post.images?.[0]?.imageUrl ?? "/images/default-room.svg",
+        verified: post.status === "APPROVED",
+        amenities: post.room?.roomAmenities?.map((item) => item.amenity?.name ?? "").filter(Boolean) ?? [],
+      })));
+    }).catch(() => {
+      setRooms([]);
+      setTotalPages(1);
+    });
+  }, [keyword, district, minPrice, maxPrice, minArea, maxArea, selectedAmenities, currentPage]);
 
   function handleAmenityToggle(amenity: string) {
     setSelectedAmenities((prev) =>
@@ -106,6 +125,8 @@ function RoomsDiscoveryContent() {
     setRoomType("");
     setMinPrice(0);
     setMaxPrice(12000000);
+    setMinArea(0);
+    setMaxArea(500);
     setSelectedAmenities([]);
     setPetFriendly(false);
     setSortBy("NEWEST");
@@ -115,9 +136,15 @@ function RoomsDiscoveryContent() {
   function handleFavoriteToggle(id: string, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    setSavedFavorites((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+    if (!getAuthToken()) {
+      router.push("/login");
+      return;
+    }
+    const wasSaved = savedFavorites.includes(id);
+    setSavedFavorites((prev) => wasSaved ? prev.filter((item) => item !== id) : [...prev, id]);
+    apiClient.favorites.toggle(id).catch(() => {
+      setSavedFavorites((prev) => wasSaved ? [...prev, id] : prev.filter((item) => item !== id));
+    });
   }
 
   // Filter computation
@@ -146,6 +173,11 @@ function RoomsDiscoveryContent() {
         return false;
       }
 
+      // Area range match
+      if (room.area < minArea || room.area > maxArea) {
+        return false;
+      }
+
       // Pet Friendly match
       if (petFriendly && !room.petFriendly) {
         return false;
@@ -154,7 +186,7 @@ function RoomsDiscoveryContent() {
       // Amenities match (all selected must be present)
       if (selectedAmenities.length > 0) {
         const hasAll = selectedAmenities.every((a) =>
-          room.amenities.includes(a)
+          room.amenities.includes(amenities.find((item) => item.id === a)?.name ?? "")
         );
         if (!hasAll) return false;
       }
@@ -166,7 +198,7 @@ function RoomsDiscoveryContent() {
       if (sortBy === "AREA_DESC") return b.area - a.area;
       return 0; // Default NEWEST
     });
-  }, [rooms, keyword, district, roomType, minPrice, maxPrice, petFriendly, selectedAmenities, sortBy]);
+  }, [rooms, keyword, district, roomType, minPrice, maxPrice, minArea, maxArea, petFriendly, selectedAmenities, amenities, sortBy]);
 
   return (
     <div className="w-full min-h-screen bg-[#f7f6f2] text-[#203c37] py-8 px-4 sm:px-6 lg:px-12">
@@ -284,7 +316,7 @@ function RoomsDiscoveryContent() {
                 className="w-full h-[42px] px-3 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] outline-none cursor-pointer"
               >
                 <option value="">Tất cả loại hình</option>
-                <option value="STUDIO">Căn hộ mini Studio</option>
+                <option value="STUDIO">Căn hộ mini</option>
                 <option value="ROOM">Phòng trọ gác lửng</option>
                 <option value="APARTMENT">Chung cư nguyên căn</option>
               </select>
@@ -337,6 +369,48 @@ function RoomsDiscoveryContent() {
               </div>
             </div>
 
+            {/* Filter 4: Area Range */}
+            <div className="space-y-3 pt-2 border-t border-[#e2e7e1]">
+              <label className="text-[12px] font-bold text-[#74817b] uppercase tracking-wider block">
+                Diện tích phòng (m²)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={minArea}
+                  onChange={(e) => setMinArea(Math.max(0, Number(e.target.value) || 0))}
+                  placeholder="Từ"
+                  aria-label="Diện tích tối thiểu"
+                  className="w-full h-[40px] px-3 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] outline-none"
+                />
+                <input
+                  type="number"
+                  min={minArea}
+                  value={maxArea}
+                  onChange={(e) => setMaxArea(Math.max(minArea, Number(e.target.value) || 0))}
+                  placeholder="Đến"
+                  aria-label="Diện tích tối đa"
+                  className="w-full h-[40px] px-3 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                {[["Dưới 20", 0, 20], ["20 - 40", 20, 40], ["Trên 40", 40, 500]].map(([label, min, max]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setMinArea(Number(min));
+                      setMaxArea(Number(max));
+                    }}
+                    className="px-2 py-1.5 rounded-[6px] bg-[#f7f6f2] text-[#203c37] hover:bg-[#eaf2ed] text-center border border-[#e2e7e1]"
+                  >
+                    {label} m²
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Filter 4: Pet Friendly Toggle */}
             <div className="pt-2 border-t border-[#e2e7e1]">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -358,20 +432,20 @@ function RoomsDiscoveryContent() {
                 Tiện ích phòng
               </label>
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                {AVAILABLE_AMENITIES.map((amenity) => {
-                  const isChecked = selectedAmenities.includes(amenity);
+                {amenities.map((amenity) => {
+                  const isChecked = selectedAmenities.includes(amenity.id);
                   return (
                     <label
-                      key={amenity}
+                      key={amenity.id}
                       className="flex items-center gap-2.5 text-[13px] text-[#203c37] cursor-pointer select-none"
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => handleAmenityToggle(amenity)}
+                        onChange={() => handleAmenityToggle(amenity.id)}
                         className="size-4 accent-[#15594f] rounded-[4px]"
                       />
-                      <span>{amenity}</span>
+                      <span>{amenity.name}</span>
                     </label>
                   );
                 })}
@@ -421,7 +495,7 @@ function RoomsDiscoveryContent() {
             </div>
 
             {/* Active Filter Chips */}
-            {(district || roomType || petFriendly || selectedAmenities.length > 0) && (
+            {(district || roomType || minArea > 0 || maxArea < 500 || petFriendly || selectedAmenities.length > 0) && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[12px] text-[#74817b]">Đang lọc:</span>
                 {district && (
@@ -434,14 +508,19 @@ function RoomsDiscoveryContent() {
                     Loại: {roomType}
                   </Badge>
                 )}
+                {(minArea > 0 || maxArea < 500) && (
+                  <Badge variant="neutral" size="sm">
+                    Diện tích: {minArea}–{maxArea} m²
+                  </Badge>
+                )}
                 {petFriendly && (
                   <Badge variant="neutral" size="sm">
                     Nuôi thú cưng
                   </Badge>
                 )}
-                {selectedAmenities.map((a) => (
-                  <Badge key={a} variant="neutral" size="sm">
-                    {a}
+                {selectedAmenities.map((id) => (
+                  <Badge key={id} variant="neutral" size="sm">
+                    {amenities.find((amenity) => amenity.id === id)?.name ?? id}
                   </Badge>
                 ))}
                 <button
@@ -563,10 +642,10 @@ function RoomsDiscoveryContent() {
             )}
 
             {/* Pagination Controls */}
-            {filteredRooms.length > 0 && (
+            {filteredRooms.length > 0 && totalPages > 1 && (
               <div className="pt-6 border-t border-[#e2e7e1] flex items-center justify-between">
                 <span className="text-[13px] text-[#74817b]">
-                  Trang {currentPage} / 3
+                  Trang {currentPage} / {totalPages}
                 </span>
                 <div className="flex items-center gap-1.5">
                   <Button
@@ -578,34 +657,22 @@ function RoomsDiscoveryContent() {
                   >
                     Trước
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-9 px-0"
-                  >
-                    1
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-9 px-0"
-                    onClick={() => setCurrentPage(2)}
-                  >
-                    2
-                  </Button>
+                  {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "primary" : "outline"}
+                      size="sm"
+                      className="w-9 px-0"
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-9 px-0"
-                    onClick={() => setCurrentPage(3)}
-                  >
-                    3
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === 3}
-                    onClick={() => setCurrentPage((p) => Math.min(3, p + 1))}
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     rightIcon={<ChevronRight className="size-4" />}
                   >
                     Sau

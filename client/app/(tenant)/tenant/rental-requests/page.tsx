@@ -58,7 +58,7 @@ export default function TenantRentalRequestsPage() {
         roomTitle: item.room?.property?.name ?? "Phòng thuê",
         roomNumber: item.room?.roomNumber ?? "---",
         roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
-        roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
+        roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/images/default-room.svg",
         monthlyRent: item.room?.priceMonthly ?? 0,
         depositAmount: item.room?.priceMonthly ?? 0,
         moveInDate: item.moveInDate,
@@ -236,7 +236,10 @@ export default function TenantRentalRequestsPage() {
                   variant="outline"
                   size="md"
                   leftIcon={<MessageCircle className="size-4 text-[#15594f]" />}
-                  onClick={() => router.push(`/tenant/messages?user=${encodeURIComponent(req.landlordId)}`)}
+                  onClick={async () => {
+                    const conversation = await apiClient.chats.getOrCreateConversationWithUser(req.landlordId);
+                    router.push(`/tenant/messages?conversation=${conversation.id}`);
+                  }}
                 >
                   Nhắn tin với chủ trọ
                 </Button>

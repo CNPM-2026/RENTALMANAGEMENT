@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { notificationService } from './notification.service';
 
 export const rentalRequestService = {
   create: async (tenantId: string, data: { roomId: string; moveInDate: string; leaseTermMonths: number; occupantsCount?: number; note?: string }) => {
@@ -13,10 +14,18 @@ export const rentalRequestService = {
       select: { id: true },
     });
     if (duplicate) throw new AppError('Bạn đã gửi yêu cầu cho phòng này', 409);
-    return prisma.rentalRequest.create({
+    const request = await prisma.rentalRequest.create({
       data: { ...data, tenantId, landlordId: room.property.landlordId, moveInDate: new Date(data.moveInDate) },
       include: { room: { include: { property: true } } },
     });
+    await notificationService.createNotification(
+      request.landlordId,
+      'Yêu cầu thuê phòng mới',
+      `Bạn nhận được yêu cầu thuê phòng ${request.room.roomNumber}.`,
+      'SYSTEM',
+      request.id
+    );
+    return request;
   },
   getMine: (userId: string, role: string) => prisma.rentalRequest.findMany({
     where: role === 'LANDLORD' ? { landlordId: userId } : { tenantId: userId },
@@ -45,10 +54,18 @@ export const rentalRequestService = {
     if (!allowed) throw new AppError('Bạn không có quyền cập nhật yêu cầu này', 403);
     if (request.status !== 'SUBMITTED') throw new AppError('Yêu cầu đã được xử lý', 400);
     if (status !== 'APPROVED') {
-      return prisma.rentalRequest.update({ where: { id }, data: { status } });
+      const updated = await prisma.rentalRequest.update({ where: { id }, data: { status } });
+      await notificationService.createNotification(
+        request.tenantId,
+        'Cập nhật yêu cầu thuê phòng',
+        `Yêu cầu thuê phòng đã được cập nhật: ${status.toLowerCase()}.`,
+        'SYSTEM',
+        request.id
+      );
+      return updated;
     }
 
-    return prisma.$transaction(async (tx) => {
+    const approved = await prisma.$transaction(async (tx) => {
       const roomClaim = await tx.room.updateMany({
         where: { id: request.roomId, status: 'AVAILABLE' },
         data: { status: 'RENTED' },
@@ -56,6 +73,10 @@ export const rentalRequestService = {
       if (roomClaim.count !== 1) {
         throw new AppError('Phòng đã được giữ hoặc cho thuê bởi yêu cầu khác', 409);
       }
+      await tx.post.updateMany({
+        where: { roomId: request.roomId, status: { in: ['PENDING', 'APPROVED'] } },
+        data: { status: 'CLOSED' },
+      });
 
       const approved = await tx.rentalRequest.update({
         where: { id: request.id, status: 'SUBMITTED' },
@@ -71,5 +92,13 @@ export const rentalRequestService = {
       });
       return approved;
     });
+    await notificationService.createNotification(
+      request.tenantId,
+      'Yêu cầu thuê phòng được chấp thuận',
+      'Yêu cầu thuê phòng của bạn đã được chủ trọ chấp thuận.',
+      'SYSTEM',
+      request.id
+    );
+    return approved;
   },
 };

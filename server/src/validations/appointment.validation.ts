@@ -6,6 +6,8 @@ export const createAppointmentSchema = z.object({
   // Bắt buộc phải có 1 trong 2 cái trên
   appointmentTime: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: 'Thời gian hẹn không hợp lệ (Vui lòng dùng định dạng ISO 8601, ví dụ: 2026-10-28T09:00:00.000Z)',
+  }).refine((val) => new Date(val).getTime() >= Date.now() + 60 * 60 * 1000, {
+    message: 'Thời gian hẹn phải cách thời điểm hiện tại ít nhất 1 tiếng',
   }),
   note: z.string().optional(),
 }).refine(data => data.roomId || data.postId, {

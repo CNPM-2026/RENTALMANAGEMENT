@@ -11,11 +11,10 @@ import {
   ZoomIn,
   ZoomOut,
   Compass,
-  Building,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { apiClient } from "@/lib/api";
+import { apiClient, resolveMediaUrl } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { Post } from "@/types/models";
 
@@ -147,7 +146,7 @@ export default function RoomsMapPage() {
         floor: 0,
         hasBalcony: false,
         address: post.property?.address ?? "Địa chỉ đang cập nhật",
-        image: post.images?.find((image) => image.isPrimary)?.imageUrl ?? post.images?.[0]?.imageUrl ?? "",
+        image: resolveMediaUrl(post.images?.find((image) => image.isPrimary)?.imageUrl ?? post.images?.[0]?.imageUrl) ?? "/images/default-room.svg",
         verified: true,
         xPercent: 15 + ((index * 19) % 70),
         yPercent: 18 + ((index * 23) % 65),
@@ -159,6 +158,7 @@ export default function RoomsMapPage() {
   }, []);
 
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId) ?? rooms[0];
+  const mapQuery = selectedRoom?.address ?? "Việt Nam";
 
   return (
     <div className="w-full h-[calc(100vh-88px)] flex flex-col bg-[#f7f6f2] text-[#203c37] overflow-hidden">
@@ -248,6 +248,9 @@ export default function RoomsMapPage() {
                     src={room.image}
                     alt={room.title}
                     className="size-20 rounded-[8px] object-cover shrink-0"
+                    onError={(event) => {
+                      event.currentTarget.src = "/images/default-room.svg";
+                    }}
                   />
 
                   {/* Info */}
@@ -316,12 +319,18 @@ export default function RoomsMapPage() {
             </button>
           </div>
 
-          {/* SVG Map Background simulating Saigon River & Major Roads */}
+          {/* Google Maps is used when a browser key is configured; the link fallback keeps the map usable without exposing credentials. */}
           <div
             className="w-full h-full relative transition-transform duration-300"
             style={{ transform: `scale(${zoomLevel / 100})` }}
           >
-            <svg
+            <iframe
+              title="Bản đồ phòng trọ"
+              className="h-full w-full border-0"
+              loading="lazy"
+              src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`}
+            />
+            {false && <svg
               className="w-full h-full"
               viewBox="0 0 1000 700"
               fill="none"
@@ -386,37 +395,8 @@ export default function RoomsMapPage() {
               <text x="290" y="504" fill="#203c37" fontSize="12" fontWeight="700">
                 Hồ Con Rùa — Quận 1
               </text>
-            </svg>
+            </svg>}
 
-            {/* Interactive Room Price Pins on Map */}
-            {rooms.map((room) => {
-              const isSelected = room.id === selectedRoomId;
-              return (
-                <div
-                  key={room.id}
-                  onClick={() => setSelectedRoomId(room.id)}
-                  style={{
-                    left: `${room.xPercent}%`,
-                    top: `${room.yPercent}%`,
-                  }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-200 z-10 ${
-                    isSelected ? "scale-115 z-30" : "hover:scale-110"
-                  }`}
-                >
-                  {/* Pin Bubble */}
-                  <div
-                    className={`px-3 py-1.5 rounded-[100px] font-bold text-[13px] shadow-lg flex items-center gap-1.5 transition-colors border ${
-                      isSelected
-                        ? "bg-[#15594f] text-white border-white ring-4 ring-[#15594f]/25"
-                        : "bg-white text-[#203c37] border-[#e2e7e1] hover:border-[#15594f]"
-                    }`}
-                  >
-                    <Building className="size-3.5 shrink-0" />
-                    <span>{room.formattedPrice}</span>
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
           {/* Active Room Floating Preview Card at Bottom Right */}
@@ -427,6 +407,9 @@ export default function RoomsMapPage() {
                   src={selectedRoom.image}
                   alt={selectedRoom.title}
                   className="w-full h-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src = "/images/default-room.svg";
+                  }}
                 />
                 <div className="absolute top-2 left-2">
                   <Badge variant="success" size="sm">

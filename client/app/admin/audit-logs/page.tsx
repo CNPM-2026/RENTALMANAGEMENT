@@ -25,7 +25,7 @@ export default function AdminAuditLogsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-[12px] text-[#74817b]">Quản trị hệ thống</p>
-          <h1 className="text-[26px] font-semibold text-[#203c37] mt-0.5">Nhật ký Hoạt động (Audit Logs)</h1>
+          <h1 className="text-[26px] font-semibold text-[#203c37] mt-0.5">Nhật ký hoạt động</h1>
           <p className="text-[14px] text-[#74817b] mt-0.5">Lưu vết toàn bộ thao tác quản trị, phê duyệt và thay đổi dữ liệu trên hệ thống.</p>
         </div>
       </div>

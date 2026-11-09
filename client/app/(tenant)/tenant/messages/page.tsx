@@ -24,12 +24,15 @@ export default function TenantMessagesPage() {
       const params = new URLSearchParams(window.location.search);
       const requested = params.get("conversation");
       const target = params.get("user");
-      setSelectedId(items.find((item) => item.id === requested || item.members.some((member) => member.userId === target))?.id ?? items[0]?.id ?? null);
+      const requestedConversation = items.find((item) => item.id === requested || (target && item.members.length === 2 && item.members.some((member) => member.userId === target)));
+      const latestConversation = items.find((item) => (item.messages?.length ?? 0) > 0) ?? items[0];
+      setSelectedId(requestedConversation?.id ?? (target ? null : latestConversation?.id ?? null));
     }).catch(() => setError("Không tải được hội thoại."));
   }, []);
 
   React.useEffect(() => {
     if (!selectedId) return;
+    setMessages([]);
     apiClient.chats.getMessages(selectedId).then((items) => setMessages([...items].reverse())).catch(() => setError("Không tải được tin nhắn."));
     const socket = refreshChatSocketAuth();
     const onMessage = (message: Message) => { if (message.conversationId === selectedId) setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]); };

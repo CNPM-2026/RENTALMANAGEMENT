@@ -7,8 +7,8 @@ export const appointmentService = {
   createAppointment: async (tenantId: string, data: any) => {
     const { roomId, postId, appointmentTime, note } = data;
     const parsedAppointmentTime = new Date(appointmentTime);
-    if (Number.isNaN(parsedAppointmentTime.getTime()) || parsedAppointmentTime <= new Date()) {
-      throw new AppError('Thời gian xem phòng phải nằm trong tương lai', 400);
+    if (Number.isNaN(parsedAppointmentTime.getTime()) || parsedAppointmentTime.getTime() < Date.now() + 60 * 60 * 1000) {
+      throw new AppError('Thời gian xem phòng phải cách thời điểm hiện tại ít nhất 1 tiếng', 400);
     }
 
     let landlordId = '';
@@ -133,9 +133,18 @@ export const appointmentService = {
       throw new AppError(`Không thể chuyển lịch hẹn từ ${appt.status} sang ${status}`, 400);
     }
 
-    return await prisma.appointment.update({
+    const updatedAppointment = await prisma.appointment.update({
       where: { id: appointmentId },
       data: { status }
     });
+    const recipientId = userId === appt.tenantId ? appt.landlordId : appt.tenantId;
+    await notificationService.createNotification(
+      recipientId,
+      'Cập nhật lịch hẹn',
+      `Lịch hẹn xem phòng đã được cập nhật: ${status.toLowerCase()}.`,
+      'APPOINTMENT',
+      appt.id
+    );
+    return updatedAppointment;
   }
 };

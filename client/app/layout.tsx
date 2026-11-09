@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     "tìm phòng trọ",
     "chủ trọ",
   ],
-  authors: [{ name: "5K-Rental Manager Team" }],
+  authors: [{ name: "Đội ngũ 5K-Rental Manager" }],
   icons: {
     icon: "/favicon.ico",
   },

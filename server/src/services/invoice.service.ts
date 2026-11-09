@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { notificationService } from './notification.service';
 
 // Tạm thời fix cứng đơn giá (sau này có thể thêm vào bảng Property/Room)
 const ELECTRICITY_PRICE = 3500; // VNĐ / kWh
@@ -49,7 +50,7 @@ export const invoiceService = {
     const dueDate = new Date(year, month - 1, 10); 
 
     // 6. Tạo hóa đơn
-    return await prisma.invoice.create({
+    const invoice = await prisma.invoice.create({
       data: {
         roomId,
         tenantId: contract.tenantId,
@@ -68,6 +69,14 @@ export const invoiceService = {
         tenant: { select: { fullName: true } }
       }
     });
+    await notificationService.createNotification(
+      contract.tenantId,
+      'Hóa đơn mới',
+      `Hóa đơn tháng ${month}/${year} của phòng ${invoice.room.roomNumber} đã được tạo.`,
+      'INVOICE',
+      invoice.id
+    );
+    return invoice;
   },
 
   // Lấy danh sách hóa đơn (Dùng cho cả Chủ trọ và Người thuê)
@@ -105,9 +114,17 @@ export const invoiceService = {
     }
     if (invoice.status === 'PAID') throw new AppError('Hóa đơn này đã được thanh toán', 400);
 
-    return await prisma.invoice.update({
+    const paidInvoice = await prisma.invoice.update({
       where: { id: invoiceId },
       data: { status: 'PAID', paidAt: new Date() }
     });
+    await notificationService.createNotification(
+      invoice.tenantId,
+      'Hóa đơn đã thanh toán',
+      `Hóa đơn tháng ${invoice.month}/${invoice.year} đã được xác nhận thanh toán.`,
+      'INVOICE',
+      invoice.id
+    );
+    return paidInvoice;
   }
 };

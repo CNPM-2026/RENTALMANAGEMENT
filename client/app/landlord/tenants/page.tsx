@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Users, Search, Phone, Mail, MessageSquare, DoorOpen, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Contract } from "@/types/models";
@@ -10,6 +11,7 @@ export default function LandlordTenantsPage() {
   const [contracts, setContracts] = React.useState<Contract[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
+  const router = useRouter();
 
   React.useEffect(() => {
     apiClient.contracts
@@ -98,13 +100,17 @@ export default function LandlordTenantsPage() {
               </div>
 
               <div className="mt-5 pt-3 border-t border-[#e2e7e1] flex items-center justify-between">
-                <Link
-                  href="/landlord/messages"
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const conversation = await apiClient.chats.getOrCreateConversationWithUser(item.tenantId);
+                    router.push(`/landlord/messages?conversation=${conversation.id}`);
+                  }}
                   className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#15594f] hover:underline"
                 >
                   <MessageSquare className="size-3.5" />
                   <span>Nhắn tin</span>
-                </Link>
+                </button>
                 <Link
                   href={`/tenant/contracts/${item.id}`}
                   className="text-[12px] text-[#74817b] hover:text-[#203c37] hover:underline"

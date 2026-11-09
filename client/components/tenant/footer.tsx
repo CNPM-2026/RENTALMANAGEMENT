@@ -8,7 +8,7 @@ export function Footer() {
       title: "Khám phá phòng",
       links: [
         { label: "Phòng trọ sinh viên", href: "/rooms?type=STUDENT" },
-        { label: "Căn hộ mini Studio", href: "/rooms?type=STUDIO" },
+        { label: "Căn hộ mini", href: "/rooms?type=STUDIO" },
         { label: "Chung cư nguyên căn", href: "/rooms?type=APARTMENT" },
         { label: "Tìm bạn ở ghép", href: "/roommates" },
         { label: "Bản đồ phòng trọ", href: "/rooms/map" },

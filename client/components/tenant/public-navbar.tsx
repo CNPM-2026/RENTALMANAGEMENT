@@ -21,6 +21,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
+import { translateRole } from "@/lib/labels";
+import { useNotifications } from "@/hooks/use-notifications";
 
 interface PublicNavbarProps {
   currentUser?: {
@@ -41,6 +43,7 @@ export function PublicNavbar({
   const currentPath = pathname ?? "";
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = React.useState(false);
+  const { unreadCount } = useNotifications(Boolean(currentUser));
 
   const navLinks = [
     { label: "Trang chủ", href: "/", icon: Home },
@@ -119,7 +122,7 @@ export function PublicNavbar({
                 className="size-10 rounded-[8px] border border-[#e2e7e1] flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors relative"
               >
                 <Bell className="size-5" />
-                <span className="absolute top-2 right-2 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />
+                {unreadCount > 0 && <span className="absolute top-2 right-2 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />}
               </Link>
 
               {/* User Dropdown Pill */}
@@ -138,7 +141,7 @@ export function PublicNavbar({
                       {currentUser.fullName}
                     </p>
                     <p className="text-[10px] text-[#74817b] uppercase mt-0.5">
-                      {currentUser.role}
+                      {translateRole(currentUser.role)}
                     </p>
                   </div>
                   <ChevronDown className="size-3.5 text-[#74817b]" />

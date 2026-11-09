@@ -77,7 +77,7 @@ export default function TenantHomePage() {
         address: post.property?.address ?? "Chưa cập nhật địa chỉ",
         price: post.room?.priceMonthly ?? post.price ?? 0,
         deposit: post.room?.priceMonthly ?? 0,
-        image: post.images?.find((image) => image.isPrimary)?.imageUrl ?? post.images?.[0]?.imageUrl ?? "/placeholder-room.jpg",
+        image: post.images?.find((image) => image.isPrimary)?.imageUrl ?? post.images?.[0]?.imageUrl ?? "/images/default-room.svg",
         badge: "ĐANG CHO THUÊ",
         rating: 0,
       }))))
@@ -289,7 +289,7 @@ export default function TenantHomePage() {
                   >
                     <option value="">Tất cả loại hình</option>
                     <option value="ROOM">Phòng trọ gác lửng</option>
-                    <option value="STUDIO">Căn hộ mini Studio</option>
+                    <option value="STUDIO">Căn hộ mini</option>
                     <option value="APARTMENT">Chung cư nguyên căn</option>
                   </select>
                 </div>

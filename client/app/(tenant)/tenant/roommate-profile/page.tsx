@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { apiClient } from "@/lib/api";
 import { RoommatePreference, UserWithProfile } from "@/types/models";
+import administrativeData from "@/data/vietnam-administrative-hierarchy.json";
 
-const DEFAULT_PREFERRED_DISTRICT = "Quận 1";
 const DEFAULT_SLEEP_SCHEDULE = "22:00";
 const DEFAULT_CLEANLINESS_LEVEL = 3;
 const DEFAULT_PET_ALLOWED = false;
@@ -52,7 +52,18 @@ export default function TenantRoommateProfilePage() {
   // Form State
   const [budgetMin, setBudgetMin] = React.useState("");
   const [budgetMax, setBudgetMax] = React.useState("");
-  const [preferredDistrict, setPreferredDistrict] = React.useState(DEFAULT_PREFERRED_DISTRICT);
+  const [preferredProvince, setPreferredProvince] = React.useState("");
+  const [preferredDistrict, setPreferredDistrict] = React.useState("");
+  const [preferredWard, setPreferredWard] = React.useState("");
+  const [hasRoom, setHasRoom] = React.useState(false);
+  const [currentProvince, setCurrentProvince] = React.useState("");
+  const [currentDistrict, setCurrentDistrict] = React.useState("");
+  const [currentWard, setCurrentWard] = React.useState("");
+  const [currentAddress, setCurrentAddress] = React.useState("");
+  const [currentRent, setCurrentRent] = React.useState("");
+  const [currentArea, setCurrentArea] = React.useState("");
+  const [currentOccupants, setCurrentOccupants] = React.useState("");
+  const [roommateSlots, setRoommateSlots] = React.useState("");
   const [moveInDate, setMoveInDate] = React.useState("");
   const [sleepSchedule, setSleepSchedule] = React.useState(DEFAULT_SLEEP_SCHEDULE);
   const [cleanlinessLevel, setCleanlinessLevel] = React.useState<number | null>(DEFAULT_CLEANLINESS_LEVEL);
@@ -66,6 +77,14 @@ export default function TenantRoommateProfilePage() {
   const [currentUser, setCurrentUser] = React.useState<UserWithProfile | null>(null);
   const [minMoveInDate, setMinMoveInDate] = React.useState("");
   const [todayDate, setTodayDate] = React.useState("");
+  const selectedPreferredProvince = React.useMemo(
+    () => administrativeData.data.find((province) => province.name.local === preferredProvince),
+    [preferredProvince],
+  );
+  const selectedCurrentProvince = React.useMemo(
+    () => administrativeData.data.find((province) => province.name.local === currentProvince),
+    [currentProvince],
+  );
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -80,7 +99,19 @@ export default function TenantRoommateProfilePage() {
         if (!value) return;
         setBudgetMin(value.budgetMin == null ? "" : String(value.budgetMin));
         setBudgetMax(value.budgetMax == null ? "" : String(value.budgetMax));
-        setPreferredDistrict(value.preferredDistrict ?? DEFAULT_PREFERRED_DISTRICT);
+        setPreferredProvince(value.preferredProvince ?? "");
+        setPreferredDistrict(value.preferredDistrict ?? "");
+        setPreferredWard(value.preferredWard ?? "");
+        setHasRoom(value.hasRoom ?? false);
+        setCurrentProvince(value.currentProvince ?? "");
+        setCurrentDistrict(value.currentDistrict ?? "");
+        setCurrentWard(value.currentWard ?? "");
+        setCurrentAddress(value.currentAddress ?? "");
+        setCurrentRent(value.currentRent == null ? "" : String(value.currentRent));
+        setCurrentArea(value.currentArea == null ? "" : String(value.currentArea));
+        setCurrentOccupants(value.currentOccupants == null ? "" : String(value.currentOccupants));
+        setRoommateSlots(value.roommateSlots == null ? "" : String(value.roommateSlots));
+        if (value.moveInDate) setMoveInDate(value.moveInDate.slice(0, 10));
         setSleepSchedule(value.sleepSchedule ?? DEFAULT_SLEEP_SCHEDULE);
         setCleanlinessLevel(value.cleanlinessLevel ?? DEFAULT_CLEANLINESS_LEVEL);
         setPetAllowed(value.petAllowed ?? DEFAULT_PET_ALLOWED);
@@ -139,6 +170,18 @@ export default function TenantRoommateProfilePage() {
         ...(budgetMin ? { budgetMin: Number(budgetMin) } : {}),
         ...(budgetMax ? { budgetMax: Number(budgetMax) } : {}),
         preferredDistrict,
+        preferredProvince,
+        preferredWard,
+        hasRoom,
+        ...(currentProvince ? { currentProvince } : {}),
+        ...(currentDistrict ? { currentDistrict } : {}),
+        ...(currentWard ? { currentWard } : {}),
+        ...(currentAddress ? { currentAddress } : {}),
+        ...(currentRent ? { currentRent: Number(currentRent) } : {}),
+        ...(currentArea ? { currentArea: Number(currentArea) } : {}),
+        ...(currentOccupants ? { currentOccupants: Number(currentOccupants) } : {}),
+        ...(roommateSlots ? { roommateSlots: Number(roommateSlots) } : {}),
+        moveInDate,
         ...(cleanlinessLevel === null ? {} : { cleanlinessLevel }),
         sleepSchedule,
         ...(petAllowed === null ? {} : { petAllowed }),
@@ -246,30 +289,109 @@ export default function TenantRoommateProfilePage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5 text-left">
-                    <label className="block text-[13px] font-medium text-[#203c37]">Khu vực quận/huyện ưu tiên</label>
+                    <label className="block text-[13px] font-medium text-[#203c37]">Tỉnh/thành phố ưu tiên</label>
                     <select
-                      value={preferredDistrict}
-                      onChange={(e) => setPreferredDistrict(e.target.value)}
+                      value={preferredProvince}
+                      onChange={(e) => {
+                        setPreferredProvince(e.target.value);
+                        setPreferredWard("");
+                      }}
                       className="w-full min-h-[48px] px-3.5 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] outline-none"
                     >
-                      <option value="Quận 1">Quận 1</option>
-                      <option value="Quận 3">Quận 3</option>
-                      <option value="Quận 10">Quận 10</option>
-                      <option value="Bình Thạnh">Bình Thạnh</option>
-                      <option value="Phú Nhuận">Phú Nhuận</option>
-                      <option value="Quận 7">Quận 7</option>
+                      <option value="">Chọn tỉnh/thành phố</option>
+                      {administrativeData.data.map((province) => (
+                        <option key={province.id} value={province.name.local}>{province.name.local}</option>
+                      ))}
                     </select>
                   </div>
+                </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 text-left">
+                    <label className="block text-[13px] font-medium text-[#203c37]">Phường/xã/đặc khu ưu tiên</label>
+                    <select
+                      value={preferredWard}
+                      onChange={(e) => setPreferredWard(e.target.value)}
+                      disabled={!selectedPreferredProvince}
+                      className="w-full min-h-[48px] px-3.5 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] outline-none disabled:bg-[#f4f6f3]"
+                    >
+                      <option value="">Chọn phường/xã/đặc khu</option>
+                      {selectedPreferredProvince?.ward.map((ward) => (
+                        <option key={ward.id} value={ward.name.local}>{ward.name.local}</option>
+                      ))}
+                    </select>
+                  </div>
                   <Input
-                    label="Ngày dự kiến dọn vào"
-                    type="date"
-                    value={moveInDate}
-                    min={minMoveInDate}
-                    onChange={(e) => handleMoveInDateChange(e.target.value)}
-                    error={moveInDate && todayDate && moveInDate <= todayDate ? "Ngày phải sau ngày hiện tại." : undefined}
-                    required
+                    label="Quận/huyện cũ (nếu cần tìm theo dữ liệu cũ)"
+                    value={preferredDistrict}
+                    onChange={(e) => setPreferredDistrict(e.target.value)}
+                    placeholder="Ví dụ: Quận 1"
                   />
+                </div>
+
+                <Input
+                  label="Ngày dự kiến dọn vào"
+                  type="date"
+                  value={moveInDate}
+                  min={minMoveInDate}
+                  onChange={(e) => handleMoveInDateChange(e.target.value)}
+                  error={moveInDate && todayDate && moveInDate <= todayDate ? "Ngày phải sau ngày hiện tại." : undefined}
+                  required
+                />
+
+                <div className="border-t border-[#e2e7e1] pt-5 space-y-4">
+                  <div>
+                    <h4 className="text-[15px] font-semibold text-[#203c37]">Thông tin phòng hiện có (không bắt buộc)</h4>
+                    <p className="text-[12px] text-[#74817b] mt-1">Điền để người phù hợp biết bạn đang có phòng và hệ thống ghép chính xác hơn.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHasRoom((value) => !value)}
+                    className={`w-full rounded-[8px] border p-3 text-left text-[13px] font-medium transition-colors ${hasRoom ? "border-[#15594f] bg-[#eaf2ed] text-[#15594f]" : "border-[#e2e7e1] text-[#74817b]"}`}
+                  >
+                    {hasRoom ? "Đang có phòng và muốn tìm bạn ở ghép" : "Chưa có phòng, đang tìm phòng cùng bạn"}
+                  </button>
+                  {hasRoom && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-1.5 text-left">
+                          <label className="block text-[13px] font-medium text-[#203c37]">Tỉnh/thành phố hiện tại</label>
+                          <select
+                            value={currentProvince}
+                            onChange={(e) => { setCurrentProvince(e.target.value); setCurrentWard(""); }}
+                            className="w-full min-h-[48px] px-3.5 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] outline-none"
+                          >
+                            <option value="">Chọn tỉnh/thành phố</option>
+                            {administrativeData.data.map((province) => (
+                              <option key={province.id} value={province.name.local}>{province.name.local}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <Input label="Quận/huyện cũ" value={currentDistrict} onChange={(e) => setCurrentDistrict(e.target.value)} />
+                        <div className="space-y-1.5 text-left">
+                          <label className="block text-[13px] font-medium text-[#203c37]">Phường/xã/đặc khu</label>
+                          <select
+                            value={currentWard}
+                            onChange={(e) => setCurrentWard(e.target.value)}
+                            disabled={!selectedCurrentProvince}
+                            className="w-full min-h-[48px] px-3.5 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] outline-none disabled:bg-[#f4f6f3]"
+                          >
+                            <option value="">Chọn phường/xã/đặc khu</option>
+                            {selectedCurrentProvince?.ward.map((ward) => (
+                              <option key={ward.id} value={ward.name.local}>{ward.name.local}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <Input label="Địa chỉ phòng" value={currentAddress} onChange={(e) => setCurrentAddress(e.target.value)} placeholder="Số nhà, tên đường..." />
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <Input label="Giá phòng hiện tại (VNĐ/tháng)" type="number" value={currentRent} onChange={(e) => setCurrentRent(e.target.value)} />
+                        <Input label="Diện tích (m²)" type="number" min="1" value={currentArea} onChange={(e) => setCurrentArea(e.target.value)} />
+                        <Input label="Số người đang ở" type="number" min="1" value={currentOccupants} onChange={(e) => setCurrentOccupants(e.target.value)} />
+                      </div>
+                      <Input label="Số chỗ muốn tìm thêm" type="number" min="1" value={roommateSlots} onChange={(e) => setRoommateSlots(e.target.value)} />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end pt-2">
@@ -478,7 +600,7 @@ export default function TenantRoommateProfilePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[#74817b]">Khu vực:</span>
-                <strong className="text-[#203c37]">{preferredDistrict}</strong>
+                <strong className="text-[#203c37]">{[preferredProvince, preferredDistrict, preferredWard].filter(Boolean).join(" - ") || "Chưa cập nhật"}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#74817b]">Giờ ngủ:</span>

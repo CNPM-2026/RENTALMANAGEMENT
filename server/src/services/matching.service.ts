@@ -55,6 +55,16 @@ export const matchingService = {
       preferredProvince,
       preferredDistrict,
       preferredWard,
+      hasRoom,
+      currentProvince,
+      currentDistrict,
+      currentWard,
+      currentAddress,
+      currentRent,
+      currentArea,
+      currentOccupants,
+      roommateSlots,
+      moveInDate,
       smokingAllowed,
       petAllowed,
       cleanlinessLevel,
@@ -72,6 +82,16 @@ export const matchingService = {
         preferredProvince,
         preferredDistrict,
         preferredWard,
+        hasRoom,
+        currentProvince,
+        currentDistrict,
+        currentWard,
+        currentAddress,
+        currentRent,
+        currentArea,
+        currentOccupants,
+        roommateSlots,
+        moveInDate,
         smokingAllowed,
         petAllowed,
         cleanlinessLevel,
@@ -87,6 +107,16 @@ export const matchingService = {
         preferredProvince,
         preferredDistrict,
         preferredWard,
+        hasRoom,
+        currentProvince,
+        currentDistrict,
+        currentWard,
+        currentAddress,
+        currentRent,
+        currentArea,
+        currentOccupants,
+        roommateSlots,
+        moveInDate,
         smokingAllowed,
         petAllowed,
         cleanlinessLevel,
@@ -121,12 +151,7 @@ export const matchingService = {
       }
     });
 
-    if (!myInfo || myInfo.lifestyleAnswers.length === 0) {
-      throw new AppError(
-        'Bạn cần hoàn thành bài khảo sát thói quen sinh hoạt trước',
-        400
-      );
-    }
+    if (!myInfo) throw new AppError('Không tìm thấy người dùng', 404);
 
     // B2. Map đáp án của mình theo questionId
     // Map: questionId -> { score, weight }
@@ -167,9 +192,9 @@ export const matchingService = {
       const candidate = post.author;
       const candidatePreferences = candidate.roommatePreference;
       const price = post.price === null ? null : Number(post.price);
-      const province = post.property?.province ?? candidatePreferences?.preferredProvince;
-      const district = post.property?.district ?? candidatePreferences?.preferredDistrict;
-      const ward = post.property?.ward ?? candidatePreferences?.preferredWard;
+      const province = post.property?.province ?? (candidatePreferences?.hasRoom ? candidatePreferences.currentProvince : undefined) ?? candidatePreferences?.preferredProvince;
+      const district = post.property?.district ?? (candidatePreferences?.hasRoom ? candidatePreferences.currentDistrict : undefined) ?? candidatePreferences?.preferredDistrict;
+      const ward = post.property?.ward ?? (candidatePreferences?.hasRoom ? candidatePreferences.currentWard : undefined) ?? candidatePreferences?.preferredWard;
 
       if (myPreferences?.budgetMin !== null && myPreferences?.budgetMin !== undefined &&
         (price === null || price < Number(myPreferences.budgetMin))) return false;
@@ -204,9 +229,9 @@ export const matchingService = {
     const results = eligiblePosts.map(post => {
       const otherUser = post.author;
       const candidatePreferences = otherUser.roommatePreference;
-      const province = post.property?.province ?? candidatePreferences?.preferredProvince;
-      const district = post.property?.district ?? candidatePreferences?.preferredDistrict;
-      const ward = post.property?.ward ?? candidatePreferences?.preferredWard;
+      const province = post.property?.province ?? (candidatePreferences?.hasRoom ? candidatePreferences.currentProvince : undefined) ?? candidatePreferences?.preferredProvince;
+      const district = post.property?.district ?? (candidatePreferences?.hasRoom ? candidatePreferences.currentDistrict : undefined) ?? candidatePreferences?.preferredDistrict;
+      const ward = post.property?.ward ?? (candidatePreferences?.hasRoom ? candidatePreferences.currentWard : undefined) ?? candidatePreferences?.preferredWard;
       let matchScore = 0;
       let matchedPossibleScore = 0;
 
@@ -309,7 +334,7 @@ export const matchingService = {
     return results
       .filter(
         result =>
-          result.compatibilityPercent >= 40 &&
+          (result.compatibilityPercent >= 40 || myInfo.lifestyleAnswers.length === 0) &&
           !result.isDealBreaker
       )
       .sort(

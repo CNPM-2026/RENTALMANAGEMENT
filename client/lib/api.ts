@@ -122,6 +122,12 @@ export function getBaseApiUrl(): string {
   return `${getBaseOriginUrl()}/api/v1`;
 }
 
+export function resolveMediaUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('/uploads/')) return `${getBaseOriginUrl()}${url}`;
+  return url;
+}
+
 /**
  * Resolves the full URL, injecting base URL and /api/v1 prefix if missing.
  */
@@ -278,6 +284,9 @@ async function requestUncoalesced<T = unknown>(path: string, options: RequestOpt
   if (!response.ok) {
     const errorBody = responseData as ApiErrorResponse;
     const message = errorBody?.message || response.statusText || 'Lỗi kết nối máy chủ';
+    if (response.status === 403 && typeof window !== 'undefined' && window.location.pathname !== '/403') {
+      window.location.replace('/403');
+    }
     throw new ApiError(message, response.status, errorBody?.errors, responseData);
   }
 
@@ -495,6 +504,15 @@ export const apiClient = {
       apiClient.post<Conversation>('/chats/conversations', payload),
     getMyConversations: () =>
       apiClient.get<Conversation[]>('/chats/conversations'),
+    findConversationWithUser: async (targetUserId: string) => {
+      const conversations = await apiClient.chats.getMyConversations();
+      return conversations.find((conversation) =>
+        conversation.members.length === 2
+        && conversation.members.some((member) => member.userId === targetUserId)
+      ) ?? null;
+    },
+    getOrCreateConversationWithUser: (targetUserId: string) =>
+      apiClient.chats.getOrCreateConversation({ targetUserId }),
     getMessages: (conversationId: string, query?: { page?: number; limit?: number }) =>
       apiClient.get<Message[]>(`/chats/conversations/${conversationId}/messages`, query),
   },
@@ -513,6 +531,8 @@ export const apiClient = {
   reports: {
     create: (payload: CreateReportPayload) =>
       apiClient.post<Report>('/reports', payload),
+    getMy: () =>
+      apiClient.get<Report[]>('/reports/my'),
     getAll: (query?: { status?: string }) =>
       apiClient.get<Report[]>('/reports', query),
     resolve: (id: string, payload: ResolveReportPayload) =>
