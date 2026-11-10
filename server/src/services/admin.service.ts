@@ -82,19 +82,40 @@ export const adminService = {
 
   updateUserStatus: async (adminId: string, userId: string, isActive: boolean) => {
     if (adminId === userId) throw new AppError('Không thể tự khóa tài khoản admin hiện tại', 400);
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (!user) throw new AppError('Không tìm thấy người dùng', 404);
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { isActive },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        isActive: true,
-      },
+
+    // Đổi trạng thái và thu hồi refresh token trong CÙNG một transaction, cùng
+    // thứ tự khóa users -> refresh_tokens với luồng cấp phiên. Nhờ vậy không có
+    // phiên nào chen được vào giữa hai bước (và ngược lại).
+    const updated = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM users WHERE id = ${userId} FOR UPDATE
+      `;
+      if (locked.length !== 1) throw new AppError('Không tìm thấy người dùng', 404);
+
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { isActive },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          isActive: true,
+        },
+      });
+
+      if (!isActive) {
+        await tx.refreshToken.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+
+      return user;
     });
+
+    // Audit ghi SAU khi transaction commit: lỗi ghi log không được rollback việc
+    // khóa tài khoản (giữ nguyên hành vi đã được duyệt của các luồng admin khác).
     await auditService.record({ userId: adminId, action: isActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', entityType: 'User', entityId: userId });
     return updated;
   },

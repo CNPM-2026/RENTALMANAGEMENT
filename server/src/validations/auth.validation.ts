@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { normalizeEmail } from '../utils/email';
 
 // Validate cho Đăng ký
 export const registerSchema = z.object({
-  email: z.string().email('Email không đúng định dạng'),
+  email: z.string().email('Email không đúng định dạng').transform(normalizeEmail),
   password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
   fullName: z.string().min(2, 'Họ tên phải có ít nhất 2 ký tự').max(50, 'Họ tên quá dài'),
   phone: z.string()
@@ -14,17 +15,17 @@ export const registerSchema = z.object({
 
 // Validate cho Đăng nhập
 export const loginSchema = z.object({
-  email: z.string().email('Email không đúng định dạng'),
+  email: z.string().email('Email không đúng định dạng').transform(normalizeEmail),
   password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
 });
 
 export const refreshTokenSchema = z.object({ refreshToken: z.string().min(20) });
-export const forgotPasswordSchema = z.object({ email: z.string().email() });
+export const forgotPasswordSchema = z.object({ email: z.string().email().transform(normalizeEmail) });
 export const resetPasswordSchema = z.object({
   token: z.string().min(20),
   password: z.string().min(6),
 });
 export const verifyEmailSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform(normalizeEmail),
   code: z.string().regex(/^\d{6}$/, 'Mã OTP phải gồm 6 chữ số'),
 });
