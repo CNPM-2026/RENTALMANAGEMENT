@@ -1,8 +1,7 @@
 
 import { Request, Response, NextFunction } from 'express';
-import { authService } from '../services/auth.service';
+import { authService, findUserByEmailOrNull } from '../services/auth.service';
 import { auditService } from '../services/audit.service';
-import prisma from '../config/db';
 import { env } from '../config/env';
 
 export const authController = {
@@ -105,7 +104,7 @@ export const authController = {
 
   resendVerification: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const user = await prisma.user.findUnique({ where: { email: req.body.email }, select: { id: true, email: true } });
+      const user = await findUserByEmailOrNull(req.body.email);
       if (user) await authService.sendEmailVerification(user.id, user.email);
       return res.json({ success: true, message: 'Nếu email tồn tại, mã xác minh mới đã được gửi' });
     } catch (error) { return next(error); }
