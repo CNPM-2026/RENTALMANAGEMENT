@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { clearAuthSession, getCurrentUser } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
 import { useNotifications } from "@/hooks/use-notifications";
+import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
 
 export function LandlordTopbar() {
   const pathname = usePathname();
@@ -81,6 +82,9 @@ export function LandlordTopbar() {
             <UserRound className="size-4" />
             <span>Khu người thuê</span>
           </Link>
+
+          {/* Chat Messenger (Next to Notifications) */}
+          <TopbarChatButton />
 
           {/* Notification Bell */}
           <Link

@@ -16,13 +16,13 @@ export const adminController = {
   updatePostStatus: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { status } = req.body; // APPROVED hoặc REJECTED
-      
+      const { status, reason } = req.body; // APPROVED hoặc REJECTED
+
       if (!['APPROVED', 'REJECTED'].includes(status)) {
         return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ' });
       }
 
-      const result = await adminService.updatePostStatus(String(id), status as PostStatus);
+      const result = await adminService.updatePostStatus(String(id), status as PostStatus, reason ? String(reason) : undefined);
       return res.status(200).json({ 
         success: true, 
         message: `Đã ${status === 'APPROVED' ? 'duyệt' : 'từ chối'} bài đăng`,

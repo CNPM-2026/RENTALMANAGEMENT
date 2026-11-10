@@ -20,7 +20,7 @@ export const adminService = {
   },
 
   // Duyệt hoặc từ chối bài
-  updatePostStatus: async (postId: string, status: PostStatus) => {
+  updatePostStatus: async (postId: string, status: PostStatus, reason?: string) => {
     const post = await prisma.post.findUnique({
       where: { id: postId }
     });
@@ -42,10 +42,13 @@ export const adminService = {
         postId
       );
     } else if (status === 'REJECTED') {
+      const content = reason
+        ? `Bài đăng "${post.title}" của bạn đã bị từ chối duyệt. Lý do: ${reason}`
+        : `Bài đăng "${post.title}" của bạn đã bị từ chối duyệt. Vui lòng kiểm tra lại nội dung và hình ảnh.`;
       await notificationService.createNotification(
         post.authorId,
         'Bài đăng bị từ chối',
-        `Bài đăng "${post.title}" của bạn đã bị từ chối duyệt.`,
+        content,
         'POST_REJECTED',
         postId
       );

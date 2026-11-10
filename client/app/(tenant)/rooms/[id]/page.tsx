@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
   MapPin,
@@ -23,12 +24,12 @@ import {
   Flag,
   Images,
   X,
+  XCircle,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Modal } from "@/components/ui/modal";
 import { apiClient, ApiError } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
 import { Post } from "@/types/models";
@@ -64,9 +65,10 @@ function RoomDetailContent() {
         if (!(error instanceof ApiError && error.status === 403)) setIsSaved(false);
       });
   }, [roomId]);
+
   const roomName = post?.title ?? "Tin đăng";
   const roomAddress = post?.property?.address ?? "Chưa cập nhật địa chỉ";
-  const ROOM_IMAGES = roomImages;
+  const ROOM_IMAGES = roomImages.length > 0 ? roomImages : ["/images/default-room.svg"];
 
   function handleShare() {
     if (typeof window !== "undefined") {
@@ -79,6 +81,41 @@ function RoomDetailContent() {
   return (
     <div className="w-full min-h-screen bg-[#f7f6f2] text-[#203c37] py-8 px-4 sm:px-6 lg:px-12">
       <div className="max-w-[1312px] mx-auto space-y-6">
+        {post?.status === "REJECTED" && (
+          <div className="rounded-xl border border-[#f6cbc1] bg-[#fbeae6] p-4 text-[#a4422c] shadow-xs flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="rounded-md bg-[#f6cbc1] p-2 text-[#a4422c]">
+                <XCircle className="size-5" />
+              </span>
+              <div>
+                <p className="font-bold text-sm">Bài đăng đã bị từ chối duyệt</p>
+                <p className="text-xs text-[#7f3221]">
+                  Bài đăng này hiện không hiển thị công khai cho người khác. Chỉ bạn và quản trị viên mới có thể xem trang này.
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/landlord/listings/${post.id}`}
+              className="shrink-0 rounded-lg bg-[#a4422c] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#883522]"
+            >
+              Quản lý tin
+            </Link>
+          </div>
+        )}
+        {post?.status === "PENDING" && (
+          <div className="rounded-xl border border-[#f4deb4] bg-[#fbf1dc] p-4 text-[#9a6a12] shadow-xs flex items-center gap-3">
+            <span className="rounded-md bg-[#f4deb4] p-2 text-[#9a6a12]">
+              <Info className="size-5" />
+            </span>
+            <div>
+              <p className="font-bold text-sm">Bài đăng đang chờ duyệt</p>
+              <p className="text-xs text-[#7a540f]">
+                Bài đăng đang được ban quản trị kiểm duyệt trước khi hiển thị công khai.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* =======================================================================
             1. BREADCRUMBS & TOP TITLE BAR (Figma Node 44:63105)
         ======================================================================== */}
@@ -165,10 +202,13 @@ function RoomDetailContent() {
               setGalleryOpen(true);
             }}
           >
-            <img
-              src={roomImages[0] ?? "/images/default-room.svg"}
+            <Image
+              src={ROOM_IMAGES[0]}
               alt={roomName}
-              className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+              fill
+              sizes="(max-width: 1024px) 100vw, 66vw"
+              priority
+              className="object-cover group-hover:scale-103 transition-transform duration-300"
             />
             <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
           </div>
@@ -182,10 +222,12 @@ function RoomDetailContent() {
                 setGalleryOpen(true);
               }}
             >
-              <img
-                src={roomImages[1] ?? roomImages[0] ?? "/images/default-room.svg"}
+              <Image
+                src={ROOM_IMAGES[1] ?? ROOM_IMAGES[0]}
                 alt="Nội thất phòng"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                fill
+                sizes="(max-width: 1024px) 0px, 33vw"
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
             </div>
             <div
@@ -195,15 +237,17 @@ function RoomDetailContent() {
                 setGalleryOpen(true);
               }}
             >
-              <img
-                src={roomImages[2] ?? roomImages[0] ?? "/images/default-room.svg"}
+              <Image
+                src={ROOM_IMAGES[2] ?? ROOM_IMAGES[0]}
                 alt="Góc làm việc"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                fill
+                sizes="(max-width: 1024px) 0px, 33vw"
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white backdrop-blur-[1px] group-hover:bg-black/50 transition-colors">
                 <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-[8px] bg-white/20 backdrop-blur-md text-[13px] font-semibold">
                   <Images className="size-4" />
-                  <span>Xem toàn bộ 5 ảnh</span>
+                  <span>Xem toàn bộ {ROOM_IMAGES.length} ảnh</span>
                 </div>
               </div>
             </div>
@@ -542,10 +586,13 @@ function RoomDetailContent() {
           </button>
 
           <div className="relative max-w-4xl max-h-[80vh] flex items-center justify-center">
-            <img
-              src={ROOM_IMAGES[activeImageIndex]}
+            <Image
+              src={ROOM_IMAGES[activeImageIndex] ?? ROOM_IMAGES[0]}
               alt={`Ảnh chi tiết ${activeImageIndex + 1}`}
-              className="max-w-full max-h-[75vh] object-contain rounded-[8px]"
+              width={1600}
+              height={1200}
+              sizes="(max-width: 1024px) 100vw, 80vw"
+              className="w-auto h-auto max-w-full max-h-[75vh] object-contain rounded-[8px]"
             />
 
             {/* Prev Button */}

@@ -94,6 +94,43 @@ export const authenticate: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const authenticateOptional: RequestHandler = async (req, res, next) => {
+  const authReq = req as AuthRequest;
+  try {
+    const authHeader = authReq.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyToken(token);
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        isActive: true,
+        isEmailVerified: true,
+        createdAt: true,
+        updatedAt: true,
+        profile: true,
+      },
+    });
+
+    if (user && user.isActive) {
+      authReq.user = user;
+    }
+    return next();
+  } catch {
+    return next();
+  }
+};
+
 // Middleware phân quyền
 export const authorize = (...roles: string[]): RequestHandler => {
   return (req, res, next) => {
