@@ -10,5 +10,6 @@ router.use(authenticate);
 router.post('/conversations', validate(conversationSchema), chatController.createConversation);
 router.get('/conversations', chatController.getMyConversations);
 router.get('/conversations/:id/messages', chatController.getMessages);
+router.patch('/conversations/:id/read', chatController.markAsRead);
 
 export default router;

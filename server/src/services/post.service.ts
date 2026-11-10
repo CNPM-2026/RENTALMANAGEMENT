@@ -4,15 +4,10 @@ import { PostType, Prisma } from '@prisma/client';
 import { storageService } from './storage.service';
 
 export const postService = {
-  getById: async (postId: string) => {
-    const post = await prisma.post.findFirst({
+  getById: async (postId: string, user?: { id: string; role: string }) => {
+    const post = await prisma.post.findUnique({
       where: {
         id: postId,
-        status: 'APPROVED',
-        AND: [
-          { OR: [{ roomId: null }, { room: { status: 'AVAILABLE' } }] },
-          { OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }] },
-        ],
       },
       include: {
         images: true,
@@ -22,6 +17,23 @@ export const postService = {
       },
     });
     if (!post) throw new AppError('Không tìm thấy tin đăng', 404);
+
+    const isAuthor = user && user.id === post.authorId;
+    const isAdmin = user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN');
+
+    if (post.status !== 'APPROVED' && !isAuthor && !isAdmin) {
+      throw new AppError('Không tìm thấy tin đăng', 404);
+    }
+
+    if (!isAuthor && !isAdmin) {
+      if (post.room && post.room.status !== 'AVAILABLE') {
+        throw new AppError('Không tìm thấy tin đăng', 404);
+      }
+      if (post.expiredAt && post.expiredAt <= new Date()) {
+        throw new AppError('Không tìm thấy tin đăng', 404);
+      }
+    }
+
     return post;
   },
   createPost: async (authorId: string, data: any, files: Express.Multer.File[]) => {

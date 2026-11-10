@@ -10,6 +10,7 @@ import { clearAuthSession, getCurrentUser } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
 import { translateRole } from "@/lib/labels";
 import { useNotifications } from "@/hooks/use-notifications";
+import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
 
 export function AdminTopbar() {
   const pathname = usePathname();
@@ -95,6 +96,9 @@ export function AdminTopbar() {
             <UserRound className="size-4" />
             <span>Khu người thuê</span>
           </Link>
+
+          {/* Chat Shortcut (Next to Notification Bell) */}
+          <TopbarChatButton />
 
           {/* Security Alert Bell */}
           <Link

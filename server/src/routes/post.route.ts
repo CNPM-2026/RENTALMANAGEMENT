@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { postController } from '../controllers/post.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, authenticateOptional } from '../middlewares/auth.middleware';
 import { upload, validateUploadedImages } from '../config/multer';
 import { validate } from '../middlewares/validate.middleware';
 import { searchPostSchema } from '../validations/post.validation';
@@ -19,7 +19,7 @@ const postWriteLimiter = rateLimit({
 router.get('/', postController.getApprovedPosts);
 router.get('/search', validate(searchPostSchema, 'query'), postController.search);
 router.get('/my-posts', authenticate, postController.getMyPosts);
-router.get('/:id', postController.getById);
+router.get('/:id', authenticateOptional, postController.getById);
 router.post(
   '/',
   postWriteLimiter,

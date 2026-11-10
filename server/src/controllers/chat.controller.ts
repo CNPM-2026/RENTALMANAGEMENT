@@ -31,5 +31,15 @@ export const chatController = {
     } catch (error) {
       return next(error);
     }
+  },
+
+  markAsRead: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      await chatService.markAsRead(req.user!.id, String(id));
+      return res.status(200).json({ success: true, message: 'Đã đánh dấu đã đọc' });
+    } catch (error) {
+      return next(error);
+    }
   }
 };

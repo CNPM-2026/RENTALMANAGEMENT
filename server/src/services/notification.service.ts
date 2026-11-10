@@ -31,8 +31,17 @@ export const notificationService = {
     return await prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 20 // Lấy 20 cái mới nhất thôi
+      take: 50
     });
+  },
+
+  // Lấy chi tiết thông báo
+  getById: async (userId: string, notificationId: string) => {
+    const noti = await prisma.notification.findUnique({ where: { id: notificationId } });
+    if (!noti || noti.userId !== userId) {
+      throw new AppError('Không tìm thấy thông báo', 404);
+    }
+    return noti;
   },
 
   // Đánh dấu đã đọc

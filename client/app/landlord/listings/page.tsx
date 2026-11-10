@@ -154,7 +154,7 @@ export default function LandlordListingsPage() {
                   return (
                     <tr key={post.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
                       <td className="py-3.5 px-4 font-medium">
-                        <Link href={`/rooms/${post.id}`} className="hover:text-[#15594f] hover:underline">
+                        <Link href={`/landlord/listings/${post.id}`} className="hover:text-[#15594f] hover:underline">
                           {post.title}
                         </Link>
                       </td>
@@ -162,20 +162,22 @@ export default function LandlordListingsPage() {
                         {formatCurrency(Number(post.room?.priceMonthly ?? post.price ?? 0))}
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${st.bg} ${st.text}`}>
-                          {st.label}
-                        </span>
+                        <Link href={`/landlord/listings/${post.id}`}>
+                          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold cursor-pointer ${st.bg} ${st.text}`}>
+                            {st.label}
+                          </span>
+                        </Link>
                       </td>
                       <td className="py-3.5 px-4 text-[#74817b]">
                         {new Date(post.createdAt).toLocaleDateString("vi-VN")}
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <Link
-                          href={`/rooms/${post.id}`}
+                          href={`/landlord/listings/${post.id}`}
                           className="inline-flex items-center gap-1 text-[12px] font-medium text-[#15594f] hover:underline"
                         >
                           <Eye className="size-3.5" />
-                          <span>Xem tin</span>
+                          <span>Chi tiết</span>
                         </Link>
                         <button type="button" onClick={() => void handleDelete(post)} className="ml-3 inline-flex items-center gap-1 text-[12px] font-medium text-red-600 hover:underline">
                           <Trash2 className="size-3.5" />

@@ -338,6 +338,7 @@ export interface Conversation {
   updatedAt: string;
   members: ConversationMember[];
   messages?: Message[];
+  unreadCount?: number;
 }
 
 export interface Notification {
@@ -758,6 +759,7 @@ export interface ResolveReportPayload {
 // --- Admin Endpoints ---
 export interface ModeratePostPayload {
   status: 'APPROVED' | 'REJECTED';
+  reason?: string;
 }
 
 export interface CreateSupportTicketPayload {

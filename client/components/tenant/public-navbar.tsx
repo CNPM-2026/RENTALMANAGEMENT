@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { translateRole } from "@/lib/labels";
 import { useNotifications } from "@/hooks/use-notifications";
+import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
 
 interface PublicNavbarProps {
   currentUser?: {
@@ -114,6 +115,9 @@ export function PublicNavbar({
               >
                 <Heart className="size-5" />
               </Link>
+
+              {/* Chat shortcut (Next to Notifications) */}
+              <TopbarChatButton className="size-10 rounded-[8px] border border-[#e2e7e1]" iconClassName="size-5" />
 
               {/* Notifications shortcut */}
               <Link

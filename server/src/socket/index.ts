@@ -106,6 +106,12 @@ export const initSocket = (server: HttpServer) => {
           where: { conversationId, userId: { not: userId } },
           select: { userId: true },
         });
+
+        // Phát tin nhắn trực tiếp đến phòng riêng của từng người nhận (để cập nhật badge đỏ realtime)
+        recipients.forEach((recipient) => {
+          io.to(`user_${recipient.userId}`).emit('receive_message', newMessage);
+        });
+
         await Promise.all(recipients.map(async (recipient) => {
           try {
             await notificationService.createNotification(

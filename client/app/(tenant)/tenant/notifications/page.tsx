@@ -2,22 +2,26 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
+  CheckCircle2,
   Calendar,
   FileText,
   Receipt,
   MessageSquare,
   ChevronRight,
+  XCircle,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Notification, NotificationType } from "@/types/models";
 import { formatDate } from "@/lib/utils";
 
-type FilterTab = "ALL" | NotificationType;
+type FilterTab = "ALL" | "POST" | "APPOINTMENT" | "INVOICE" | "CONTRACT" | "MESSAGE";
 
 export default function TenantNotificationsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<FilterTab>("ALL");
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -67,6 +71,7 @@ export default function TenantNotificationsPage() {
   // Filter items by category
   const filteredNotifications = notifications.filter((item) => {
     if (activeTab === "ALL") return true;
+    if (activeTab === "POST") return item.type === "POST_REJECTED" || item.type === "POST_APPROVED";
     return item.type === activeTab;
   });
 
@@ -74,6 +79,18 @@ export default function TenantNotificationsPage() {
 
   function renderNotificationIcon(type: NotificationType) {
     switch (type) {
+      case "POST_REJECTED":
+        return (
+          <div className="size-[42px] rounded-full bg-[#fbeae6] text-[#a4422c] flex items-center justify-center shrink-0">
+            <XCircle className="size-5" />
+          </div>
+        );
+      case "POST_APPROVED":
+        return (
+          <div className="size-[42px] rounded-full bg-[#eaf2ed] text-[#15594f] flex items-center justify-center shrink-0">
+            <CheckCircle2 className="size-5" />
+          </div>
+        );
       case "APPOINTMENT":
         return (
           <div className="size-[42px] rounded-full bg-[#eaf2ed] text-[#15594f] flex items-center justify-center shrink-0">
@@ -109,6 +126,9 @@ export default function TenantNotificationsPage() {
 
   function getActionLink(type: NotificationType, refId?: string | null): string {
     switch (type) {
+      case "POST_REJECTED":
+      case "POST_APPROVED":
+        return refId ? `/rooms/${refId}` : "/rooms";
       case "APPOINTMENT":
         return "/tenant/appointments";
       case "CONTRACT":
@@ -127,7 +147,9 @@ export default function TenantNotificationsPage() {
       {/* Header */}
       <div>
         <nav className="text-[12px] text-[#74817b] flex items-center gap-1.5 mb-2">
-          <Link href="/" className="hover:text-[#203c37]">Trang chủ</Link>
+          <Link href="/" className="hover:text-[#203c37]">
+            Trang chủ
+          </Link>
           <span>/</span>
           <span>Tài khoản</span>
           <span>/</span>
@@ -139,10 +161,14 @@ export default function TenantNotificationsPage() {
               Trung tâm thông báo
             </h1>
             <p className="text-[14px] text-[#74817b] mt-1">
-              Theo dõi biến động lịch hẹn, hóa đơn thanh toán, hợp đồng và tin nhắn mới.
+              Theo dõi biến động bài đăng, lịch hẹn, hóa đơn thanh toán, hợp đồng và tin nhắn mới.
             </p>
           </div>
-          {error && <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-4 py-3 text-[14px] text-[#a4422c]">{error}</div>}
+          {error && (
+            <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-4 py-3 text-[14px] text-[#a4422c]">
+              {error}
+            </div>
+          )}
 
           {unreadCount > 0 && (
             <button
@@ -161,10 +187,26 @@ export default function TenantNotificationsPage() {
       <div className="flex border-b border-[#e2e7e1] gap-2 overflow-x-auto no-scrollbar">
         {[
           { key: "ALL", label: `Tất cả (${notifications.length})` },
-          { key: "APPOINTMENT", label: "Lịch xem phòng" },
-          { key: "INVOICE", label: "Thanh toán & Hóa đơn" },
-          { key: "CONTRACT", label: "Hợp đồng" },
-          { key: "MESSAGE", label: "Tin nhắn" },
+          {
+            key: "POST",
+            label: `Tin đăng (${notifications.filter((n) => n.type === "POST_REJECTED" || n.type === "POST_APPROVED").length})`,
+          },
+          {
+            key: "APPOINTMENT",
+            label: `Lịch xem phòng (${notifications.filter((n) => n.type === "APPOINTMENT").length})`,
+          },
+          {
+            key: "INVOICE",
+            label: `Hóa đơn (${notifications.filter((n) => n.type === "INVOICE").length})`,
+          },
+          {
+            key: "CONTRACT",
+            label: `Hợp đồng (${notifications.filter((n) => n.type === "CONTRACT").length})`,
+          },
+          {
+            key: "MESSAGE",
+            label: `Tin nhắn (${notifications.filter((n) => n.type === "MESSAGE").length})`,
+          },
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -187,56 +229,78 @@ export default function TenantNotificationsPage() {
       <div className="bg-white rounded-[12px] border border-[#e2e7e1] shadow-sm divide-y divide-[#e2e7e1] overflow-hidden">
         {isLoading && <div className="p-10 text-center text-sm text-[#74817b]">Đang tải thông báo...</div>}
         {!isLoading && filteredNotifications.length > 0 ? (
-          filteredNotifications.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => handleMarkAsRead(item.id)}
-              className={`p-5 flex items-start gap-4 transition-colors hover:bg-[#f7f6f2]/80 cursor-pointer ${
-                !item.isRead ? "bg-[#eaf2ed]/20" : ""
-              }`}
-            >
-              {renderNotificationIcon(item.type)}
+          filteredNotifications.map((item) => {
+            const actionLink = getActionLink(item.type, item.referenceId);
+            return (
+              <div
+                key={item.id}
+                onClick={() => {
+                  handleMarkAsRead(item.id);
+                  router.push(`/tenant/notifications/${item.id}`);
+                }}
+                className={`p-5 flex items-start gap-4 transition-colors hover:bg-[#f7f6f2]/80 cursor-pointer ${
+                  !item.isRead ? "bg-[#eaf2ed]/20" : ""
+                }`}
+              >
+                {renderNotificationIcon(item.type)}
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className={`text-[15px] ${!item.isRead ? "font-bold text-[#203c37]" : "font-semibold text-[#203c37]"}`}>
-                    {item.title}
-                  </h3>
-                  {!item.isRead && (
-                    <span className="size-2 rounded-full bg-[#15594f] shrink-0" aria-label="Chưa đọc" />
-                  )}
-                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3
+                      className={`text-[15px] ${
+                        !item.isRead ? "font-bold text-[#203c37]" : "font-semibold text-[#203c37]"
+                      }`}
+                    >
+                      {item.title}
+                    </h3>
+                    {!item.isRead && (
+                      <span className="size-2 rounded-full bg-[#15594f] shrink-0" aria-label="Chưa đọc" />
+                    )}
+                  </div>
 
-                <p className="text-[13px] text-[#74817b] leading-relaxed">
-                  {item.content}
-                </p>
+                  <p className="text-[13px] text-[#74817b] leading-relaxed">{item.content}</p>
 
-                <div className="mt-2.5 flex items-center justify-between text-[12px] text-[#74817b]">
-                  <span>{formatDate(item.createdAt, "datetime")}</span>
+                  <div className="mt-2.5 flex items-center justify-between text-[12px] text-[#74817b]">
+                    <span>{formatDate(item.createdAt, "datetime")}</span>
 
-                  <Link
-                    href={getActionLink(item.type, item.referenceId)}
-                    className="inline-flex items-center gap-1 font-semibold text-[#15594f] hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span>Xem chi tiết</span>
-                    <ChevronRight className="size-3.5" />
-                  </Link>
+                    <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                      <Link
+                        href={`/tenant/notifications/${item.id}`}
+                        className="text-xs text-[#74817b] hover:text-[#203c37] hover:underline"
+                      >
+                        Chi tiết thông báo
+                      </Link>
+
+                      <Link
+                        href={actionLink}
+                        className={`inline-flex items-center gap-1 font-semibold hover:underline ${
+                          item.type === "POST_REJECTED" ? "text-[#a4422c]" : "text-[#15594f]"
+                        }`}
+                      >
+                        <span>
+                          {item.type === "POST_REJECTED"
+                            ? "Xem bài viết bị từ chối"
+                            : item.type === "POST_APPROVED"
+                            ? "Xem bài viết"
+                            : "Xem chi tiết"}
+                        </span>
+                        <ChevronRight className="size-3.5" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : !isLoading ? (
           /* Empty State */
           <div className="py-16 text-center space-y-3">
             <div className="size-14 rounded-full bg-[#f2ede3] text-[#74817b] flex items-center justify-center mx-auto">
               <Bell className="size-7" />
             </div>
-            <h3 className="text-[16px] font-semibold text-[#203c37]">
-              Không có thông báo nào
-            </h3>
+            <h3 className="text-[16px] font-semibold text-[#203c37]">Không có thông báo nào</h3>
             <p className="text-[13px] text-[#74817b] max-w-sm mx-auto">
-              Khi có lịch hẹn mới, hóa đơn tiền phòng hoặc tin nhắn từ chủ trọ, thông báo sẽ hiển thị tại đây.
+              Khi có lịch hẹn mới, trạng thái duyệt bài đăng hoặc hóa đơn tiền phòng, thông báo sẽ hiển thị tại đây.
             </p>
           </div>
         ) : null}

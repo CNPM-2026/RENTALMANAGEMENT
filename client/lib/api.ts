@@ -515,12 +515,16 @@ export const apiClient = {
       apiClient.chats.getOrCreateConversation({ targetUserId }),
     getMessages: (conversationId: string, query?: { page?: number; limit?: number }) =>
       apiClient.get<Message[]>(`/chats/conversations/${conversationId}/messages`, query),
+    markAsRead: (conversationId: string) =>
+      apiClient.patch<{ message: string }>(`/chats/conversations/${conversationId}/read`),
   },
 
   // 14. Notifications
   notifications: {
     getMy: () =>
       apiClient.get<Notification[]>('/notifications'),
+    getById: (id: string) =>
+      apiClient.get<Notification>(`/notifications/${id}`),
     markAsRead: (id: string) =>
       apiClient.patch<Notification>(`/notifications/${id}/read`),
     markAllAsRead: () =>

@@ -39,9 +39,9 @@ export const chatService = {
     });
   },
 
-  // Lấy danh sách các cuộc trò chuyện của tôi (Kèm tin nhắn cuối cùng)
+  // Lấy danh sách các cuộc trò chuyện của tôi (Kèm tin nhắn cuối cùng & số tin chưa đọc)
   getMyConversations: async (userId: string) => {
-    return await prisma.conversation.findMany({
+    const list = await prisma.conversation.findMany({
       where: { members: { some: { userId } } },
       include: {
         members: { 
@@ -51,10 +51,25 @@ export const chatService = {
           take: 1, // Chỉ lấy tin nhắn mới nhất
           orderBy: { createdAt: 'desc' },
           include: { sender: { select: { fullName: true } } }
-        }
+        },
+        _count: {
+          select: {
+            messages: {
+              where: {
+                isRead: false,
+                senderId: { not: userId },
+              },
+            },
+          },
+        },
       },
       orderBy: { updatedAt: 'desc' }
     });
+
+    return list.map((conv) => ({
+      ...conv,
+      unreadCount: conv._count?.messages ?? 0,
+    }));
   },
 
   // Lấy lịch sử tin nhắn của 1 cuộc trò chuyện (Phân trang)
@@ -65,6 +80,16 @@ export const chatService = {
     });
     if (!member) throw new AppError('Bạn không có quyền xem cuộc trò chuyện này', 403);
 
+    // Tự động đánh dấu đã đọc các tin nhắn gửi tới mình
+    await prisma.message.updateMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+
     const skip = (page - 1) * limit;
 
     return await prisma.message.findMany({
@@ -74,5 +99,17 @@ export const chatService = {
       skip,
       take: limit
     });
-  }
+  },
+
+  // Đánh dấu đã đọc tin nhắn trong cuộc trò chuyện
+  markAsRead: async (userId: string, conversationId: string) => {
+    return await prisma.message.updateMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+  },
 };
