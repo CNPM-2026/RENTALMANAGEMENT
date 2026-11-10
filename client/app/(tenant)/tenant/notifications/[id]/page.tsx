@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Bell,
@@ -14,7 +14,6 @@ import {
   MapPin,
   MessageSquare,
   Receipt,
-  Users,
   XCircle,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
@@ -84,7 +83,6 @@ function getNotificationTypeBadge(type: NotificationType) {
 
 function TenantNotificationDetailContent() {
   const params = useParams();
-  const router = useRouter();
   const notificationId = params?.id as string;
 
   const [notification, setNotification] = React.useState<Notification | null>(null);
@@ -96,7 +94,6 @@ function TenantNotificationDetailContent() {
     if (!notificationId) return;
 
     let isMounted = true;
-    setLoading(true);
 
     apiClient.notifications
       .getById(notificationId)
@@ -280,6 +277,7 @@ function TenantNotificationDetailContent() {
           <div className="flex flex-col sm:flex-row gap-4 rounded-lg border border-[#eef3ef] bg-[#f7f6f2] p-4">
             {post.images && post.images.length > 0 ? (
               <div className="aspect-4/3 w-full sm:w-36 overflow-hidden rounded-md bg-gray-200 shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={post.images[0].imageUrl}
                   alt={post.title}

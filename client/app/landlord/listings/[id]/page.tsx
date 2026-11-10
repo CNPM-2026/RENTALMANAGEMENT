@@ -5,10 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  Calendar,
   Eye,
-  FileText,
-  Home,
   MapPin,
   Pencil,
   Trash2,
@@ -17,7 +14,6 @@ import {
   Clock,
   AlertTriangle,
   Building,
-  Layers,
   Sparkles,
   ExternalLink,
 } from "lucide-react";
@@ -77,25 +73,36 @@ function LandlordListingDetailContent() {
   const [editError, setEditError] = React.useState<string | null>(null);
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
 
-  const fetchPost = React.useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await apiClient.posts.getById(id);
-      setPost(data);
-      setEditTitle(data.title);
-      setEditDescription(data.description);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không tải được thông tin bài đăng.");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
   React.useEffect(() => {
-    fetchPost();
-  }, [fetchPost]);
+    let isMounted = true;
+
+    async function loadPost() {
+      if (!id) return;
+      try {
+        const data = await apiClient.posts.getById(id);
+        if (isMounted) {
+          setError(null);
+          setPost(data);
+          setEditTitle(data.title);
+          setEditDescription(data.description);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Không tải được thông tin bài đăng.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPost();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,6 +328,7 @@ function LandlordListingDetailContent() {
                       onClick={() => setSelectedImage(img.imageUrl)}
                       className="group relative aspect-4/3 overflow-hidden rounded-lg border border-[#e2e7e1] bg-gray-100 cursor-pointer shadow-xs hover:border-[#15594f] transition-all"
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={img.imageUrl}
                         alt={`Ảnh ${idx + 1}`}
@@ -529,6 +537,7 @@ function LandlordListingDetailContent() {
       {selectedImage && (
         <Modal isOpen={Boolean(selectedImage)} onClose={() => setSelectedImage(null)} title="Xem hình ảnh" size="lg">
           <div className="aspect-16/10 w-full overflow-hidden rounded-lg bg-black flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={selectedImage} alt="Ảnh phòng" className="max-h-[75vh] w-auto object-contain" />
           </div>
         </Modal>
