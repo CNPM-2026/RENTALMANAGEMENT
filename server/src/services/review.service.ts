@@ -39,8 +39,6 @@ export const reviewService = {
               OR: [
                 { tenantId: reviewerId, room: { property: { landlordId: targetId } } },
                 { tenantId: targetId, room: { property: { landlordId: reviewerId } } },
-                { agentId: reviewerId, tenantId: targetId },
-                { agentId: targetId, tenantId: reviewerId },
               ],
             },
             select: { id: true },

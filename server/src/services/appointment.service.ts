@@ -80,7 +80,7 @@ export const appointmentService = {
     return newAppointment;
   },
 
-  // Lấy lịch hẹn của tôi (Dùng chung cho cả Tenant, Landlord, Agent)
+  // Lấy lịch hẹn của tôi (Dùng chung cho Tenant và Landlord)
   getMyAppointments: async (userId: string, role: string) => {
     let whereClause: any = {};
 
@@ -88,8 +88,6 @@ export const appointmentService = {
       whereClause = { tenantId: userId };
     } else if (role === 'LANDLORD') {
       whereClause = { landlordId: userId };
-    } else if (role === 'AGENT') {
-      whereClause = { agentId: userId };
     } else {
       throw new AppError('Role không được phép xem lịch hẹn cá nhân', 403);
     }

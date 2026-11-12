@@ -48,6 +48,11 @@ export interface ApiValidationError {
 export interface ApiErrorResponse {
   success: false;
   message: string;
+  /**
+   * Mã lỗi máy đọc được do backend trả về (vd. `OTP_INVALID`). Chỉ mang tính
+   * bổ sung: UI vẫn dùng `message`; mã này KHÔNG dùng để suy ra trạng thái phiên.
+   */
+  code?: string;
   errors?: ApiValidationError[];
 }
 

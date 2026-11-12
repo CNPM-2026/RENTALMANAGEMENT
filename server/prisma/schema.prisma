@@ -16,7 +16,28 @@ enum Role {
   ADMIN
   LANDLORD
   TENANT
+  // 🆕 STAFF: thợ / nhà cung cấp dịch vụ ĐỘC LẬP (marketplace).
+  // KHÔNG phải nhân viên của chủ trọ — đó là `StaffMembership` (bảng riêng).
+  // Tài khoản STAFF tự đăng ký, tự quản lý hồ sơ, làm việc với nhiều chủ trọ.
+  STAFF
+  // ⚠️ DEPRECATED: AGENT không còn được cấp cho tài khoản mới và không còn
+  // route/middleware/UI nào xử lý role này. Giá trị enum chỉ còn tồn tại để
+  // KHÔNG làm hỏng các row `users.role = 'AGENT'` đang có trong DB.
+  // Việc xoá hẳn giá trị này là một migration có mất dữ liệu (xem
+  // docs/BATCH-1-STAFF-FOUNDATION.md §5) và phải được duyệt riêng.
   AGENT // Người dẫn đi xem / Môi giới / Cộng tác viên
+}
+
+// 🆕 Nhóm kỹ năng / loại dịch vụ của thợ (structured data, không phải text tự do)
+enum ServiceCategory {
+  ELECTRICAL // Sửa điện
+  PLUMBING // Sửa ống nước
+  WATER_LEAK // Xử lý rò rỉ nước
+  FURNITURE // Sửa chữa nội thất
+  AIR_CONDITIONER // Bảo trì máy lạnh
+  PAINTING // Sơn sửa
+  CLEANING // Vệ sinh
+  GENERAL_MAINTENANCE // Bảo trì tổng hợp
 }
 
 enum RoomStatus {
@@ -112,6 +133,16 @@ enum CommissionStatus {
   CANCELLED
 }
 
+// 🆕 H-05: mục đích của mã OTP lưu trong `email_verification_codes`.
+// Mã phát cho purpose nào chỉ tiêu thụ được cho đúng purpose đó (purpose cũng
+// nằm trong nguyên liệu HMAC, xem `src/utils/otp.ts`).
+// Batch 2A chỉ dùng SIGNUP_VERIFY; LOGIN_STEP_UP được khai báo sẵn để Batch 2B
+// không phải sửa kiểu dữ liệu lần nữa.
+enum OtpPurpose {
+  SIGNUP_VERIFY
+  LOGIN_STEP_UP
+}
+
 // 🆕 Enum cho loại tin nhắn
 enum MessageType {
   TEXT
@@ -153,6 +184,17 @@ model User {
   role            Role     @default(TENANT)
   isActive        Boolean  @default(true) @map("is_active")
   isEmailVerified Boolean  @default(false) @map("is_email_verified")
+
+  // H-05: credential provenance.
+  // `authVersion` is bumped by every write that invalidates an in-flight
+  // credential decision (Google claim, password reset).
+  // `passwordProvenAt` answers "was this hash ever proven through the mailbox?";
+  // NULL means unproven (a password created by `register` is always unproven).
+  authVersion       Int       @default(0) @map("auth_version")
+  passwordProvenAt  DateTime? @map("password_proven_at")
+  passwordProvenVia String?   @map("password_proven_via")
+  passwordSetVia    String?   @map("password_set_via")
+
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -190,6 +232,7 @@ model User {
   reviewedKycSubmissions      KycSubmission[]         @relation("KycReviewer")
   staffMemberships            StaffMembership[]       @relation("StaffUser")
   landlordStaff               StaffMembership[]       @relation("StaffLandlord")
+  staffProfile                StaffProfile? // 🆕 hồ sơ thợ độc lập (marketplace)
 
   @@index([role])
   @@map("users")
@@ -216,6 +259,22 @@ model EmailVerificationCode {
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
   createdAt DateTime  @default(now()) @map("created_at")
+
+  // H-05/OTP: mục đích của challenge. OTP phát cho purpose nào chỉ tiêu thụ được
+  // cho đúng purpose đó (purpose cũng nằm trong nguyên liệu HMAC).
+  // Default SIGNUP_VERIFY để row cũ (trước Batch 2A) mang đúng purpose mà chúng
+  // từng được phát hành.
+  purpose OtpPurpose @default(SIGNUP_VERIFY)
+
+  // Ngân sách thử của TỪNG row: đổi hằng số trong code không làm thay đổi
+  // challenge đã phát hành trước đó.
+  attempts    Int @default(0)
+  maxAttempts Int @default(5) @map("max_attempts")
+
+  // Phiên bản cấu trúc HMAC (pepper + input). NULL = row cũ dùng SHA-256 không
+  // khóa; verifier mới cố tình KHÔNG khớp nên các row này không thể bị tiêu thụ
+  // sau khi triển khai. Không backfill, không đánh dấu xác minh.
+  hmacVersion Int? @map("hmac_version")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -403,6 +462,52 @@ model StaffMembership {
   @@unique([landlordId, userId])
   @@index([landlordId, isActive])
   @@map("staff_memberships")
+}
+
+// 🆕 HỒ SƠ THỢ ĐỘC LẬP (staff marketplace)
+// Tách hoàn toàn khỏi `StaffMembership`: đây là tài khoản role = STAFF, tự đăng
+// ký, không trực thuộc chủ trọ nào và có thể nhận việc của nhiều chủ trọ.
+// Không chứa email/số điện thoại: những trường đó thuộc `users` (một nguồn duy
+// nhất), tránh hai bản sao lệch nhau.
+model StaffProfile {
+  id      String @id @default(uuid())
+  userId  String @unique @map("user_id")
+  // Mô tả năng lực / kinh nghiệm (text do chính thợ nhập)
+  description String?
+  // Khu vực hành nghề + toạ độ dùng để tính khoảng cách tới bất động sản.
+  // NULL = thợ CHƯA khai báo toạ độ; caller phải xử lý riêng, tuyệt đối không
+  // được coi NULL là (0,0) khi tính khoảng cách.
+  serviceAddress String? @map("service_address")
+  latitude       Float?
+  longitude      Float?
+  // Khoảng giá mong muốn (VNĐ). NULL = "thương lượng".
+  priceMin Decimal? @map("price_min") @db.Decimal(12, 2)
+  priceMax Decimal? @map("price_max") @db.Decimal(12, 2)
+  // Trạng thái sẵn sàng nhận việc. Trạng thái tài khoản (khoá/mở) vẫn là
+  // `users.is_active` — không nhân đôi khái niệm.
+  isAvailable Boolean  @default(true) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills StaffSkill[]
+
+  @@index([isAvailable])
+  @@map("staff_profiles")
+}
+
+// 🆕 Kỹ năng của thợ: 1 dòng / 1 nhóm dịch vụ, có ràng buộc duy nhất
+// (staff_profile_id, category) nên không thể khai trùng một kỹ năng.
+model StaffSkill {
+  staffProfileId String          @map("staff_profile_id")
+  category       ServiceCategory
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  staffProfile StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  @@id([staffProfileId, category])
+  @@index([category]) // lọc "thợ theo kỹ năng" (khám phá thợ / gợi ý việc)
+  @@map("staff_skills")
 }
 
 // ==========================================

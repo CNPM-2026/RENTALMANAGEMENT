@@ -27,6 +27,7 @@ import maintenanceRoute from './routes/maintenance.route'
 import rentalRequestRoute from './routes/rental-request.route'
 import roommateInvitationRoute from './routes/roommate-invitation.route'
 import staffRoute from './routes/staff.route'
+import staffProfileRoute from './routes/staffProfile.route'
 import { env } from './config/env';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
@@ -71,6 +72,7 @@ app.use('/api/v1/maintenance', maintenanceRoute);
 app.use('/api/v1/rental-requests', rentalRequestRoute);
 app.use('/api/v1/roommate-invitations', roommateInvitationRoute);
 app.use('/api/v1/staff', staffRoute);
+app.use('/api/v1/staff-marketplace', staffProfileRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });

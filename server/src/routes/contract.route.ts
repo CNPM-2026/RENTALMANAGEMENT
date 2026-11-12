@@ -12,7 +12,7 @@ router.use(authenticate); // Tất cả đều phải đăng nhập
 router.post('/', authorize('LANDLORD'), validate(contractSchema), contractController.create);
 
 // Admin xem toàn bộ; các role còn lại chỉ xem hợp đồng thuộc phạm vi của mình.
-router.get('/my', authorize('ADMIN', 'LANDLORD', 'TENANT', 'AGENT'), contractController.getMyContracts);
+router.get('/my', authorize('ADMIN', 'LANDLORD', 'TENANT'), contractController.getMyContracts);
 
 // Chỉ chủ trọ mới được cập nhật trạng thái (hủy hợp đồng)
 router.patch('/:id/status', authorize('LANDLORD'), validate(contractStatusSchema), contractController.updateStatus);

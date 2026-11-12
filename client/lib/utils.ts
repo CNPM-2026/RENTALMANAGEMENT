@@ -163,8 +163,8 @@ export function getRoleLabel(role?: Role | null): string {
       return 'Chủ trọ';
     case 'TENANT':
       return 'Người thuê';
-    case 'AGENT':
-      return 'Môi giới / CTV';
+    case 'STAFF':
+      return 'Thợ / Dịch vụ';
     default:
       return 'Khách';
   }

@@ -14,7 +14,7 @@ export default function AdminRolesPage() {
     { name: "Quản trị viên", desc: "Tài khoản có quyền quản trị hệ thống", count: users.filter((user) => user.role === "ADMIN").length },
     { name: "Chủ trọ", desc: "Quản lý cơ sở, phòng, tin đăng và hợp đồng", count: users.filter((user) => user.role === "LANDLORD").length },
     { name: "Người thuê", desc: "Tìm phòng, đặt lịch và quản lý hợp đồng thuê", count: users.filter((user) => user.role === "TENANT").length },
-    { name: "Môi giới", desc: "Hỗ trợ dẫn xem phòng và quản lý hoa hồng", count: users.filter((user) => user.role === "AGENT").length },
+    { name: "Thợ / Dịch vụ", desc: "Nhà cung cấp dịch vụ độc lập: nhận việc bảo trì, sửa chữa", count: users.filter((user) => user.role === "STAFF").length },
   ];
 
   return (

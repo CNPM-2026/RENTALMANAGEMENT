@@ -1,0 +1,66 @@
+import { describe, expect, it } from 'vitest';
+import { staffBrowseQuerySchema, staffProfileUpsertSchema } from './staffProfile.validation';
+
+/**
+ * Lớp validate là chốt chặn số cuối cùng trước Prisma. Bộ test này khoá lại các
+ * hành vi dễ hỏng nhất của input số/địa lý (cùng nhóm lỗi với bug nhập
+ * điện/nước): chuỗi rỗng KHÔNG được thành 0, giá trị rác phải bị từ chối.
+ */
+describe('staffProfileUpsertSchema', () => {
+  it('coi chuỗi rỗng là null (xoá giá trị) thay vì 0', () => {
+    const parsed = staffProfileUpsertSchema.parse({ priceMin: '', latitude: '', longitude: '' });
+    expect(parsed.priceMin).toBeNull();
+    expect(parsed.latitude).toBeNull();
+    expect(parsed.longitude).toBeNull();
+  });
+
+  it('từ chối giá trị không phải số thay vì âm thầm đổi thành 0/NaN', () => {
+    expect(() => staffProfileUpsertSchema.parse({ priceMin: 'abc' })).toThrow();
+    expect(() => staffProfileUpsertSchema.parse({ priceMin: '1.500.000' })).toThrow();
+  });
+
+  it('từ chối toạ độ ngoài phạm vi và trùng lặp ràng buộc cặp toạ độ', () => {
+    expect(() => staffProfileUpsertSchema.parse({ latitude: 95, longitude: 106 })).toThrow();
+    expect(() => staffProfileUpsertSchema.parse({ latitude: 10.7 })).toThrow();
+    expect(staffProfileUpsertSchema.parse({ latitude: 10.7, longitude: 106.6 })).toMatchObject({
+      latitude: 10.7,
+      longitude: 106.6,
+    });
+  });
+
+  it('loại bỏ kỹ năng trùng lặp và từ chối kỹ năng ngoài danh mục', () => {
+    const parsed = staffProfileUpsertSchema.parse({ skills: ['ELECTRICAL', 'ELECTRICAL', 'CLEANING'] });
+    expect(parsed.skills).toEqual(['ELECTRICAL', 'CLEANING']);
+    expect(() => staffProfileUpsertSchema.parse({ skills: ['HACKING'] })).toThrow();
+  });
+
+  it('từ chối khoảng giá ngược', () => {
+    expect(() => staffProfileUpsertSchema.parse({ priceMin: 500_000, priceMax: 100_000 })).toThrow();
+    expect(staffProfileUpsertSchema.parse({ priceMin: 500_000, priceMax: 500_000 })).toMatchObject({
+      priceMin: 500_000,
+      priceMax: 500_000,
+    });
+  });
+
+  it('giữ nguyên các trường khi không gửi (PUT bán phần)', () => {
+    const parsed = staffProfileUpsertSchema.parse({});
+    expect(parsed.description).toBeUndefined();
+    expect(parsed.priceMin).toBeUndefined();
+    expect(parsed.skills).toBeUndefined();
+  });
+});
+
+describe('staffBrowseQuerySchema', () => {
+  it('parse tham số query dạng chuỗi', () => {
+    expect(staffBrowseQuerySchema.parse({ page: '2', limit: '10', isAvailable: 'true' })).toMatchObject({
+      page: 2,
+      limit: 10,
+      isAvailable: true,
+    });
+  });
+
+  it('chặn limit quá lớn và category lạ', () => {
+    expect(() => staffBrowseQuerySchema.parse({ limit: '1000' })).toThrow();
+    expect(() => staffBrowseQuerySchema.parse({ category: 'UNKNOWN' })).toThrow();
+  });
+});

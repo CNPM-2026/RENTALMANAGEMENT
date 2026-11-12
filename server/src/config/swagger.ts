@@ -53,7 +53,7 @@ export const swaggerSpec: OpenAPIV3.Document = {
         password: { type: 'string', format: 'password', minLength: 6 },
         fullName: { type: 'string' },
         phone: { type: 'string' },
-        role: { type: 'string', enum: ['TENANT', 'LANDLORD', 'AGENT'] },
+        role: { type: 'string', enum: ['TENANT', 'LANDLORD', 'STAFF'] },
       }, ['email', 'password', 'fullName']),
       Error: objectSchema({
         success: { type: 'boolean', example: false },

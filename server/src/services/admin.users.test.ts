@@ -64,7 +64,7 @@ describe('admin updateUserStatus', () => {
 
     expect(mocks.tx.user.update).toHaveBeenCalledWith({
       where: { id: 'user-2' },
-      data: { isActive: false },
+      data: { isActive: false, authVersion: { increment: 1 } },
       select: { id: true, email: true, fullName: true, role: true, isActive: true },
     });
     expect(mocks.tx.refreshToken.updateMany).toHaveBeenCalledWith({
@@ -97,7 +97,7 @@ describe('admin updateUserStatus', () => {
     await adminService.updateUserStatus('admin-1', 'user-2', true);
 
     expect(mocks.tx.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'user-2' }, data: { isActive: true } }),
+      expect.objectContaining({ where: { id: 'user-2' }, data: { isActive: true, authVersion: { increment: 1 } } }),
     );
     expect(mocks.tx.refreshToken.updateMany).not.toHaveBeenCalled();
     expect(mocks.auditRecord).toHaveBeenCalledWith(

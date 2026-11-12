@@ -5,7 +5,8 @@ import { validate } from '../middlewares/validate.middleware';
 import { reportSchema, reportStatusSchema } from '../validations/resource.validation';
 
 const router = Router();
-router.use(authenticate, authorize('TENANT', 'LANDLORD', 'ADMIN', 'AGENT'));
+// Thợ (STAFF) cũng có thể báo cáo chủ trọ / người thuê trong phạm vi công việc.
+router.use(authenticate, authorize('TENANT', 'LANDLORD', 'STAFF', 'ADMIN'));
 
 // Ai cũng được gửi báo cáo
 router.post('/', validate(reportSchema), reportController.create);

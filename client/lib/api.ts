@@ -21,6 +21,8 @@ import {
   RefreshTokenResponse,
   ForgotPasswordPayload,
   ResetPasswordPayload,
+  PasswordSetPayload,
+  VerifyEmailResponse,
   UpdateProfilePayload,
   Property,
   CreatePropertyPayload,
@@ -70,9 +72,13 @@ import {
   RoommateInvitation,
   CreateRoommateInvitationPayload,
   KycSubmission,
+  KycRole,
   AuditLog,
   StaffMembership,
   StaffPermission,
+  StaffProfile,
+  StaffProfilePayload,
+  StaffBrowseQuery,
 } from '@/types/models';
 
 const inFlightWrites = new Map<string, Promise<unknown>>();
@@ -376,7 +382,11 @@ export const apiClient = {
     resetPassword: (payload: ResetPasswordPayload) =>
       apiClient.post<{ message: string }>('/auth/reset-password', payload, { skipAuth: true }),
     verifyEmail: (payload: { email: string; code: string }) =>
-      apiClient.post<{ message: string }>('/auth/verify-email', payload, { skipAuth: true }),
+      apiClient.post<VerifyEmailResponse>('/auth/verify-email', payload, { skipAuth: true }),
+    // H-05/Batch 2B1: đặt mật khẩu bằng grant ngắn hạn. `skipAuth` vì grant KHÔNG
+    // phải access token và request này không được mang Authorization của phiên cũ.
+    setPassword: (payload: PasswordSetPayload) =>
+      apiClient.post<{ message: string }>('/auth/password/set', payload, { skipAuth: true }),
     resendVerification: (payload: { email: string }) =>
       apiClient.post<{ message: string }>('/auth/resend-verification', payload, { skipAuth: true }),
     getMe: () =>
@@ -615,8 +625,9 @@ export const apiClient = {
       apiClient.get<User[]>('/admin/users', query),
     updateUserStatus: (id: string, isActive: boolean) =>
       apiClient.patch<User>(`/admin/users/${id}/status`, { isActive }),
-    getKyc: (status?: string) =>
-      apiClient.get<KycSubmission[]>('/admin/kyc', status ? { status } : undefined),
+    /** `role` lọc hàng đợi theo người nộp (`LANDLORD` | `STAFF`); bỏ trống = cả hai. */
+    getKyc: (status?: string, role?: KycRole) =>
+      apiClient.get<KycSubmission[]>('/admin/kyc', { status, role }),
     updateKyc: (id: string, payload: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
       apiClient.patch<KycSubmission>(`/admin/kyc/${id}/status`, payload),
     getAuditLogs: (query?: { search?: string; limit?: number }) =>
@@ -629,6 +640,27 @@ export const apiClient = {
     update: (id: string, payload: { permissions?: StaffPermission[]; isActive?: boolean }) =>
       apiClient.patch<StaffMembership>(`/staff/${id}`, payload),
     remove: (id: string) => apiClient.delete<void>(`/staff/${id}`),
+  },
+
+  /**
+   * 🆕 STAFF MARKETPLACE — hồ sơ thợ độc lập (role = STAFF).
+   * Khác `staff` ở trên (`StaffMembership` = nhân viên do chủ trọ cấp quyền).
+   */
+  staffMarketplace: {
+    /** Hồ sơ của chính mình; `null` nếu thợ chưa hoàn thiện hồ sơ. */
+    getMe: () => apiClient.get<StaffProfile | null>('/staff-marketplace/me'),
+    upsertMe: (payload: StaffProfilePayload) =>
+      apiClient.put<StaffProfile>('/staff-marketplace/me', payload),
+    updateAvailability: (isAvailable: boolean) =>
+      apiClient.patch<StaffProfile>('/staff-marketplace/me/availability', { isAvailable }),
+    /** Chủ trọ khám phá thợ theo kỹ năng / trạng thái (phân trang). */
+    browse: (query?: StaffBrowseQuery) =>
+      apiClient.get<{ meta: PaginationMeta; data: StaffProfile[] }>(
+        '/staff-marketplace',
+        query as unknown as RequestOptions['params'],
+      ),
+    getPublicProfile: (userId: string) =>
+      apiClient.get<StaffProfile>(`/staff-marketplace/${userId}`),
   },
 };
 

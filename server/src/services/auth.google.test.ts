@@ -11,7 +11,7 @@ import { authService } from './auth.service';
 const mocks = vi.hoisted(() => {
   const tx = {
     $queryRaw: vi.fn(),
-    user: { updateMany: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
+    user: { update: vi.fn(), findUniqueOrThrow: vi.fn() },
     refreshToken: { updateMany: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn() },
   };
@@ -85,6 +85,11 @@ const baseUser = {
   role: 'TENANT',
   isActive: true,
   isEmailVerified: true,
+  // H-05: provenance mặc định của một row đã xác minh.
+  authVersion: 0,
+  passwordProvenAt: null,
+  passwordProvenVia: null,
+  passwordSetVia: 'REGISTER',
 };
 
 const primeGoogle = (email = 'User@Example.com') => {
@@ -206,31 +211,38 @@ describe('google account resolution', () => {
       message: 'Tài khoản đã bị khóa',
     });
     expect(mocks.userUpdate).not.toHaveBeenCalled();
-    expect(mocks.tx.user.updateMany).not.toHaveBeenCalled();
+    expect(mocks.tx.user.update).not.toHaveBeenCalled();
     expect(mocks.refreshTokenCreate).not.toHaveBeenCalled();
     expect(mocks.tx.refreshToken.create).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it('claims an unverified account, revoking tokens and auditing in one transaction', async () => {
-    const unverified = { ...baseUser, isEmailVerified: false };
+  it('claims an unverified account, retiring the unproven password and auditing in one transaction', async () => {
+    const unverified = { ...baseUser, isEmailVerified: false, passwordProvenAt: null };
     mocks.userFindMany.mockResolvedValue([unverified]);
-    mocks.tx.user.updateMany.mockResolvedValue({ count: 1 });
+    // Lần đọc ĐẦU là row đã khóa bên trong claim (vẫn chưa xác minh); các lần sau
+    // (cuối claim + issueSession) đọc row đã xác minh.
+    mocks.tx.user.findUniqueOrThrow.mockResolvedValueOnce(unverified);
+    mocks.tx.user.update.mockResolvedValue({});
     mocks.tx.refreshToken.updateMany.mockResolvedValue({ count: 2 });
     mocks.tx.auditLog.create.mockResolvedValue({});
-    mocks.tx.user.findUniqueOrThrow.mockResolvedValue({ ...unverified, isEmailVerified: true });
 
     const result = await authService.loginWithGoogle('code-1', 'state-1');
-    const claim = mocks.tx.user.updateMany.mock.calls[0][0];
+    const claim = mocks.tx.user.update.mock.calls[0][0];
 
-    expect(claim.where).toEqual({ id: 'user-1', isEmailVerified: false, isActive: true });
+    // Khóa row users TRƯỚC khi ghi (thứ tự khóa toàn cục: users -> bảng con).
+    expect(mocks.tx.$queryRaw).toHaveBeenCalled();
+    expect(claim.where).toEqual({ id: 'user-1' });
     expect(claim.data).toMatchObject({
       isEmailVerified: true,
       fullName: 'Google User',
       avatarUrl: 'https://pic.test/avatar.png',
+      authVersion: { increment: 1 },
     });
-    // Không ghi đè mật khẩu hợp lệ đã có và không đụng tới trạng thái khóa.
-    expect(claim.data).not.toHaveProperty('passwordHash');
+    // H-05: mật khẩu chưa từng được chứng minh bị thu hồi bằng sentinel.
+    expect(claim.data.passwordHash).toBe(NO_PASSWORD);
+    expect(claim.data.passwordSetVia).toBeNull();
+    // Không bao giờ tự mở khóa tài khoản.
     expect(claim.data).not.toHaveProperty('isActive');
 
     expect(mocks.tx.refreshToken.updateMany).toHaveBeenCalledWith({
@@ -243,31 +255,54 @@ describe('google account resolution', () => {
         action: 'GOOGLE_ACCOUNT_CLAIMED',
         entityType: 'USER',
         entityId: 'user-1',
+        metadata: expect.objectContaining({ passwordRetired: true }),
       }),
     });
     // 2 transaction: một cho claim, một cho issueSession (khóa users -> tạo RT).
     expect(mocks.transaction).toHaveBeenCalledTimes(2);
     expect(mocks.userUpdate).not.toHaveBeenCalled();
     expect(mocks.tx.refreshToken.create).toHaveBeenCalledTimes(1);
+    // H-05: metadata credential không được rò ra response.
     expect(result.user).not.toHaveProperty('passwordHash');
+    expect(result.user).not.toHaveProperty('authVersion');
+    expect(result.user).not.toHaveProperty('passwordProvenAt');
+    expect(result.user).not.toHaveProperty('passwordSetVia');
+  });
+
+  it('keeps a previously proven password when the account is claimed', async () => {
+    const unverified = { ...baseUser, isEmailVerified: false, passwordProvenAt: new Date('2026-01-01T00:00:00Z') };
+    mocks.userFindMany.mockResolvedValue([unverified]);
+    mocks.tx.user.findUniqueOrThrow.mockResolvedValueOnce(unverified);
+    mocks.tx.user.update.mockResolvedValue({});
+    mocks.tx.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+    mocks.tx.auditLog.create.mockResolvedValue({});
+
+    await authService.loginWithGoogle('code-1', 'state-1');
+
+    const claim = mocks.tx.user.update.mock.calls[0][0];
+    expect(claim.data).not.toHaveProperty('passwordHash');
+    expect(claim.data).not.toHaveProperty('passwordSetVia');
+    expect(claim.data.authVersion).toEqual({ increment: 1 });
+    expect(mocks.tx.auditLog.create.mock.calls[0][0].data.metadata.passwordRetired).toBe(false);
   });
 
   it('does not audit or revoke when another request already verified the account', async () => {
     mocks.userFindMany.mockResolvedValue([{ ...baseUser, isEmailVerified: false }]);
-    mocks.tx.user.updateMany.mockResolvedValue({ count: 0 });
-    mocks.tx.user.findUnique.mockResolvedValue({ ...baseUser, isEmailVerified: true });
+    // Row đã khóa cho thấy request khác vừa xác minh xong.
+    mocks.tx.user.findUniqueOrThrow.mockResolvedValueOnce({ ...baseUser, isEmailVerified: true });
 
     const result = await authService.loginWithGoogle('code-1', 'state-1');
 
     expect(result.user.id).toBe('user-1');
+    expect(mocks.tx.user.update).not.toHaveBeenCalled();
     expect(mocks.tx.refreshToken.updateMany).not.toHaveBeenCalled();
     expect(mocks.tx.auditLog.create).not.toHaveBeenCalled();
   });
 
   it('fails closed when the account is banned while being claimed', async () => {
     mocks.userFindMany.mockResolvedValue([{ ...baseUser, isEmailVerified: false }]);
-    mocks.tx.user.updateMany.mockResolvedValue({ count: 0 });
-    mocks.tx.user.findUnique.mockResolvedValue({ ...baseUser, isActive: false });
+    // Row đã khóa (đọc lại bên trong claim) cho thấy tài khoản vừa bị khóa.
+    mocks.tx.user.findUniqueOrThrow.mockResolvedValueOnce({ ...baseUser, isActive: false, isEmailVerified: false });
 
     await expect(authService.loginWithGoogle('code-1', 'state-1')).rejects.toMatchObject({
       statusCode: 403,
@@ -278,8 +313,10 @@ describe('google account resolution', () => {
   });
 
   it('surfaces a revocation failure without writing the audit event', async () => {
-    mocks.userFindMany.mockResolvedValue([{ ...baseUser, isEmailVerified: false }]);
-    mocks.tx.user.updateMany.mockResolvedValue({ count: 1 });
+    const unverified = { ...baseUser, isEmailVerified: false, passwordProvenAt: null };
+    mocks.userFindMany.mockResolvedValue([unverified]);
+    mocks.tx.user.findUniqueOrThrow.mockResolvedValueOnce(unverified);
+    mocks.tx.user.update.mockResolvedValue({});
     mocks.tx.refreshToken.updateMany.mockRejectedValue(new Error('refresh token store down'));
 
     await expect(authService.loginWithGoogle('code-1', 'state-1')).rejects.toThrow('refresh token store down');

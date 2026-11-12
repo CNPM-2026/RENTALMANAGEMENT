@@ -1,9 +1,16 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { PostStatus } from '@prisma/client';
+import type { KycStatus, Prisma, Role } from '@prisma/client';
 import { notificationService } from './notification.service';
 import { auditService } from './audit.service';
 import { storageService } from './storage.service';
+import { invalidateUserSockets } from '../socket/sessionInvalidation';
+
+/** Giá trị hợp lệ cho bộ lọc hàng đợi KYC; giá trị lạ bị BỎ QUA (không 500). */
+const KYC_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
+/** Chỉ các role này mới có hồ sơ KYC (TENANT/ADMIN nộp qua API cũ vẫn xem được khi không lọc). */
+const KYC_ROLES = ['LANDLORD', 'STAFF'] as const;
 
 export const adminService = {
   // Lấy danh sách bài chờ duyệt
@@ -92,9 +99,13 @@ export const adminService = {
       `;
       if (locked.length !== 1) throw new AppError('Không tìm thấy người dùng', 404);
 
+      // H-05/Batch 2B1.1 (F-2): mọi thay đổi trạng thái do admin thực hiện đều tăng
+      // `authVersion`, nên một "password-setup grant" đang bay bị vô hiệu vĩnh viễn —
+      // kể cả trường hợp khóa rồi mở khóa lại trong TTL 10 phút của grant (khi đó
+      // `establishPassword` thấy `authVersion` lệch và trả lỗi chung như mọi grant chết).
       const user = await tx.user.update({
         where: { id: userId },
-        data: { isActive },
+        data: { isActive, authVersion: { increment: 1 } },
         select: {
           id: true,
           email: true,
@@ -114,16 +125,39 @@ export const adminService = {
       return user;
     });
 
+    // H-05/Batch 2B2.2 (L1.2): đóng mọi socket realtime đang mở của user NGAY SAU khi
+    // transaction commit. Transaction rollback thì hàm này không bao giờ chạy tới,
+    // nên một lần đổi trạng thái thất bại không thể đá phiên hợp lệ. Đặt TRƯỚC bước
+    // audit để lỗi ghi log (không được rollback thay đổi) cũng không thể giữ lại một
+    // phiên đã bị vô hiệu hóa.
+    invalidateUserSockets(userId);
+
     // Audit ghi SAU khi transaction commit: lỗi ghi log không được rollback việc
     // khóa tài khoản (giữ nguyên hành vi đã được duyệt của các luồng admin khác).
     await auditService.record({ userId: adminId, action: isActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', entityType: 'User', entityId: userId });
     return updated;
   },
 
-  getKycSubmissions: async (status?: string) => {
+  /**
+   * Hàng đợi KYC dùng CHUNG cho chủ trọ và thợ (một bảng `kyc_submissions`).
+   *
+   * - `status`: lọc theo trạng thái (`PENDING` mặc định ở UI).
+   * - `role`: lọc theo role của người nộp. Không truyền = tất cả (giữ nguyên hành
+   *   vi cũ cho các màn hình admin hiện có).
+   * - Trả kèm `user.role` để admin phân biệt hồ sơ chủ trọ với hồ sơ thợ.
+   */
+  getKycSubmissions: async (status?: string, role?: string) => {
+    const where: Prisma.KycSubmissionWhereInput = {};
+    if (status && (KYC_STATUSES as readonly string[]).includes(status)) {
+      where.status = status as KycStatus;
+    }
+    if (role && (KYC_ROLES as readonly string[]).includes(role)) {
+      where.user = { role: role as Role };
+    }
+
     const submissions = await prisma.kycSubmission.findMany({
-      where: status ? { status: status as never } : undefined,
-      include: { user: { select: { id: true, fullName: true, email: true, phone: true } } },
+      where,
+      include: { user: { select: { id: true, fullName: true, email: true, phone: true, role: true } } },
       orderBy: { createdAt: 'asc' },
     });
     return submissions.map((submission) => ({

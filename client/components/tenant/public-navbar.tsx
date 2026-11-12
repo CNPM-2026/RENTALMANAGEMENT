@@ -193,14 +193,14 @@ export function PublicNavbar({
                       </Link>
                     )}
 
-                    {currentUser.role === "AGENT" && (
+                    {currentUser.role === "STAFF" && (
                       <Link
-                        href="/landlord/dashboard"
+                        href="/staff/profile"
                         onClick={() => setProfileDropdownOpen(false)}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
                       >
                         <Users className="size-4" />
-                        <span>Không gian nhân viên</span>
+                        <span>Không gian thợ</span>
                       </Link>
                     )}
 

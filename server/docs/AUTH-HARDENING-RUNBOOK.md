@@ -672,7 +672,7 @@ event. A4 now takes the `audit_id` A3 printed and re-verifies, in this order:
    ticket CSV — corroboration stays independent because only the id is part of the
    selection predicate, so a wrong ticket still fails;
 5. `metadata->>'survivor_id'` is present, is not the loser, and that row still
-   holds the key (§3.5.2, above).
+   holds the key (the ownership table above).
 
 A second remediation of the *same* group is the one case the id cannot distinguish,
 and it does not need to: A3 derives the quarantine address from `(email_key, loser)`,

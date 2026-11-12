@@ -9,6 +9,9 @@ export const errorHandler = (
 ) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
+  // Mã lỗi máy đọc được chỉ phát ra với AppError (lỗi nghiệp vụ đã kiểm soát).
+  // Mã nội bộ của Prisma (vd. P2002) hay mã HTTP thô không bao giờ đi qua đây.
+  const code = err instanceof AppError && typeof err.code === 'string' ? err.code : undefined;
 
   // Bắt lỗi Prisma (Unique constraint)
   if (err.code === 'P2002') {
@@ -25,6 +28,7 @@ export const errorHandler = (
   res.status(statusCode).json({
     success: false,
     message,
+    ...(code ? { code } : {}),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };

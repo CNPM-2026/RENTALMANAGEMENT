@@ -8,7 +8,7 @@ const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Quản trị viên",
   LANDLORD: "Chủ trọ",
   TENANT: "Người thuê",
-  AGENT: "Môi giới",
+  STAFF: "Thợ / Dịch vụ",
 };
 
 function formatNumber(value: number) {

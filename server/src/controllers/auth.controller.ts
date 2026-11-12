@@ -97,15 +97,32 @@ export const authController = {
 
   verifyEmail: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await authService.verifyEmail(req.body.email, req.body.code);
-      return res.json({ success: true, message: 'Xác minh email thành công' });
+      const result = await authService.verifyEmail(req.body.email, req.body.code);
+      // Chỉ trả về "password-setup grant" hẹp (không phải access/refresh token):
+      // mục đích duy nhất của nó là gọi POST /auth/password/set.
+      return res.json({
+        success: true,
+        message: 'Xác minh email thành công',
+        data: { passwordSetupGrant: result.passwordSetupGrant },
+      });
+    } catch (error) { return next(error); }
+  },
+
+  setPassword: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.setPassword(req.body.token, req.body.password);
+      // Không trả token/phiên và không trả metadata credential.
+      return res.status(200).json({
+        success: true,
+        message: 'Thiết lập mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+      });
     } catch (error) { return next(error); }
   },
 
   resendVerification: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = await findUserByEmailOrNull(req.body.email);
-      if (user) await authService.sendEmailVerification(user.id, user.email);
+      if (user) await authService.sendEmailVerification(user.id);
       return res.json({ success: true, message: 'Nếu email tồn tại, mã xác minh mới đã được gửi' });
     } catch (error) { return next(error); }
   },

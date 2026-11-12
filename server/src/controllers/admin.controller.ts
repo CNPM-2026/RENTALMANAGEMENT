@@ -51,8 +51,15 @@ export const adminController = {
   },
 
   getKyc: async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try { return res.json({ success: true, data: await adminService.getKycSubmissions(req.query.status as string) }); }
-    catch (error) { return next(error); }
+    try {
+      return res.json({
+        success: true,
+        data: await adminService.getKycSubmissions(
+          req.query.status as string | undefined,
+          req.query.role as string | undefined,
+        ),
+      });
+    } catch (error) { return next(error); }
   },
 
   updateKyc: async (req: AuthRequest, res: Response, next: NextFunction) => {

@@ -40,6 +40,8 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
+    // Ném 401 nếu thiếu/sai claim (`av`, `typ`, `id`, `role`) hoặc sai chữ ký/thuật
+    // toán; đây là điều kiện cần để `av` bên dưới có nghĩa.
     const decoded = verifyToken(token);
 
     // Lấy user từ DB (để check xem user có bị khóa không)
@@ -54,6 +56,7 @@ export const authenticate: RequestHandler = async (req, res, next) => {
         role: true,
         isActive: true,
         isEmailVerified: true,
+        authVersion: true,
         createdAt: true,
         updatedAt: true,
         profile: true,
@@ -63,6 +66,17 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     if (!user || !user.isActive) {
       throw new AppError('Tài khoản không tồn tại hoặc đã bị khóa', 401);
     }
+
+    // H-05/Batch 2B2: token phải mang đúng `authVersion` hiện tại thì mới còn giá
+    // trị. `authVersion` được đọc từ CHÍNH row `users` ở trên nên không phát sinh
+    // thêm truy vấn, và được tách khỏi `req.user` để hình dạng request giữ nguyên.
+    // Dùng chung thông điệp với token hết hạn: response không tiết lộ account có
+    // tồn tại hay vì sao token bị từ chối, và client vẫn đi đúng nhánh refresh 401.
+    const { authVersion, ...authorizedUser } = user;
+    if (decoded.av !== authVersion) {
+      throw new AppError('Phiên đăng nhập đã hết hạn', 401);
+    }
+
     if (!user.isEmailVerified) {
       throw new AppError('Vui lòng xác minh email trước khi sử dụng hệ thống', 403);
     }
@@ -78,7 +92,7 @@ export const authenticate: RequestHandler = async (req, res, next) => {
           orderBy: { createdAt: 'desc' },
         });
     authReq.user = {
-      ...user,
+      ...authorizedUser,
       landlordId: staff?.landlordId,
       staffPermissions: staff?.permissions,
     };
@@ -116,14 +130,19 @@ export const authenticateOptional: RequestHandler = async (req, res, next) => {
         role: true,
         isActive: true,
         isEmailVerified: true,
+        authVersion: true,
         createdAt: true,
         updatedAt: true,
         profile: true,
       },
     });
 
-    if (user && user.isActive) {
-      authReq.user = user;
+    // H-05/Batch 2B2: token stale/có `av` sai KHÔNG bao giờ được chuyển thành danh
+    // tính tin cậy — request tiếp tục như khách ẩn danh, đúng ngữ nghĩa "optional".
+    // Không có token cũng vẫn ẩn danh như trước.
+    if (user && user.isActive && decoded.av === user.authVersion) {
+      const { authVersion: _currentAuthVersion, ...authorizedUser } = user;
+      authReq.user = authorizedUser;
     }
     return next();
   } catch {
