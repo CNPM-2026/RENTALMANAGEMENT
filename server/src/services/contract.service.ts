@@ -81,8 +81,6 @@ export const contractService = {
       whereClause.room = { property: { landlordId: userId } };
     } else if (role === 'TENANT') {
       whereClause.tenantId = userId;
-    } else if (role === 'AGENT') {
-      whereClause.agentId = userId;
     } else if (role === 'ADMIN') {
       // Admin is intentionally allowed to review all contracts.
     } else {

@@ -1,16 +1,35 @@
 "use client";
 
 import * as React from "react";
-import { BadgeCheck, Check, X, Eye, FileText, ShieldAlert } from "lucide-react";
+import { BadgeCheck, Check, X } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { KycSubmission } from "@/types/models";
+import { translateRole } from "@/lib/labels";
+import type { KycSubmission, KycRole } from "@/types/models";
+
+/**
+ * Hàng đợi KYC của ADMIN — DÙNG CHUNG cho chủ trọ và thợ.
+ *
+ * Chỉ có một bảng `kyc_submissions` và một endpoint duyệt, nên không tồn tại màn
+ * duyệt thứ hai cho thợ. Bộ lọc role chỉ chia hàng đợi cho dễ xử lý, không đổi
+ * quyền hay kết quả duyệt. Duyệt hồ sơ của thợ chính là điều kiện mở khoá cho
+ * `kycGate.service` (thợ chỉ được bật "đang nhận việc" khi hồ sơ APPROVED).
+ */
+const ROLE_FILTERS: Array<{ key: KycRole | "ALL"; label: string }> = [
+  { key: "ALL", label: "Tất cả" },
+  { key: "LANDLORD", label: "Chủ trọ" },
+  { key: "STAFF", label: "Thợ dịch vụ" },
+];
 
 export default function AdminKycPage() {
   const [kycRequests, setKycRequests] = React.useState<KycSubmission[]>([]);
+  const [roleFilter, setRoleFilter] = React.useState<KycRole | "ALL">("ALL");
 
   React.useEffect(() => {
-    apiClient.adminGovernance.getKyc("PENDING").then(setKycRequests).catch(() => setKycRequests([]));
-  }, []);
+    apiClient.adminGovernance
+      .getKyc("PENDING", roleFilter === "ALL" ? undefined : roleFilter)
+      .then(setKycRequests)
+      .catch(() => setKycRequests([]));
+  }, [roleFilter]);
 
   const handleAction = async (id: string, action: "APPROVED" | "REJECTED") => {
     await apiClient.adminGovernance.updateKyc(id, { status: action });
@@ -22,7 +41,27 @@ export default function AdminKycPage() {
       <div>
         <p className="text-[12px] text-[#74817b]">Tài khoản & KYC</p>
         <h1 className="text-[26px] font-semibold text-[#203c37] mt-0.5">Xác minh Danh tính (KYC)</h1>
-        <p className="text-[14px] text-[#74817b] mt-0.5">Đối soát CCCD/hộ chiếu và thông tin đăng ký cơ sở kinh doanh của chủ trọ.</p>
+        <p className="text-[14px] text-[#74817b] mt-0.5">
+          Đối soát CCCD/hộ chiếu cho chủ trọ và thợ dịch vụ. Hồ sơ của thợ phải được duyệt
+          trước khi họ có thể bật trạng thái nhận việc.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {ROLE_FILTERS.map((filter) => (
+          <button
+            key={filter.key}
+            type="button"
+            onClick={() => setRoleFilter(filter.key)}
+            className={`px-3 py-1.5 rounded-[7px] border text-[12px] font-semibold cursor-pointer transition-colors ${
+              roleFilter === filter.key
+                ? "border-[#15594f] bg-[#15594f] text-white"
+                : "border-[#e2e7e1] bg-white text-[#74817b] hover:text-[#203c37]"
+            }`}
+          >
+            {filter.label}
+          </button>
+        ))}
       </div>
 
       {kycRequests.length === 0 ? (
@@ -41,6 +80,9 @@ export default function AdminKycPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <h3 className="text-[17px] font-bold text-[#203c37]">{req.user?.fullName ?? "Người dùng"}</h3>
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#eaf2ed] text-[#15594f]">
+                    {translateRole(req.user?.role)}
+                  </span>
                   <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#fbf1dc] text-[#9a6a12]">
                     Chờ duyệt
                   </span>

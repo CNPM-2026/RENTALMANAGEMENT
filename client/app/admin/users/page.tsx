@@ -9,7 +9,7 @@ const ROLE_LABELS: Record<Role, { label: string; bg: string; text: string }> = {
   ADMIN: { label: "Quản trị viên", bg: "bg-[#fbeae6]", text: "text-[#a4422c]" },
   LANDLORD: { label: "Chủ trọ", bg: "bg-[#eaf2ed]", text: "text-[#15594f]" },
   TENANT: { label: "Người thuê", bg: "bg-[#e8f0fb]", text: "text-[#2d5d8c]" },
-  AGENT: { label: "Môi giới", bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]" },
+  STAFF: { label: "Thợ / Dịch vụ", bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]" },
 };
 
 export default function AdminUsersPage() {
@@ -45,7 +45,7 @@ export default function AdminUsersPage() {
         <div>
           <p className="text-[12px] text-[#74817b]">Tài khoản & KYC</p>
           <h1 className="text-[26px] font-semibold text-[#203c37] mt-0.5">Quản lý Người dùng</h1>
-          <p className="text-[14px] text-[#74817b] mt-0.5">Danh sách toàn bộ tài khoản người dùng, chủ trọ và môi giới trên hệ thống.</p>
+          <p className="text-[14px] text-[#74817b] mt-0.5">Danh sách toàn bộ tài khoản người dùng, chủ trọ và thợ dịch vụ trên hệ thống.</p>
         </div>
       </div>
 
@@ -62,7 +62,7 @@ export default function AdminUsersPage() {
         </div>
 
         <div className="flex items-center gap-1.5">
-          {["ALL", "TENANT", "LANDLORD", "AGENT"].map((r) => (
+          {["ALL", "TENANT", "LANDLORD", "STAFF"].map((r) => (
             <button
               key={r}
               onClick={() => setRoleFilter(r)}

@@ -7,7 +7,7 @@ import { updateProfileSchema } from '../validations/user.validation';
 import { kycSubmissionSchema } from '../validations/resource.validation';
 
 const router = Router();
-router.use(authenticate, authorize('TENANT', 'LANDLORD', 'ADMIN', 'AGENT'));
+router.use(authenticate, authorize('TENANT', 'LANDLORD', 'STAFF', 'ADMIN'));
 
 // upload.single('avatar'): Chỉ nhận 1 file với key là 'avatar'
 router.put(

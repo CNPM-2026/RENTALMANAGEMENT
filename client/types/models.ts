@@ -7,7 +7,7 @@
 // 1. SYSTEM ENUMS
 // =============================================================================
 
-export type Role = 'ADMIN' | 'LANDLORD' | 'TENANT' | 'AGENT';
+export type Role = 'ADMIN' | 'LANDLORD' | 'TENANT' | 'STAFF';
 
 export type RoomStatus = 'AVAILABLE' | 'RENTED' | 'MAINTENANCE';
 
@@ -46,6 +46,29 @@ export type MaintenanceStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCE
 export type RentalRequestStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'CONTRACT_READY' | 'SIGNED';
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED';
 export type KycStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+/**
+ * Trạng thái KYC đầy đủ như server trả về: `NONE` = tài khoản chưa từng nộp hồ sơ.
+ * Dùng chung cho chủ trọ và thợ vì cả hai ghi vào cùng bảng `kyc_submissions`.
+ */
+export type KycState = 'NONE' | KycStatus;
+
+/** Các role có hồ sơ trong hàng đợi KYC của admin (cùng bảng `kyc_submissions`). */
+export type KycRole = 'LANDLORD' | 'STAFF';
+
+/**
+ * 🆕 Nhóm kỹ năng / loại dịch vụ của THỢ ĐỘC LẬP (mirror enum `ServiceCategory`
+ * trong Prisma schema). Dùng mảng có kiểm soát thay cho text tự do.
+ */
+export type ServiceCategory =
+  | 'ELECTRICAL'
+  | 'PLUMBING'
+  | 'WATER_LEAK'
+  | 'FURNITURE'
+  | 'AIR_CONDITIONER'
+  | 'PAINTING'
+  | 'CLEANING'
+  | 'GENERAL_MAINTENANCE';
 
 // =============================================================================
 // 2. CORE DOMAIN ENTITY MODELS
@@ -486,6 +509,63 @@ export interface StaffMembership {
   user: Pick<User, 'id' | 'email' | 'fullName' | 'phone' | 'avatarUrl'>;
 }
 
+/**
+ * 🆕 Hồ sơ THỢ ĐỘC LẬP (marketplace) — khác hoàn toàn `StaffMembership`
+ * (nhân viên được chủ trọ cấp quyền). Trả về từ `/staff-marketplace/*`.
+ *
+ * `priceMin`/`priceMax` là Decimal của Prisma nên trong JSON là string.
+ * `latitude`/`longitude` chỉ có ở hồ sơ của chính thợ (API công khai không trả
+ * toạ độ để tránh lộ vị trí nhà).
+ */
+export interface StaffProfile {
+  id: string;
+  userId: string;
+  description?: string | null;
+  serviceAddress?: string | null;
+  priceMin?: string | number | null;
+  priceMax?: string | number | null;
+  isAvailable: boolean;
+  createdAt: string;
+  updatedAt: string;
+  skills: Array<{ category: ServiceCategory }>;
+  user: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string | null;
+    email?: string;
+    phone?: string | null;
+    role?: Role;
+    isActive?: boolean;
+  };
+  latitude?: number | null;
+  longitude?: number | null;
+  /**
+   * Trạng thái KYC của thợ, đọc từ bảng dùng chung `kyc_submissions`
+   * (`NONE` = chưa từng nộp). Chỉ `APPROVED` mới được bật "đang nhận việc".
+   */
+  kycStatus?: KycState;
+}
+
+/** Payload cập nhật hồ sơ thợ (`PUT /staff-marketplace/me`). */
+export interface StaffProfilePayload {
+  description?: string | null;
+  serviceAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  priceMin?: number | null;
+  priceMax?: number | null;
+  isAvailable?: boolean;
+  skills?: ServiceCategory[];
+}
+
+export interface StaffBrowseQuery {
+  category?: ServiceCategory;
+  isAvailable?: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
 // =============================================================================
 // 3. API ENDPOINT PAYLOADS & RESPONSES (51 ENDPOINTS)
 // =============================================================================
@@ -534,6 +614,24 @@ export interface ForgotPasswordPayload {
 export interface ResetPasswordPayload {
   token: string;
   password: string;
+}
+
+/**
+ * H-05/Batch 2B1: payload của `POST /auth/password/set`.
+ * `token` là "password-setup grant" ngắn hạn phát ra sau khi xác minh email —
+ * KHÔNG phải access token/refresh token và không được lưu vào storage của trình duyệt.
+ */
+export interface PasswordSetPayload {
+  token: string;
+  password: string;
+}
+
+/**
+ * Kết quả `POST /auth/verify-email`: grant đặt mật khẩu dùng MỘT lần, sống 10 phút,
+ * gắn với `authVersion` hiện tại của tài khoản.
+ */
+export interface VerifyEmailResponse {
+  passwordSetupGrant: string;
 }
 
 // --- User Profile Endpoints ---

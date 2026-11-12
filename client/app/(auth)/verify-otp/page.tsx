@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Home, ShieldCheck, CheckCircle2, Info } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api";
+import { setPasswordSetupGrant } from "@/lib/passwordSetupGrant";
 
 function VerifyOtpForm() {
   const router = useRouter();
@@ -78,11 +79,23 @@ function VerifyOtpForm() {
     setError(null);
 
     try {
-      await apiClient.auth.verifyEmail({ email: emailParam, code: fullOtp });
+      const response = await apiClient.auth.verifyEmail({ email: emailParam, code: fullOtp });
+
+      // H-05/Batch 2B1: server KHÔNG cấp phiên đăng nhập ở bước này. Nó chỉ trả về
+      // một "password-setup grant" hẹp, giữ trong RAM (không storage, không URL) và
+      // chuyển sang bước đặt mật khẩu.
+      if (!response?.passwordSetupGrant) {
+        setError("Không thể khởi tạo bước thiết lập mật khẩu. Vui lòng thử lại hoặc dùng chức năng quên mật khẩu.");
+        return;
+      }
+
+      setPasswordSetupGrant(response.passwordSetupGrant);
       setIsSuccess(true);
       setTimeout(() => {
-        router.push("/login?verified=true");
-      }, 1500);
+        // F-3: `replace` thay vì `push` — lịch sử không giữ lại trang xác minh mà OTP
+        // đã bị tiêu thụ, nên Back/Forward không quay lại một bước đã chết.
+        router.replace("/set-password");
+      }, 1200);
     } catch (verificationError) {
       setError(verificationError instanceof ApiError ? verificationError.message : "Mã xác minh không chính xác hoặc đã hết hạn.");
     } finally {
@@ -210,7 +223,7 @@ function VerifyOtpForm() {
             Xác minh thành công!
           </h2>
           <p className="text-[14px] text-[#74817b]">
-            Tài khoản 5K-Rental Manager của bạn đã được kích hoạt. Đang chuyển hướng đến trang đăng nhập...
+            Email của bạn đã được xác minh. Đang chuyển sang bước thiết lập mật khẩu mới...
           </p>
         </div>
       )}

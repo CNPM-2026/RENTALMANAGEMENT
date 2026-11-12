@@ -3,10 +3,49 @@ export function translateRole(role?: string | null) {
     ADMIN: "Quản trị viên",
     LANDLORD: "Chủ trọ",
     TENANT: "Người thuê",
-    AGENT: "Môi giới",
+    STAFF: "Thợ / Dịch vụ",
     SUPPORT: "Bộ phận hỗ trợ",
   };
   return role ? labels[role] ?? role : "Chưa cập nhật";
+}
+
+/**
+ * Nhãn tiếng Việt cho nhóm kỹ năng của thợ (mirror `ServiceCategory`).
+ */
+export function translateServiceCategory(category?: string | null) {
+  const labels: Record<string, string> = {
+    ELECTRICAL: "Sửa điện",
+    PLUMBING: "Sửa ống nước",
+    WATER_LEAK: "Xử lý rò rỉ nước",
+    FURNITURE: "Sửa chữa nội thất",
+    AIR_CONDITIONER: "Bảo trì máy lạnh",
+    PAINTING: "Sơn sửa",
+    CLEANING: "Vệ sinh",
+    GENERAL_MAINTENANCE: "Bảo trì tổng hợp",
+  };
+  return category ? labels[category] ?? category : "Chưa cập nhật";
+}
+
+/** Danh mục kỹ năng đầy đủ, dùng cho form chọn kỹ năng của thợ. */
+export const SERVICE_CATEGORY_OPTIONS = [
+  "ELECTRICAL",
+  "PLUMBING",
+  "WATER_LEAK",
+  "FURNITURE",
+  "AIR_CONDITIONER",
+  "PAINTING",
+  "CLEANING",
+  "GENERAL_MAINTENANCE",
+] as const;
+
+export function translateKycState(state?: string | null) {
+  const labels: Record<string, string> = {
+    NONE: "Chưa nộp hồ sơ",
+    PENDING: "Đang chờ duyệt",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Bị từ chối",
+  };
+  return state ? labels[state] ?? state : "Chưa nộp hồ sơ";
 }
 
 export function translateStatus(status?: string | null) {

@@ -131,31 +131,50 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {/* Role Selector Tabs (TENANT vs LANDLORD) */}
-          <div className="grid grid-cols-2 p-1 bg-[#eaf2ed] rounded-[8px] mb-6">
+          {/* Role Selector Tabs (TENANT / LANDLORD / STAFF) */}
+          <div className="grid grid-cols-3 p-1 bg-[#eaf2ed] rounded-[8px] mb-6">
             <button
               type="button"
               onClick={() => setRole("TENANT")}
-              className={`h-[38px] rounded-[6px] text-[13px] font-semibold transition-all cursor-pointer ${
+              className={`h-[38px] rounded-[6px] text-[12px] font-semibold transition-all cursor-pointer ${
                 role === "TENANT"
                   ? "bg-white text-[#15594f] shadow-sm"
                   : "text-[#74817b] hover:text-[#203c37]"
               }`}
             >
-              Tôi là Người thuê phòng
+              Người thuê phòng
             </button>
             <button
               type="button"
               onClick={() => setRole("LANDLORD")}
-              className={`h-[38px] rounded-[6px] text-[13px] font-semibold transition-all cursor-pointer ${
+              className={`h-[38px] rounded-[6px] text-[12px] font-semibold transition-all cursor-pointer ${
                 role === "LANDLORD"
                   ? "bg-white text-[#15594f] shadow-sm"
                   : "text-[#74817b] hover:text-[#203c37]"
               }`}
             >
-              Tôi là Chủ trọ / Quản lý
+              Chủ trọ / Quản lý
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole("STAFF")}
+              className={`h-[38px] rounded-[6px] text-[12px] font-semibold transition-all cursor-pointer ${
+                role === "STAFF"
+                  ? "bg-white text-[#15594f] shadow-sm"
+                  : "text-[#74817b] hover:text-[#203c37]"
+              }`}
+            >
+              Thợ / Nhận việc
             </button>
           </div>
+
+          {role === "STAFF" && (
+            <div className="mb-6 p-3 rounded-[8px] bg-[#eaf2ed] border border-[#cfe0d8] text-[#15594f] text-[12px] leading-relaxed">
+              Tài khoản thợ là tài khoản <strong>độc lập</strong>: bạn tự quản lý hồ sơ, kỹ năng và
+              nhận việc từ nhiều chủ trọ. Sau khi xác minh email, hãy hoàn thiện hồ sơ thợ tại{" "}
+              <span className="font-semibold">Không gian thợ</span>.
+            </div>
+          )}
 
           {errorMessage && (
             <div className="mb-6 p-4 rounded-[8px] bg-[#fee2e2] border border-[#fecaca] text-[#991b1b] text-[13px] flex items-center gap-2.5">

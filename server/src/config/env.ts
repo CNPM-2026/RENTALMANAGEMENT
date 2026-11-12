@@ -29,6 +29,14 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().default('http://localhost:3000/api/v1/auth/google/callback'),
   FRONTEND_URL: z.string().url().default('http://localhost:3001'),
+  // H-05/OTP: pepper riêng cho HMAC của mã OTP (>= 32 ký tự). Cố tình OPTIONAL ở
+  // mức boot để không chặn toàn bộ server; nếu thiếu, luồng OTP fail closed (503).
+  OTP_PEPPER: z.string().optional(),
+  // Chuỗi rỗng được coi là "chưa cấu hình" (mặc định 1) thay vì làm sập boot.
+  OTP_PEPPER_VERSION: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.coerce.number().int().positive().optional(),
+  ),
 }).superRefine((config, context) => {
   const cloudinaryValues = [
     config.CLOUDINARY_CLOUD_NAME,
@@ -52,6 +60,25 @@ const envSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['CLOUDINARY_API_SECRET'],
       message: 'CLOUDINARY_API_SECRET phải là API secret riêng trong Cloudinary, không phải API key.',
+    });
+  }
+
+  // H-05/OTP: pepper phải là secret riêng và đủ mạnh. Chuỗi rỗng được coi là
+  // "chưa cấu hình" (luồng OTP trả 503), còn giá trị quá ngắn hoặc trùng secret
+  // khác là cấu hình SAI nên chặn ngay lúc khởi động.
+  const otpPepper = config.OTP_PEPPER?.trim();
+  if (otpPepper && otpPepper.length < 32) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['OTP_PEPPER'],
+      message: 'OTP_PEPPER phải dài ít nhất 32 ký tự.',
+    });
+  }
+  if (otpPepper && (otpPepper === config.JWT_SECRET || otpPepper === config.DB_URL)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['OTP_PEPPER'],
+      message: 'OTP_PEPPER phải là chuỗi bí mật riêng, không được trùng JWT_SECRET hoặc DB_URL.',
     });
   }
 });

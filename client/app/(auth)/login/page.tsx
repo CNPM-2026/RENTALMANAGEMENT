@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Home, ArrowRight, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Home, ArrowRight, Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
 import { apiClient, ApiError, getBaseApiUrl } from "@/lib/api";
 import { setAuthSession, getCurrentUser } from "@/lib/auth";
 
@@ -70,6 +70,13 @@ function LoginForm() {
     }
   }, [router]);
 
+  // H-05/Batch 2B1: quay về từ bước thiết lập mật khẩu sau khi xác minh email.
+  // Giá trị được suy ra trực tiếp từ URL (không state/effect): ở đây chỉ có một cờ
+  // hiển thị thông báo, KHÔNG có token nào được đọc từ URL.
+  const passwordSetMessage = searchParams.get("passwordSet")
+    ? "Mật khẩu đã được thiết lập. Vui lòng đăng nhập bằng email và mật khẩu mới."
+    : null;
+
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrorMessage(null);
@@ -114,6 +121,13 @@ function LoginForm() {
           Chốn ở và những kết nối của bạn vẫn ở đây.
         </p>
       </div>
+
+      {passwordSetMessage && (
+        <div className="mb-6 p-4 rounded-[8px] bg-[#eaf2ed] border border-[#cfe3d7] text-[#15594f] text-[13px] flex items-center gap-2.5">
+          <CheckCircle2 className="size-4 shrink-0" />
+          <span>{passwordSetMessage}</span>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="mb-6 p-4 rounded-[8px] bg-[#fee2e2] border border-[#fecaca] text-[#991b1b] text-[13px] flex items-center gap-2.5">
