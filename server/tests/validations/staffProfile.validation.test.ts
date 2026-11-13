@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { staffBrowseQuerySchema, staffProfileUpsertSchema } from '../../src/validations/staffProfile.validation';
+import {
+  staffBrowseBodySchema,
+  staffBrowseGetQuerySchema,
+  staffProfileUpsertSchema,
+} from '../../src/validations/staffProfile.validation';
 
 /**
  * Lớp validate là chốt chặn số cuối cùng trước Prisma. Bộ test này khoá lại các
@@ -50,9 +54,9 @@ describe('staffProfileUpsertSchema', () => {
   });
 });
 
-describe('staffBrowseQuerySchema', () => {
-  it('parse tham số query dạng chuỗi', () => {
-    expect(staffBrowseQuerySchema.parse({ page: '2', limit: '10', isAvailable: 'true' })).toMatchObject({
+describe('staffBrowseBodySchema', () => {
+  it('parse tham số dạng chuỗi và boolean từ JSON body', () => {
+    expect(staffBrowseBodySchema.parse({ page: '2', limit: '10', isAvailable: 'true' })).toMatchObject({
       page: 2,
       limit: 10,
       isAvailable: true,
@@ -60,7 +64,35 @@ describe('staffBrowseQuerySchema', () => {
   });
 
   it('chặn limit quá lớn và category lạ', () => {
-    expect(() => staffBrowseQuerySchema.parse({ limit: '1000' })).toThrow();
-    expect(() => staffBrowseQuerySchema.parse({ category: 'UNKNOWN' })).toThrow();
+    expect(() => staffBrowseBodySchema.parse({ limit: '1000' })).toThrow();
+    expect(() => staffBrowseBodySchema.parse({ category: 'UNKNOWN' })).toThrow();
+  });
+});
+
+describe('staffBrowseBodySchema — dữ liệu vị trí chỉ đi qua POST body', () => {
+  it('GET từ chối toạ độ/bán kính thay vì âm thầm bỏ qua', () => {
+    expect(staffBrowseGetQuerySchema.safeParse({ latitude: '21.0278', longitude: '105.8342' }).success).toBe(false);
+    expect(staffBrowseGetQuerySchema.safeParse({ radiusKm: '5' }).success).toBe(false);
+    expect(staffBrowseGetQuerySchema.safeParse({ page: '2', sort: 'newest' }).success).toBe(true);
+  });
+
+  it('POST body parse toạ độ dạng số/chuỗi và giữ ràng buộc cặp + bán kính', () => {
+    expect(
+      staffBrowseBodySchema.parse({
+        latitude: '21.0278',
+        longitude: '105.8342',
+        radiusKm: '5',
+        sort: 'nearest',
+        page: '2',
+      }),
+    ).toMatchObject({
+      latitude: 21.0278,
+      longitude: 105.8342,
+      radiusKm: 5,
+      sort: 'nearest',
+      page: 2,
+    });
+    expect(staffBrowseBodySchema.safeParse({ latitude: 21.0278 }).success).toBe(false);
+    expect(staffBrowseBodySchema.safeParse({ radiusKm: 5 }).success).toBe(false);
   });
 });

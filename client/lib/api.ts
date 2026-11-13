@@ -835,11 +835,17 @@ export const apiClient = {
     /** Công việc của chính chủ trọ (kèm `_count.applications`). */
     getMine: (status?: MaintenanceTaskStatus) =>
       apiClient.get<MaintenanceTask[]>('/maintenance-tasks/mine', status ? { status } : undefined),
-    /** Công việc đang mở — chỉ role STAFF. */
+    /**
+     * Công việc đang mở — chỉ role STAFF.
+     *
+     * Dùng POST body vì bộ lọc có thể chứa toạ độ (`latitude`/`longitude`) và
+     * bán kính; đưa dữ liệu vị trí vào query string sẽ làm lộ qua access log,
+     * browser history và referer.
+     */
     browseOpen: (query?: MaintenanceTaskBrowseQuery) =>
-      apiClient.get<{ meta: PaginationMeta; data: MaintenanceTask[] }>(
-        '/maintenance-tasks',
-        query as unknown as RequestOptions['params'],
+      apiClient.post<{ meta: PaginationMeta; data: MaintenanceTask[] }>(
+        '/maintenance-tasks/browse',
+        query ?? {},
       ),
     getById: (id: string) => apiClient.get<MaintenanceTask>(`/maintenance-tasks/${id}`),
     cancel: (id: string) => apiClient.post<MaintenanceTask>(`/maintenance-tasks/${id}/cancel`),
@@ -947,11 +953,16 @@ export const apiClient = {
       apiClient.put<StaffProfile>('/staff-marketplace/me', payload),
     updateAvailability: (isAvailable: boolean) =>
       apiClient.patch<StaffProfile>('/staff-marketplace/me/availability', { isAvailable }),
-    /** Chủ trọ khám phá thợ theo kỹ năng / trạng thái (phân trang). */
+    /**
+     * Chủ trọ khám phá thợ theo kỹ năng / trạng thái (phân trang).
+     *
+     * POST body để toạ độ/bán kính không xuất hiện trong URL (access log,
+     * browser history, referer headers).
+     */
     browse: (query?: StaffBrowseQuery) =>
-      apiClient.get<{ meta: PaginationMeta; data: StaffProfile[] }>(
-        '/staff-marketplace',
-        query as unknown as RequestOptions['params'],
+      apiClient.post<{ meta: PaginationMeta; data: StaffProfile[] }>(
+        '/staff-marketplace/browse',
+        query ?? {},
       ),
     getPublicProfile: (userId: string) =>
       apiClient.get<StaffProfile>(`/staff-marketplace/${userId}`),

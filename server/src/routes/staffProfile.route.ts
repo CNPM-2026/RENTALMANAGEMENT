@@ -4,7 +4,8 @@ import { validate } from '../middlewares/validate.middleware';
 import { staffProfileController } from '../controllers/staffProfile.controller';
 import {
   staffAvailabilitySchema,
-  staffBrowseQuerySchema,
+  staffBrowseBodySchema,
+  staffBrowseGetQuerySchema,
   staffProfileUpsertSchema,
 } from '../validations/staffProfile.validation';
 
@@ -30,9 +31,16 @@ router.patch(
   staffProfileController.updateAvailability,
 );
 
-// --- Chủ trọ khám phá thợ (lọc theo kỹ năng/trạng thái) ---
-// Sắp xếp theo khoảng cách địa lý được bổ sung ở Batch 2 (cần toạ độ bất động sản).
-router.get('/', authorize('LANDLORD', 'ADMIN'), validate(staffBrowseQuerySchema, 'query'), staffProfileController.browse);
+// --- Chủ trọ khám phá thợ ---
+// GET chỉ nhận filter thường. Toạ độ/bán kính là dữ liệu nhạy cảm nên đi qua
+// POST body để không bị lộ trong URL (access log, browser history, referer).
+router.post(
+  '/browse',
+  authorize('LANDLORD', 'ADMIN'),
+  validate(staffBrowseBodySchema),
+  staffProfileController.browseByLocation,
+);
+router.get('/', authorize('LANDLORD', 'ADMIN'), validate(staffBrowseGetQuerySchema, 'query'), staffProfileController.browse);
 
 // --- Hồ sơ công khai (mọi user đã đăng nhập) ---
 // Đặt SAU các route tĩnh để `/me` không bị hiểu thành `:userId`.

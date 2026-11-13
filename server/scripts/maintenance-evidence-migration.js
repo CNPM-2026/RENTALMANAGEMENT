@@ -118,20 +118,35 @@ const saveState = (state) => writeJson(STATE_FILE, { ...state, updatedAt: new Da
  *  - `cloudinary-url` : URL Cloudinary công khai (dữ liệu cũ, cần migrate)
  *  - `local`          : file trong `server/uploads` (không phải Cloudinary)
  *  - `foreign-host`   : URL của host khác — không tự ý tải (chống SSRF)
+ *  - `unsupported-url`: đúng host Cloudinary nhưng sai scheme/port/userinfo
  *  - `unsupported-path` / `malformed` / `empty`
  */
 const parseCloudinaryRef = (value) => {
-  if (!value) return { kind: 'empty' };
-  if (value.startsWith('/uploads/')) return { kind: 'local' };
-  if (!value.includes('://')) return { kind: 'private-id' };
+  if (typeof value !== 'string' || value.trim() === '') return { kind: 'empty' };
+  const ref = value.trim();
+  if (ref.startsWith('/uploads/')) return { kind: 'local' };
+  // `//host/path` là URL protocol-relative, KHÔNG phải public_id. Xếp vào
+  // malformed để không bao giờ bị dùng như asset Cloudinary.
+  if (ref.startsWith('//')) return { kind: 'malformed' };
+  if (!ref.includes('://')) return { kind: 'private-id' };
 
   let url;
   try {
-    url = new URL(value);
+    // Parse bằng WHATWG URL rồi so `hostname` CHÍNH XÁC. Không dùng
+    // startsWith/includes để kiểm tra host: `https://res.cloudinary.com.evil.tld`
+    // hoặc `https://res.cloudinary.com@evil.tld` đều sẽ lọt nếu so chuỗi.
+    url = new URL(ref);
   } catch {
     return { kind: 'malformed' };
   }
   if (url.hostname !== CLOUDINARY_HOST) return { kind: 'foreign-host', host: url.hostname };
+
+  // URL Cloudinary hợp lệ phải là HTTPS, không port lạ, không userinfo. Các dạng
+  // `http://...`, `https://user:pass@res.cloudinary.com/...` hoặc port tùy ý bị
+  // từ chối thay vì được tải/xóa như asset thật.
+  if (url.protocol !== 'https:' || url.port !== '' || url.username !== '' || url.password !== '') {
+    return { kind: 'unsupported-url', host: url.hostname, protocol: url.protocol };
+  }
 
   const segments = url.pathname.split('/').filter(Boolean);
   const [cloud, resourceType, deliveryType] = segments;
@@ -327,6 +342,7 @@ const emptyKinds = () => ({
   'cloudinary-url': 0,
   local: 0,
   'foreign-host': 0,
+  'unsupported-url': 0,
   'unsupported-path': 0,
   malformed: 0,
   empty: 0,
@@ -1027,12 +1043,22 @@ const runFixtureChecks = async (pngBuffer) => {
     });
 
     const minted = service.mintEvidenceUrl('issue', image.id, { id: tenant.id, role: 'TENANT' });
+    // Parse như một URL tương đối để kiểm tra origin/path/query thay vì so chuỗi
+    // host bằng `includes` (không đáng tin và bị CodeQL cảnh báo).
+    let mintedUrl = null;
+    try {
+      mintedUrl = new URL(minted, 'https://app.invalid');
+    } catch {
+      mintedUrl = null;
+    }
     checks.push({
       name: 'fixture-payload-uses-proxy-not-cloudinary',
       ok:
-        minted.startsWith('/api/v1/maintenance-images/issue/') &&
-        minted.includes('token=') &&
-        !minted.includes('res.cloudinary.com'),
+        mintedUrl !== null &&
+        mintedUrl.origin === 'https://app.invalid' &&
+        /^\/api\/v1\/maintenance-images\/issue\//.test(mintedUrl.pathname) &&
+        Boolean(mintedUrl.searchParams.get('token')) &&
+        mintedUrl.hostname !== CLOUDINARY_HOST,
       detail: 'đường dẫn + token, không có URL Cloudinary',
     });
 

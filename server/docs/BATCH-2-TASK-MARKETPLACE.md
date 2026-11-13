@@ -30,7 +30,7 @@ reuses it instead of re-implementing it.
 | `src/validations/staffProfile.validation.ts` | extended browse query with `latitude`/`longitude`/`radiusKm`/`sort` + cross-field rules |
 | `src/services/maintenanceTask.service.ts` | **new** — task creation/update/cancel, landlord list, viewer-scoped detail, staff discovery by distance |
 | `src/services/maintenanceApplication.service.ts` | **new** — apply/withdraw, landlord review list, atomic accept, reject |
-| `src/services/staffProfile.service.ts` | distance ordering + radius filtering for `GET /staff-marketplace` (coordinates never returned) |
+| `src/services/staffProfile.service.ts` | distance ordering + radius filtering for `POST /staff-marketplace/browse` (coordinates never returned) |
 | `src/controllers/maintenanceTask.controller.ts` | **new** |
 | `src/controllers/staffProfile.controller.ts` | passes the new geo query parameters |
 | `src/routes/maintenanceTask.route.ts` | **new** — mounted at `/api/v1/maintenance-tasks` |
@@ -91,10 +91,12 @@ Staff:
 - See every application they sent and its current status.
 
 Landlord discovery (Batch 1 endpoint extended):
-- `GET /api/v1/staff-marketplace` now supports `latitude`, `longitude`,
-  `radiusKm`, `sort=nearest`; staff without coordinates are excluded from radius
-  searches and get `distanceKm: null` otherwise. A staff member's coordinates are
-  still never returned.
+- `POST /api/v1/staff-marketplace/browse` accepts `latitude`, `longitude`,
+  `radiusKm`, `sort=nearest` in the JSON **body**. Location data must not travel
+  in a GET query string (access logs, browser history, referer); `GET
+  /api/v1/staff-marketplace` only accepts non-sensitive filters. Staff without
+  coordinates are excluded from radius searches and get `distanceKm: null`
+  otherwise. A staff member's coordinates are still never returned.
 
 Notifications (existing `notificationService`, persisted first, socket second):
 new application (→ landlord), application accepted (→ staff), application
@@ -113,11 +115,13 @@ because the task was cancelled (→ each staff).
 | `GET` | `/api/v1/maintenance-tasks/:id/applications` | `LANDLORD` | owner only, 404 otherwise |
 | `POST` | `/api/v1/maintenance-tasks/:id/applications/:applicationId/accept` | `LANDLORD` | atomic assignment |
 | `POST` | `/api/v1/maintenance-tasks/:id/applications/:applicationId/reject` | `LANDLORD` | pending applications only |
-| `GET` | `/api/v1/maintenance-tasks` | `STAFF` | open tasks; `category`, `skill`, `urgency`, `search`, `latitude`, `longitude`, `radiusKm`, `sort`, `page`, `limit` |
+| `GET` | `/api/v1/maintenance-tasks` | `STAFF` | open tasks; non-sensitive filters only: `category`, `skill`, `urgency`, `search`, `sort=newest|urgency`, `page`, `limit` |
+| `POST` | `/api/v1/maintenance-tasks/browse` | `STAFF` | body variant for distance search: adds `latitude`, `longitude`, `radiusKm`, `sort=nearest` without putting location in the URL |
 | `POST` | `/api/v1/maintenance-tasks/:id/applications` | `STAFF` | body `{ message? }`; KYC + eligibility enforced in-transaction |
 | `DELETE` | `/api/v1/maintenance-tasks/:id/applications/me` | `STAFF` | withdraw a `PENDING` application |
 | `GET` | `/api/v1/maintenance-tasks/applications/mine` | `STAFF` | own applications with task summary |
-| `GET` | `/api/v1/staff-marketplace` | `LANDLORD`, `ADMIN` | **modified**: `latitude`, `longitude`, `radiusKm`, `sort`; items gain `distanceKm` |
+| `GET` | `/api/v1/staff-marketplace` | `LANDLORD`, `ADMIN` | **modified**: non-sensitive filters only; items gain `distanceKm` when returned from the POST variant |
+| `POST` | `/api/v1/staff-marketplace/browse` | `LANDLORD`, `ADMIN` | JSON body: `latitude`, `longitude`, `radiusKm`, `sort=nearest`; items gain `distanceKm` |
 
 "Filter by KYC-approved status" is a **hard filter**, not a parameter: only
 `kyc_submissions.status = APPROVED` staff are ever returned (Batch 1

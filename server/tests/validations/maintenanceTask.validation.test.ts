@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   maintenanceApplicationCreateSchema,
-  maintenanceTaskBrowseQuerySchema,
+  maintenanceTaskBrowseBodySchema,
+  maintenanceTaskGetQuerySchema,
   maintenanceTaskUpdateSchema,
 } from '../../src/validations/maintenanceTask.validation';
 
@@ -80,14 +81,40 @@ describe('maintenanceTaskUpdateSchema', () => {
   });
 });
 
-describe('maintenanceTaskBrowseQuerySchema', () => {
+describe('maintenanceTaskBrowseBodySchema', () => {
   it('bắt buộc có toạ độ khi sắp xếp theo khoảng cách hoặc lọc bán kính', () => {
-    expect(maintenanceTaskBrowseQuerySchema.safeParse({ sort: 'nearest' }).success).toBe(false);
-    expect(maintenanceTaskBrowseQuerySchema.safeParse({ radiusKm: 5 }).success).toBe(false);
+    expect(maintenanceTaskBrowseBodySchema.safeParse({ sort: 'nearest' }).success).toBe(false);
+    expect(maintenanceTaskBrowseBodySchema.safeParse({ radiusKm: 5 }).success).toBe(false);
     expect(
-      maintenanceTaskBrowseQuerySchema.safeParse({ latitude: '21.0278', longitude: '105.8342', sort: 'nearest', radiusKm: '5' })
-        .success,
+      maintenanceTaskBrowseBodySchema.safeParse({
+        latitude: '21.0278',
+        longitude: '105.8342',
+        sort: 'nearest',
+        radiusKm: '5',
+      }).success,
     ).toBe(true);
+  });
+});
+
+describe('maintenanceTaskGetQuerySchema — không nhận dữ liệu vị trí qua GET', () => {
+  it('từ chối toạ độ/bán kính và sort=nearest', () => {
+    expect(maintenanceTaskGetQuerySchema.safeParse({ latitude: '21.0278', longitude: '105.8342' }).success).toBe(false);
+    expect(maintenanceTaskGetQuerySchema.safeParse({ radiusKm: '5' }).success).toBe(false);
+    expect(maintenanceTaskGetQuerySchema.safeParse({ sort: 'nearest' }).success).toBe(false);
+  });
+
+  it('vẫn nhận filter thường', () => {
+    expect(
+      maintenanceTaskGetQuerySchema.parse({
+        category: 'PLUMBING',
+        skill: 'CLEANING',
+        urgency: 'HIGH',
+        search: 'rò rỉ',
+        sort: 'urgency',
+        page: '2',
+        limit: '20',
+      }),
+    ).toMatchObject({ page: 2, limit: 20, sort: 'urgency' });
   });
 });
 

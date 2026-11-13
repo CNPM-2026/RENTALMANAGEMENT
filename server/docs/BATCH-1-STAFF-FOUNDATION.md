@@ -314,7 +314,8 @@ system.
 1. **Approval gate:** approve §4 (additive) and pick an option in §5.3.
 2. **Batch 2 (task marketplace):** needs new tables (`maintenance_tasks`, task
    images, applications/assignments, negotiation history) plus the Haversine
-   ordering for `GET /staff-marketplace`. Distance ordering must skip staff with
+   ordering for `POST /staff-marketplace/browse` (geo in the body, not a GET
+  query string). Distance ordering must skip staff with
    `latitude`/`longitude` = NULL explicitly (never treat missing as `(0,0)`) and
    must fall back to a deterministic secondary order (`updatedAt desc, id asc`).
    **→ delivered in `docs/BATCH-2-TASK-MARKETPLACE.md`** (schema delta awaiting

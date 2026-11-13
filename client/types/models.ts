@@ -916,6 +916,12 @@ export interface StaffProfilePayload {
   skills?: ServiceCategory[];
 }
 
+/**
+ * Filter gửi trong body của `POST /staff-marketplace/browse`.
+ *
+ * Toạ độ/bán kính KHÔNG đi qua GET query string để tránh lộ qua access log,
+ * browser history và referer.
+ */
 export interface StaffBrowseQuery {
   category?: ServiceCategory;
   isAvailable?: boolean;
@@ -1106,6 +1112,7 @@ export interface CreateMaintenanceTaskPayload {
   additionalInstructions?: string | null;
 }
 
+/** Filter gửi trong body của `POST /maintenance-tasks/browse`. */
 export interface MaintenanceTaskBrowseQuery {
   category?: ServiceCategory;
   skill?: ServiceCategory;

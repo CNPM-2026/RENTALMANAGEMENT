@@ -9,8 +9,9 @@ import {
   maintenanceCompletionConfirmSchema,
   maintenanceCompletionRejectSchema,
   maintenanceTaskAssignedQuerySchema,
-  maintenanceTaskBrowseQuerySchema,
+  maintenanceTaskBrowseBodySchema,
   maintenanceTaskCompletionSchema,
+  maintenanceTaskGetQuerySchema,
   maintenanceTaskListQuerySchema,
   maintenanceTaskUpdateSchema,
 } from '../validations/maintenanceTask.validation';
@@ -45,10 +46,18 @@ const taskWriteLimiter = rateLimit({
 router.use(authenticate);
 
 // --- Thợ: công việc đang mở + đơn của chính mình ---
+// GET chỉ nhận filter thường (category/skill/search...). Toạ độ/bán kính là dữ
+// liệu nhạy cảm nên đi qua POST body, tránh lộ trong URL/access log/referer.
+router.post(
+  '/browse',
+  authorize('STAFF'),
+  validate(maintenanceTaskBrowseBodySchema),
+  maintenanceTaskController.browseOpenByLocation,
+);
 router.get(
   '/',
   authorize('STAFF'),
-  validate(maintenanceTaskBrowseQuerySchema, 'query'),
+  validate(maintenanceTaskGetQuerySchema, 'query'),
   maintenanceTaskController.browseOpen,
 );
 router.get('/applications/mine', authorize('STAFF'), maintenanceTaskController.listMyApplications);

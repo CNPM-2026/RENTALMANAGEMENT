@@ -75,21 +75,39 @@ export const maintenanceTaskController = {
   },
 
   // --- Thợ ---
+  /**
+   * GET chỉ dành cho filter KHÔNG nhạy cảm.
+   *
+   * Không đọc `latitude`/`longitude`/`radiusKm` từ `req.query`: URL có thể bị
+   * ghi vào access log, browser history hoặc referer. Tìm việc gần đây dùng
+   * `browseOpenByLocation` (POST).
+   */
   browseOpen: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const query = req.query as Record<string, unknown>;
-      const result = await maintenanceTaskService.browseOpen(req.user!.id, {
-        category: query.category as never,
-        skill: query.skill as never,
-        urgency: query.urgency as never,
-        search: query.search as string | undefined,
-        latitude: toOptionalNumber(query.latitude),
-        longitude: toOptionalNumber(query.longitude),
-        radiusKm: toOptionalNumber(query.radiusKm),
-        sort: query.sort as never,
-        page: toPositiveInt(query.page) ?? undefined,
-        limit: toPositiveInt(query.limit) ?? undefined,
-      });
+      const query = req.query as MaintenanceTaskBrowseSource;
+      const result = await maintenanceTaskService.browseOpen(
+        req.user!.id,
+        baseTaskBrowseInput(query),
+      );
+      return res.json({ success: true, data: result.items, meta: result.meta });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  /**
+   * POST body cho filter có dữ liệu vị trí nhạy cảm.
+   *
+   * Chỉ đọc `req.body`; không fallback sang `req.query` cho geo — fallback sẽ
+   * tái tạo đúng luồng dữ liệu mà CodeQL cảnh báo.
+   */
+  browseOpenByLocation: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as MaintenanceTaskBrowseSource;
+      const result = await maintenanceTaskService.browseOpen(
+        req.user!.id,
+        taskBrowseInputWithLocation(body),
+      );
       return res.json({ success: true, data: result.items, meta: result.meta });
     } catch (error) {
       return next(error);
@@ -335,6 +353,45 @@ export const maintenanceTaskController = {
     }
   },
 };
+
+type MaintenanceTaskBrowseSource = {
+  category?: string;
+  skill?: string;
+  urgency?: 'LOW' | 'MEDIUM' | 'HIGH';
+  search?: string;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+  radiusKm?: string | number | null;
+  sort?: 'newest' | 'nearest' | 'urgency';
+  page?: string | number;
+  limit?: string | number;
+};
+
+/** Filter thường — an toàn cho cả GET query và POST body. */
+function baseTaskBrowseInput(source: MaintenanceTaskBrowseSource) {
+  return {
+    category: source.category as never,
+    skill: source.skill as never,
+    urgency: source.urgency as never,
+    search: source.search,
+    sort: source.sort as never,
+    page: toPositiveInt(source.page) ?? undefined,
+    limit: toPositiveInt(source.limit) ?? undefined,
+  };
+}
+
+/**
+ * Filter có geo — CHỈ gọi với `req.body` từ route POST.
+ * Giữ `toOptionalNumber` để `''`/dữ liệu lỗi không âm thầm thành 0.
+ */
+function taskBrowseInputWithLocation(source: MaintenanceTaskBrowseSource) {
+  return {
+    ...baseTaskBrowseInput(source),
+    latitude: toOptionalNumber(source.latitude),
+    longitude: toOptionalNumber(source.longitude),
+    radiusKm: toOptionalNumber(source.radiusKm),
+  };
+}
 
 /** Query string luôn là chuỗi: `''`/không phải số -> `undefined` (không thành 0). */
 function toOptionalNumber(value: unknown): number | undefined {

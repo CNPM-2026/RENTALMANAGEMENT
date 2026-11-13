@@ -250,17 +250,38 @@ export const MAINTENANCE_TASK_STATUSES = [
 
 
 
-export const maintenanceTaskBrowseQuerySchema = z
+/**
+ * Filter KHÔNG nhạy cảm — an toàn khi nhận qua GET query string.
+ *
+ * `latitude`/`longitude`/`radiusKm` cố ý không nằm ở đây. CodeQL coi dữ liệu vị
+ * trí đọc từ GET là nhạy cảm (có thể lộ qua access log, browser history,
+ * referer), nên geo chỉ được nhận từ body của `POST /maintenance-tasks/browse`.
+ */
+const maintenanceTaskBrowseFilterFields = {
+  category: serviceCategorySchema.optional(),
+  // Kỹ năng cụ thể của thợ — khác `category` (danh mục của công việc).
+  skill: serviceCategorySchema.optional(),
+  urgency: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+  search: z.string().trim().max(100).optional(),
+  page: positiveIntQuery,
+  limit: positiveIntQuery,
+};
+
+/** GET chỉ nhận filter thường; `nearest` cần toạ độ nên chỉ có ở POST body. */
+export const maintenanceTaskGetQuerySchema = z
   .object({
-    category: serviceCategorySchema.optional(),
-    // Kỹ năng cụ thể của thợ — khác `category` (danh mục của công việc).
-    skill: serviceCategorySchema.optional(),
-    urgency: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
-    search: z.string().trim().max(100).optional(),
+    ...maintenanceTaskBrowseFilterFields,
+    sort: z.enum(['newest', 'urgency']).optional(),
+  })
+  // Từ chối geo trong GET thay vì âm thầm bỏ qua; client phải dùng POST body.
+  .strict();
+
+/** Body của `POST /maintenance-tasks/browse` (có dữ liệu vị trí nhạy cảm). */
+export const maintenanceTaskBrowseBodySchema = z
+  .object({
+    ...maintenanceTaskBrowseFilterFields,
     ...coordinateQueryFields,
     sort: z.enum(MAINTENANCE_TASK_SORTS).optional(),
-    page: positiveIntQuery,
-    limit: positiveIntQuery,
   })
   .superRefine(applyGeoRules);
 
@@ -323,7 +344,7 @@ export const maintenanceCompletionRejectSchema = z.object({
 
 export type MaintenanceTaskUpdateInput = z.infer<typeof maintenanceTaskUpdateSchema>;
 export type MaintenanceTaskFromIssueInput = z.infer<typeof maintenanceTaskFromIssueSchema>;
-export type MaintenanceTaskBrowseQuery = z.infer<typeof maintenanceTaskBrowseQuerySchema>;
+export type MaintenanceTaskBrowseQuery = z.infer<typeof maintenanceTaskBrowseBodySchema>;
 export type MaintenanceApplicationCreateInput = z.infer<typeof maintenanceApplicationCreateSchema>;
 /** 🆕 Batch 3 */
 export type MaintenanceTaskCompletionInput = z.infer<typeof maintenanceTaskCompletionSchema>;
