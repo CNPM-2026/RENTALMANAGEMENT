@@ -4,21 +4,18 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ShieldAlert,
   Flag,
-  Upload,
   Check,
   AlertTriangle,
   Lock,
   ChevronLeft,
   ImagePlus,
-  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
-import { ReportTargetType } from "@/types/models";
+import { ReportTargetType, DisputeCategory } from "@/types/models";
 
 function SafetyReportViolationContent() {
   const router = useRouter();
@@ -87,10 +84,20 @@ function SafetyReportViolationContent() {
     setErrorMessage(null);
 
     try {
+      // Ánh xạ lựa chọn của trang an toàn sang `DisputeCategory` chuẩn của server
+      // (Batch 4) — server từ chối giá trị ngoài enum, không đoán hộ.
+      const categoryMap: Record<string, DisputeCategory> = {
+        FAKE_LISTING: "FRAUD",
+        ILLEGAL_DEPOSIT: "FRAUD",
+        PRICE_FRAUD: "PRICE_DISPUTE",
+        HARASSMENT: "HARASSMENT",
+        OTHER: "OTHER",
+      };
       await apiClient.reports.create({
         targetType,
         targetId: targetIdentifier.trim(),
-        reason: `[${violationCategory}] ${reasonDescription.trim()} (URL: ${targetUrl || "Không có"}) (Liên hệ xác minh: ${contactInfo})`,
+        category: categoryMap[violationCategory] ?? "OTHER",
+        reason: `${reasonDescription.trim()} (URL: ${targetUrl || "Không có"}) (Liên hệ xác minh: ${contactInfo || "Không có"})`,
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Không thể gửi báo cáo. Vui lòng thử lại.");

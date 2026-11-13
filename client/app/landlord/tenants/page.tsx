@@ -3,8 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users, Search, Phone, Mail, MessageSquare, DoorOpen, ShieldCheck } from "lucide-react";
+import { Users, Search, Phone, Mail, MessageSquare, DoorOpen } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { Avatar } from "@/components/ui/avatar";
 import { Contract } from "@/types/models";
 
 export default function LandlordTenantsPage() {
@@ -71,16 +72,24 @@ export default function LandlordTenantsPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-[16px] font-semibold text-[#203c37]">
-                      {item.tenant?.fullName || "Khách thuê"}
+                      <Link
+                        href={`/users/${item.tenantId}`}
+                        className="hover:text-[#15594f] hover:underline"
+                        title="Xem trang cá nhân công khai"
+                      >
+                        {item.tenant?.fullName || "Khách thuê"}
+                      </Link>
                     </h3>
                     <p className="text-[12px] text-[#15594f] font-medium flex items-center gap-1 mt-0.5">
                       <DoorOpen className="size-3.5" />
                       Phòng {item.room?.roomNumber || "---"}
                     </p>
                   </div>
-                  <span className="size-8 rounded-full bg-[#eaf2ed] text-[#15594f] flex items-center justify-center font-bold text-xs">
-                    {(item.tenant?.fullName || "U").charAt(0).toUpperCase()}
-                  </span>
+                  <Avatar
+                    src={item.tenant?.avatarUrl}
+                    alt={item.tenant?.fullName || "Khách thuê"}
+                    className="size-8 rounded-full border border-[#e2e7e1] object-cover"
+                  />
                 </div>
 
                 <div className="mt-4 space-y-1.5 text-[12px] text-[#74817b]">

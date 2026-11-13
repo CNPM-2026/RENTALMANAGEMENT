@@ -55,6 +55,78 @@ export const roomService = {
     });
   },
 
+  /**
+   * 🆕 Sửa phòng (giá điện/nước/sức chứa...).
+   * Sức chứa KHÔNG được giảm xuống dưới số người đã được xác minh hiện tại —
+   * nếu không, dữ liệu occupancy và hoá đơn sẽ mâu thuẫn ngay sau khi lưu.
+   */
+  updateRoom: async (landlordId: string, roomId: string, data: any) => {
+    const room = await prisma.room.findFirst({
+      where: { id: roomId, property: { landlordId } },
+      select: { id: true, propertyId: true, roomNumber: true },
+    });
+    if (!room) throw new AppError('Không tìm thấy phòng hoặc bạn không có quyền sửa', 404);
+
+    const { amenityIds, ...fields } = data;
+    const updateData: Record<string, unknown> = {};
+    for (const key of [
+      'roomNumber',
+      'priceMonthly',
+      'priceYearly',
+      'depositAmount',
+      'electricityRate',
+      'waterRate',
+      'internetFee',
+      'serviceFee',
+      'parkingFee',
+      'area',
+      'maxOccupants',
+    ]) {
+      if (fields[key] !== undefined) updateData[key] = fields[key];
+    }
+
+    if (typeof updateData.maxOccupants === 'number') {
+      const verified = await prisma.roomOccupancyDeclaration.findFirst({
+        where: { roomId, status: 'VERIFIED', supersededAt: null },
+        orderBy: { verifiedAt: 'desc' },
+        select: { occupants: true },
+      });
+      if (verified && updateData.maxOccupants < verified.occupants) {
+        throw new AppError(
+          `Không thể giảm sức chứa xuống ${updateData.maxOccupants}: hiện có ${verified.occupants} người đã được xác minh`,
+          400,
+          'CAPACITY_BELOW_VERIFIED_OCCUPANTS',
+        );
+      }
+    }
+
+    if (typeof updateData.roomNumber === 'string' && updateData.roomNumber !== room.roomNumber) {
+      const duplicate = await prisma.room.findFirst({
+        where: { propertyId: room.propertyId, roomNumber: updateData.roomNumber },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new AppError(`Phòng ${updateData.roomNumber} đã tồn tại trong dãy trọ này`, 400);
+      }
+    }
+
+    return prisma.$transaction(async (tx) => {
+      if (Array.isArray(amenityIds)) {
+        await tx.roomAmenity.deleteMany({ where: { roomId } });
+        if (amenityIds.length > 0) {
+          await tx.roomAmenity.createMany({
+            data: amenityIds.map((amenityId: string) => ({ roomId, amenityId })),
+          });
+        }
+      }
+      return tx.room.update({
+        where: { id: roomId },
+        data: updateData,
+        include: { roomAmenities: { include: { amenity: true } } },
+      });
+    });
+  },
+
   // Lấy danh sách phòng theo nhà trọ
   getRoomsByProperty: async (landlordId: string, propertyId: string) => {
     // Check quyền sở hữu

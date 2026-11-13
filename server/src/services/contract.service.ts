@@ -2,6 +2,7 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { ContractStatus } from '@prisma/client';
 import { notificationService } from './notification.service';
+import { roomDemandService } from './roomDemand.service';
 
 export const contractService = {
   // 1. Chủ trọ tạo hợp đồng mới
@@ -31,7 +32,7 @@ export const contractService = {
     }
 
     // Sử dụng Transaction để tạo hợp đồng VÀ đổi trạng thái phòng cùng lúc
-    const contract = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const claimedRoom = await tx.room.updateMany({
         where: { id: roomId, status: 'AVAILABLE' },
         data: { status: 'RENTED' },
@@ -61,16 +62,21 @@ export const contractService = {
         }
       });
 
-      return contract;
+      // Hợp đồng ACTIVE ⇒ phòng đã thuộc về tenant này. Huỷ mọi yêu cầu thuê /
+      // lịch xem còn mở của phòng ngay trong cùng transaction.
+      const cancelled = await roomDemandService.cancelOpenDemand(tx, { roomId });
+
+      return { contract, cancelled };
     });
+    await roomDemandService.notifyCancelledDemand(result.cancelled, result.contract.room.roomNumber);
     await notificationService.createNotification(
       tenantId,
       'Hợp đồng mới',
       'Chủ trọ đã tạo hợp đồng thuê mới cho bạn.',
       'CONTRACT',
-      contract.id
+      result.contract.id
     );
-    return contract;
+    return result.contract;
   },
 
   // 2. Lấy danh sách hợp đồng (Dành cho cả Chủ trọ và Người thuê)
@@ -87,7 +93,7 @@ export const contractService = {
       throw new AppError('Role không được phép xem hợp đồng', 403);
     }
 
-    return await prisma.contract.findMany({
+    const contracts = await prisma.contract.findMany({
       where: whereClause,
       include: {
         room: { 
@@ -99,10 +105,19 @@ export const contractService = {
             },
           }
         },
-        tenant: { select: { fullName: true, phone: true, email: true } }
+        tenant: { select: { id: true, fullName: true, phone: true, email: true, avatarUrl: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // `isExpired` là giá trị SUY RA, không ghi ngược status: hợp đồng có thể vẫn
+    // ACTIVE trong DB cho tới khi chủ trọ/người thuê chọn ký tiếp hoặc chấm dứt.
+    // Nhờ vậy UI hiển thị đúng "đã đến hạn" mà không cần job nền đổi trạng thái.
+    const now = Date.now();
+    return contracts.map((contract) => ({
+      ...contract,
+      isExpired: Boolean(contract.endDate && new Date(contract.endDate).getTime() < now),
+    }));
   },
 
   // 3. Cập nhật trạng thái hợp đồng (Kết thúc hợp đồng trước hạn)
@@ -126,7 +141,11 @@ export const contractService = {
       throw new AppError(`Không thể chuyển hợp đồng từ ${contract.status} sang ${status}`, 400);
     }
 
-    const updatedContract = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
+      let cancelled: Awaited<ReturnType<typeof roomDemandService.cancelOpenDemand>> = {
+        rentalRequests: [],
+        appointments: [],
+      };
       if (status === 'ACTIVE') {
         const claimedRoom = await tx.room.updateMany({
           where: { id: contract.roomId, status: 'AVAILABLE' },
@@ -139,6 +158,8 @@ export const contractService = {
           where: { roomId: contract.roomId, status: { in: ['PENDING', 'APPROVED'] } },
           data: { status: 'CLOSED' },
         });
+        // Kích hoạt hợp đồng = phòng đã thuê ⇒ huỷ nhu cầu còn mở của phòng.
+        cancelled = await roomDemandService.cancelOpenDemand(tx, { roomId: contract.roomId });
       } else if (status === 'TERMINATED' || status === 'EXPIRED') {
         if (contract.status === 'ACTIVE') {
           const releasedRoom = await tx.room.updateMany({
@@ -159,8 +180,12 @@ export const contractService = {
         throw new AppError('Hợp đồng vừa được cập nhật bởi request khác', 409);
       }
 
-      return tx.contract.findUniqueOrThrow({ where: { id: contractId } });
+      return {
+        updatedContract: await tx.contract.findUniqueOrThrow({ where: { id: contractId } }),
+        cancelled,
+      };
     });
+    await roomDemandService.notifyCancelledDemand(result.cancelled, contract.room.roomNumber);
     await notificationService.createNotification(
       contract.tenantId,
       'Cập nhật hợp đồng',
@@ -168,6 +193,6 @@ export const contractService = {
       'CONTRACT',
       contract.id
     );
-    return updatedContract;
+    return result.updatedContract;
   }
 };

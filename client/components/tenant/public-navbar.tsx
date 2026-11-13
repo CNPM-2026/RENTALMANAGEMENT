@@ -13,6 +13,7 @@ import {
   X,
   Heart,
   Bell,
+  MessageSquare,
   User,
   ShieldCheck,
   LogOut,
@@ -22,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { translateRole } from "@/lib/labels";
-import { useNotifications } from "@/hooks/use-notifications";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
 
 interface PublicNavbarProps {
@@ -44,7 +45,6 @@ export function PublicNavbar({
   const currentPath = pathname ?? "";
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = React.useState(false);
-  const { unreadCount } = useNotifications(Boolean(currentUser));
 
   const navLinks = [
     { label: "Trang chủ", href: "/", icon: Home },
@@ -119,15 +119,13 @@ export function PublicNavbar({
               {/* Chat shortcut (Next to Notifications) */}
               <TopbarChatButton className="size-10 rounded-[8px] border border-[#e2e7e1]" iconClassName="size-5" />
 
-              {/* Notifications shortcut */}
-              <Link
-                href="/tenant/notifications"
-                title="Thông báo"
-                className="size-10 rounded-[8px] border border-[#e2e7e1] flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors relative"
-              >
-                <Bell className="size-5" />
-                {unreadCount > 0 && <span className="absolute top-2 right-2 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />}
-              </Link>
+              {/* Notifications dropdown */}
+              <NotificationDropdown
+                portal="tenant"
+                badgeMode="dot"
+                buttonClassName="size-10 rounded-[8px] border border-[#e2e7e1] flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors relative"
+                iconClassName="size-5"
+              />
 
               {/* User Dropdown Pill */}
               <div className="relative">
@@ -159,6 +157,9 @@ export function PublicNavbar({
                       </p>
                       <p className="text-[11px] text-[#74817b] truncate">
                         {currentUser.email}
+                      </p>
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#15594f]">
+                        {translateRole(currentUser.role)}
                       </p>
                     </div>
 
@@ -195,7 +196,7 @@ export function PublicNavbar({
 
                     {currentUser.role === "STAFF" && (
                       <Link
-                        href="/staff/profile"
+                        href="/staff"
                         onClick={() => setProfileDropdownOpen(false)}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
                       >
@@ -261,7 +262,30 @@ export function PublicNavbar({
         </div>
 
         {/* Mobile Hamburger Button */}
-        <div className="md:hidden flex items-center">
+        <div className="md:hidden flex items-center gap-1">
+          {currentUser && (
+            <>
+              <TopbarChatButton className="size-9" iconClassName="size-5" />
+              <NotificationDropdown
+                portal="tenant"
+                badgeMode="dot"
+                buttonClassName="relative flex size-9 items-center justify-center rounded-full text-[#74817b] hover:bg-[#f7f6f2] hover:text-[#15594f]"
+                iconClassName="size-5"
+              />
+              <Link
+                href="/tenant/profile"
+                title="Hồ sơ cá nhân"
+                aria-label="Hồ sơ cá nhân"
+                className="ml-0.5 flex size-9 items-center justify-center"
+              >
+                <Avatar
+                  src={currentUser.avatar}
+                  alt={currentUser.fullName || "Ảnh đại diện"}
+                  className="size-8 rounded-full border border-[#e2e7e1] object-cover"
+                />
+              </Link>
+            </>
+          )}
           <button
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             aria-label="Menu"
@@ -293,6 +317,21 @@ export function PublicNavbar({
 
           {currentUser ? (
             <div className="space-y-2 pt-1">
+              <div className="flex items-center gap-3 rounded-[10px] bg-[#f7f6f2] p-3">
+                <Avatar
+                  src={currentUser.avatar}
+                  alt={currentUser.fullName || "Ảnh đại diện"}
+                  className="size-10 shrink-0 rounded-full object-cover"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-semibold text-[#203c37]">
+                    {currentUser.fullName}
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#74817b]">
+                    {translateRole(currentUser.role)}
+                  </p>
+                </div>
+              </div>
               <Link
                 href="/tenant/favorites"
                 onClick={() => setMobileMenuOpen(false)}
@@ -300,6 +339,24 @@ export function PublicNavbar({
               >
                 <User className="size-4" />
                 <span>Vào không gian cá nhân</span>
+              </Link>
+              <Link
+                href="/tenant/messages"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-3 py-2 text-[14px] text-[#203c37]"
+              >
+                <MessageSquare className="size-4" />
+                <span>Tin nhắn</span>
+              </Link>
+              <Link
+                href="/tenant/notifications"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-[14px] text-[#203c37]"
+              >
+                <span className="flex items-center gap-3">
+                  <Bell className="size-4" />
+                  <span>Thông báo</span>
+                </span>
               </Link>
               <button
                 onClick={() => {

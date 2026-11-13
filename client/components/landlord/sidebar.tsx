@@ -17,6 +17,7 @@ import {
   BarChart3,
   Wrench,
   UserCog,
+  ClipboardList,
   MessageSquare,
   ChevronDown,
   ExternalLink,
@@ -27,23 +28,33 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
+import { useLandlordAccess } from "@/context/landlord-access-context";
+import { landlordRuleForPath, type LandlordRouteRule } from "@/lib/landlord-permissions";
 import { Property } from "@/types/models";
+
+const ALLOWED_FOR_MEMBER = (rule: LandlordRouteRule, permissions: string[]) =>
+  rule === null || (rule !== "LANDLORD_ONLY" && permissions.includes(rule));
 
 export function LandlordSidebar() {
   const pathname = usePathname();
   const currentPath = pathname ?? "";
+  const { isLandlord, permissions } = useLandlordAccess();
   const [properties, setProperties] = React.useState<Property[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = React.useState<string | null>(null);
   const [propertyDropdownOpen, setPropertyDropdownOpen] = React.useState(false);
 
+  const canSeeProperties = isLandlord || permissions.includes("PROPERTIES_ROOMS");
   React.useEffect(() => {
+    // Nhân viên không có quyền PROPERTIES_ROOMS không gọi endpoint này — tránh
+    // 403 làm client chuyển sang /403 ngay khi vừa mở dashboard.
+    if (!canSeeProperties) return;
     apiClient.properties.getMyProperties()
       .then((items) => {
         setProperties(items ?? []);
         setSelectedPropertyId((current) => current ?? items?.[0]?.id ?? null);
       })
       .catch(() => setProperties([]));
-  }, []);
+  }, [canSeeProperties]);
 
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId);
 
@@ -64,6 +75,7 @@ export function LandlordSidebar() {
         { label: "Yêu cầu thuê phòng", href: "/landlord/rental-requests", icon: Inbox },
         { label: "Lịch xem phòng", href: "/landlord/calendar", icon: Calendar },
         { label: "Khách thuê", href: "/landlord/tenants", icon: Users },
+        { label: "Xác minh số người ở", href: "/landlord/occupancy", icon: Users },
         { label: "Hợp đồng & đặt cọc", href: "/landlord/contracts", icon: FileCheck },
       ],
     },
@@ -78,6 +90,8 @@ export function LandlordSidebar() {
     {
       title: "VẬN HÀNH",
       items: [
+        { label: "Chợ công việc bảo trì", href: "/landlord/maintenance-tasks", icon: ClipboardList },
+        { label: "Tìm thợ theo kỹ năng", href: "/landlord/staff-marketplace", icon: Users },
         { label: "Sửa chữa & bảo trì", href: "/landlord/maintenance", icon: Wrench },
         { label: "Nhân viên & phân quyền", href: "/landlord/staff", icon: UserCog },
         { label: "Tin nhắn & thông báo", href: "/landlord/messages", icon: MessageSquare },
@@ -166,11 +180,17 @@ export function LandlordSidebar() {
                 {group.title}
               </p>
               <div className="space-y-0.5 pt-1">
-                {group.items.map((item) => {
+                {group.items
+                  .filter(
+                    (item) =>
+                      isLandlord || ALLOWED_FOR_MEMBER(landlordRuleForPath(item.href), permissions),
+                  )
+                  .map((item) => {
+                  // So khớp theo SEGMENT: `/landlord/maintenance` không được
+                  // sáng đèn khi đang ở `/landlord/maintenance-tasks`.
                   const isActive =
                     currentPath === item.href ||
-                    (item.href !== "/landlord/dashboard" &&
-                      currentPath.startsWith(item.href));
+                    (item.href !== "/landlord/dashboard" && currentPath.startsWith(`${item.href}/`));
 
                   return (
                     <Link

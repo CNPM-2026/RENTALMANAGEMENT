@@ -10,7 +10,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DB_URL: z.string().url(),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET phải dài ít nhất 32 ký tự để bảo mật'),
-  JWT_EXPIRES_IN: z.string().default('7d'),
+  // Phiên đăng nhập tối đa 2 giờ (xem `REFRESH_TOKEN_TTL_MS` trong auth.service).
+  JWT_EXPIRES_IN: z.string().default('2h'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),

@@ -224,4 +224,116 @@ export const adminService = {
     if (!amenity) throw new AppError('Không tìm thấy tiện ích', 404);
     return prisma.amenity.delete({ where: { id } });
   },
+
+  // ---------------------------------------------------------------------------
+  // Câu hỏi khảo sát thói quen sinh hoạt cho tính năng tìm bạn ở ghép
+  // ---------------------------------------------------------------------------
+  getLifestyleQuestions: () => prisma.lifestyleQuestion.findMany({
+    include: {
+      options: { orderBy: { scoreValue: 'asc' } },
+      _count: { select: { answers: true } },
+    },
+    orderBy: [{ category: 'asc' }, { questionText: 'asc' }],
+  }),
+
+  createLifestyleQuestion: async (data: {
+    questionText: string;
+    category: string;
+    weight: number;
+    options: Array<{ optionText: string; scoreValue: number }>;
+  }) => {
+    const created = await prisma.lifestyleQuestion.create({
+      data: {
+        questionText: data.questionText,
+        category: data.category,
+        weight: data.weight,
+        options: {
+          create: data.options.map((option) => ({
+            optionText: option.optionText,
+            scoreValue: option.scoreValue,
+          })),
+        },
+      },
+    });
+    return prisma.lifestyleQuestion.findUnique({
+      where: { id: created.id },
+      include: {
+        options: { orderBy: { scoreValue: 'asc' } },
+        _count: { select: { answers: true } },
+      },
+    });
+  },
+
+  updateLifestyleQuestion: async (id: string, data: {
+    questionText?: string;
+    category?: string;
+    weight?: number;
+    options?: Array<{ id?: string; optionText: string; scoreValue: number }>;
+  }) => {
+    const existing = await prisma.lifestyleQuestion.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError('Không tìm thấy câu hỏi sinh hoạt', 404);
+
+    const { options, ...questionData } = data;
+    await prisma.$transaction(async (tx) => {
+      await tx.lifestyleQuestion.update({ where: { id }, data: questionData });
+
+      if (options) {
+        const keptIds = options
+          .map((option) => option.id)
+          .filter((optionId): optionId is string => Boolean(optionId));
+        await tx.lifestyleOption.deleteMany({
+          where: {
+            questionId: id,
+            ...(keptIds.length > 0 ? { id: { notIn: keptIds } } : {}),
+          },
+        });
+
+        for (const option of options) {
+          const current = option.id
+            ? await tx.lifestyleOption.findFirst({
+                where: { id: option.id, questionId: id },
+                select: { id: true },
+              })
+            : null;
+          if (current) {
+            await tx.lifestyleOption.update({
+              where: { id: current.id },
+              data: {
+                optionText: option.optionText,
+                scoreValue: option.scoreValue,
+              },
+            });
+          } else {
+            await tx.lifestyleOption.create({
+              data: {
+                questionId: id,
+                optionText: option.optionText,
+                scoreValue: option.scoreValue,
+              },
+            });
+          }
+        }
+      }
+    });
+
+    return prisma.lifestyleQuestion.findUnique({
+      where: { id },
+      include: {
+        options: { orderBy: { scoreValue: 'asc' } },
+        _count: { select: { answers: true } },
+      },
+    });
+  },
+
+  deleteLifestyleQuestion: async (id: string) => {
+    const existing = await prisma.lifestyleQuestion.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError('Không tìm thấy câu hỏi sinh hoạt', 404);
+    return prisma.lifestyleQuestion.delete({ where: { id } });
+  },
 };

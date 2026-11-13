@@ -18,7 +18,7 @@ Copy `.env.example` to `server/.env` for development. Create
 ```env
 DB_URL="postgresql://USER:PASSWORD@HOST:5432/postgres?schema=public"
 JWT_SECRET="replace-with-a-random-secret-at-least-32-characters"
-JWT_EXPIRES_IN=7d
+JWT_EXPIRES_IN=2h
 CORS_ORIGIN=http://localhost:3000
 
 # Optional image and email integrations

@@ -2,6 +2,7 @@ import * as React from "react";
 import { Suspense } from "react";
 import { LandlordSidebar } from "@/components/landlord/sidebar";
 import { LandlordTopbar } from "@/components/landlord/topbar";
+import { LandlordAccessProvider } from "@/context/landlord-access-context";
 
 export default function LandlordLayout({
   children,
@@ -9,6 +10,10 @@ export default function LandlordLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // `LandlordAccessProvider` dùng usePathname() để chặn URL thiếu quyền, nên
+    // cần một Suspense boundary bao ngoài khi prerender (Next 16).
+    <Suspense fallback={<div className="min-h-screen bg-[#f7f6f2]" />}>
+    <LandlordAccessProvider>
     <div className="min-h-screen bg-[#f7f6f2] flex flex-col md:flex-row">
       {/* Sidebar được bọc Suspense để tránh crash khi dùng usePathname() lúc prerender */}
       <Suspense fallback={<aside className="w-64 bg-white border-r border-[#e2e7e1] h-screen hidden md:block animate-pulse" />}>
@@ -26,5 +31,7 @@ export default function LandlordLayout({
         </main>
       </div>
     </div>
+    </LandlordAccessProvider>
+    </Suspense>
   );
 }

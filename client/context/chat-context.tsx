@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { apiClient } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth";
+import { AUTH_CHANGE_EVENT, getAuthToken, getCurrentUser } from "@/lib/auth";
 import { refreshChatSocketAuth } from "@/lib/socket";
 import { Conversation, Message, User } from "@/types/models";
 
@@ -32,6 +32,67 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [activeTargetUser, setActiveTargetUser] =
     React.useState<Partial<User> | null>(null);
   const [isMinimized, setIsMinimized] = React.useState(false);
+  /**
+   * `null` = chưa có phiên. Đây là "chìa khoá" cho cả việc tải hội thoại và mở
+   * socket: ChatProvider nằm ở root layout nên được mount khi người dùng còn ở
+   * /login, lúc đó chưa có token. Chỉ tải một lần lúc mount sẽ khiến chat rỗng
+   * cho tới khi F5. `authUserId` được đồng bộ lại mỗi khi phiên thay đổi.
+   */
+  const [authUserId, setAuthUserId] = React.useState<string | null>(null);
+  const authUserIdRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    const syncAuth = () => {
+      const user = getAuthToken() ? getCurrentUser() : null;
+      const nextId = user?.id ?? null;
+      if (authUserIdRef.current === nextId) return;
+
+      // Đổi tài khoản/đăng xuất: bỏ dữ liệu của người cũ NGAY, không chờ API.
+      authUserIdRef.current = nextId;
+      setAuthUserId(nextId);
+      setConversations([]);
+      setActiveConversation(null);
+      setActiveTargetUser(null);
+      setIsMinimized(false);
+
+      // Socket singleton giữ token của lần handshake đầu tiên. Ngắt để effect
+      // realtime bên dưới kết nối lại bằng token mới (hoặc dừng hẳn khi logout).
+      refreshChatSocketAuth().disconnect();
+      if (nextId) refreshChatSocketAuth();
+    };
+
+    syncAuth();
+    window.addEventListener(AUTH_CHANGE_EVENT, syncAuth);
+    window.addEventListener("storage", syncAuth);
+    window.addEventListener("focus", syncAuth);
+    return () => {
+      window.removeEventListener(AUTH_CHANGE_EVENT, syncAuth);
+      window.removeEventListener("storage", syncAuth);
+      window.removeEventListener("focus", syncAuth);
+    };
+  }, []);
+
+  // Tải hội thoại mỗi khi danh tính đã xác thực thay đổi (đăng nhập / đổi tài khoản).
+  React.useEffect(() => {
+    if (!authUserId) return;
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const items = await apiClient.chats.getMyConversations();
+        if (cancelled) return;
+        setConversations(items ?? []);
+      } catch {
+        // 401/offline: giữ danh sách hiện tại, socket reconnect sẽ tải lại.
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId]);
 
   const refreshConversations = React.useCallback(async () => {
     const user = getCurrentUser();
@@ -44,31 +105,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Initial load
-  React.useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      const user = getCurrentUser();
-      if (!user) return;
-      try {
-        const items = await apiClient.chats.getMyConversations();
-        if (cancelled) return;
-        setConversations(items ?? []);
-      } catch {
-        // Ignore initial unauthenticated load
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // Real-time socket events
   React.useEffect(() => {
+    if (!authUserId) return;
     const user = getCurrentUser();
     if (!user) return;
 
@@ -108,8 +147,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       socket.off("receive_message", handleNewMessage);
+      // Deps đổi do mở/đóng cửa sổ chat -> giữ kết nối. Chỉ ngắt khi mất phiên.
+      if (!getAuthToken()) socket.disconnect();
     };
-  }, [activeConversation, isMinimized, refreshConversations]);
+  }, [activeConversation, authUserId, isMinimized, refreshConversations]);
 
   // Calculate total unread messages count
   const unreadCount = React.useMemo(() => {

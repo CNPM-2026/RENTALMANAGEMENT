@@ -73,13 +73,66 @@ export const staffAvailabilitySchema = z.object({
   isAvailable: z.boolean({ message: 'Trạng thái sẵn sàng phải là true/false' }),
 });
 
-export const staffBrowseQuerySchema = z.object({
+/**
+ * Sắp xếp danh sách thợ. `nearest` chỉ hợp lệ khi có toạ độ của chủ trọ — nếu
+ * thiếu toạ độ, server trả 400 thay vì lặng lẽ trả danh sách sai thứ tự.
+ */
+export const STAFF_BROWSE_SORTS = ['newest', 'nearest'] as const;
+
+/**
+ * Các filter KHÔNG nhạy cảm — dùng được qua GET query string.
+ *
+ * Toạ độ và bán kính KHÔNG nằm ở đây: chúng bị CodeQL coi là dữ liệu nhạy cảm
+ * khi đọc từ GET (có thể lộ qua access log, history, referer). Các trường đó chỉ
+ * được nhận qua body của `POST /staff-marketplace/browse`.
+ */
+const staffBrowseFilterFields = {
   category: serviceCategorySchema.optional(),
   isAvailable: z
     .preprocess((value) => (value === 'true' ? true : value === 'false' ? false : value), z.boolean().optional()),
   search: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).max(1000).optional(),
   limit: z.coerce.number().int().min(1).max(50).optional(),
-});
+};
+
+/**
+ * Schema cho GET `/staff-marketplace`: chỉ filter thường, không geo.
+ * `nearest` bị loại khỏi GET vì không thể tính khoảng cách khi không có toạ độ.
+ */
+export const staffBrowseGetQuerySchema = z
+  .object({
+    ...staffBrowseFilterFields,
+    sort: z.enum(['newest']).optional(),
+  })
+  // Từ chối thay vì âm thầm bỏ qua geo: client cũ phải chuyển sang POST, không
+  // được tưởng mình đã lọc theo khoảng cách trong khi server bỏ dữ liệu.
+  .strict();
+
+/**
+ * Schema body cho `POST /staff-marketplace/browse`.
+ *
+ * Toạ độ của CHỦ TRỌ / bất động sản để tính khoảng cách. Không bao giờ được
+ * dùng để suy ra toạ độ của thợ.
+ */
+export const staffBrowseBodySchema = z
+  .object({
+    ...staffBrowseFilterFields,
+    latitude: nullableNumber(-90, 90, 'Vĩ độ không hợp lệ'),
+    longitude: nullableNumber(-180, 180, 'Kinh độ không hợp lệ'),
+    radiusKm: nullableNumber(0.5, 200, 'Bán kính tìm kiếm phải từ 0.5 đến 200 km'),
+    sort: z.enum(STAFF_BROWSE_SORTS).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if ((value.latitude == null) !== (value.longitude == null)) {
+      ctx.addIssue({ code: 'custom', message: 'Vĩ độ và kinh độ phải được cung cấp cùng nhau', path: ['longitude'] });
+      return;
+    }
+    if (value.radiusKm != null && value.latitude == null) {
+      ctx.addIssue({ code: 'custom', message: 'Cần toạ độ khi lọc theo bán kính', path: ['radiusKm'] });
+    }
+    if (value.sort === 'nearest' && value.latitude == null) {
+      ctx.addIssue({ code: 'custom', message: 'Cần toạ độ khi sắp xếp theo khoảng cách', path: ['sort'] });
+    }
+  });
 
 export type StaffProfileUpsertInput = z.infer<typeof staffProfileUpsertSchema>;

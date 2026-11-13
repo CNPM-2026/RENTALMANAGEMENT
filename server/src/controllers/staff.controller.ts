@@ -3,6 +3,14 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { staffService } from '../services/staff.service';
 
 export const staffController = {
+  /** Quyền của chính mình (mọi role đã đăng nhập) — `null` nếu không phải nhân viên. */
+  getMyMembership: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.json({ success: true, data: await staffService.getMyMembership(req.user!.id) });
+    } catch (error) {
+      return next(error);
+    }
+  },
   list: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try { return res.json({ success: true, data: await staffService.list(req.user!.id) }); }
     catch (error) { return next(error); }

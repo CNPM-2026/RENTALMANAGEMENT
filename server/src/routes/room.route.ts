@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { roomController } from '../controllers/room.controller';
 import { authenticate, authorizeStaff } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { roomSchema } from '../validations/resource.validation';
+import { roomSchema, roomUpdateSchema } from '../validations/resource.validation';
 
 const router = Router();
 
@@ -13,6 +13,7 @@ router.get('/amenities', roomController.getAmenities);
 router.use(authenticate, authorizeStaff('PROPERTIES_ROOMS'));
 
 router.post('/', validate(roomSchema), roomController.create);
+router.patch('/:id', validate(roomUpdateSchema), roomController.update);
 router.get('/property/:propertyId', roomController.getByProperty);
 router.delete('/:id', roomController.delete);
 

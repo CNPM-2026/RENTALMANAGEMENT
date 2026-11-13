@@ -6,7 +6,7 @@ import { Maximize2, Minus, Send, X, MessageCircle } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { apiClient } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
-import { getChatSocket, refreshChatSocketAuth } from "@/lib/socket";
+import { refreshChatSocketAuth } from "@/lib/socket";
 import { Message } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
 
@@ -64,7 +64,14 @@ export function FloatingChatBox() {
     const handleMessage = (msg: Message) => {
       if (msg.conversationId === conversationId) {
         setMessages((prev) =>
-          prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+          // Dedupe theo `id` (server là nguồn duy nhất) và theo `clientMessageId`
+          // (phòng trường hợp server gửi lại bản ghi vừa tạo bằng HTTP).
+          prev.some(
+            (m) => m.id === msg.id ||
+              (!!msg.clientMessageId && m.clientMessageId === msg.clientMessageId),
+          )
+            ? prev
+            : [...prev, msg]
         );
         setTimeout(() => scrollToBottom("smooth"), 50);
         if (!isMinimized) {
@@ -83,24 +90,30 @@ export function FloatingChatBox() {
   }, [conversationId, isMinimized, markConversationAsRead]);
 
   // Send message
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const content = input.trim();
     if (!content || !conversationId || sending) return;
 
     setSending(true);
-    const socket = getChatSocket();
-
-    socket.emit(
-      "send_message",
-      { conversationId, content, messageType: "TEXT" },
-      (result: { success: boolean; message?: string }) => {
-        setSending(false);
-        if (result?.success) {
-          setInput("");
-        }
-      }
-    );
+    try {
+      // Chat chỉ gửi văn bản. `clientMessageId` giữ tính idempotent khi retry.
+      const saved = await apiClient.chats.sendMessage(conversationId, {
+        content,
+        clientMessageId: `c_${crypto.randomUUID()}`,
+      });
+      setMessages((prev) =>
+        prev.some((m) => m.id === saved.id || (!!saved.clientMessageId && m.clientMessageId === saved.clientMessageId))
+          ? prev
+          : [...prev, saved]
+      );
+      setInput("");
+      setTimeout(() => scrollToBottom("smooth"), 50);
+    } catch {
+      // Lỗi gửi: giữ nguyên nội dung để người dùng thử lại.
+    } finally {
+      setSending(false);
+    }
   };
 
   if (!activeConversation) return null;
@@ -247,7 +260,7 @@ export function FloatingChatBox() {
                       : "rounded-bl-xs border border-[#e2e7e1] bg-white text-[#203c37]"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.content ? <p className="whitespace-pre-wrap">{msg.content}</p> : null}
                   <span
                     className={`block text-[9px] mt-0.5 text-right ${
                       isMine ? "text-white/70" : "text-[#74817b]"
@@ -266,7 +279,7 @@ export function FloatingChatBox() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Facebook-style Input Footer */}
+      {/* Facebook-style Input Footer — chỉ gửi văn bản */}
       <form
         onSubmit={handleSend}
         className="flex items-center gap-1.5 border-t border-[#e8eee9] bg-white p-2"

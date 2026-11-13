@@ -26,7 +26,14 @@ export default function LandlordDashboardPage() {
   const [stats, setStats] = React.useState<LandlordStatsResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [fullName, setFullName] = React.useState(() => getCurrentUser()?.fullName ?? "");
+  const [fullName, setFullName] = React.useState("");
+
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setFullName(getCurrentUser()?.fullName ?? "");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   React.useEffect(() => {
     apiClient.statistics

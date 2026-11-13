@@ -29,8 +29,8 @@ export function Footer() {
         { label: "Giới thiệu nền tảng", href: "/about" },
         { label: "Cam kết an tâm 100%", href: "/about#commitment" },
         { label: "Quy chế hoạt động", href: "/about#rules" },
-        { label: "Chính sách bảo mật", href: "/about#privacy" },
-        { label: "Điều khoản sử dụng", href: "/about#terms" },
+        { label: "Chính sách bảo mật", href: "/privacy" },
+        { label: "Điều khoản sử dụng", href: "/terms" },
       ],
     },
     {

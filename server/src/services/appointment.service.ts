@@ -18,16 +18,32 @@ export const appointmentService = {
     if (roomId) {
       const room = await prisma.room.findUnique({
         where: { id: roomId },
-        include: { property: true }
+        include: {
+          property: true,
+          // Hợp đồng ACTIVE là nguồn sự thật mạnh hơn `rooms.status`: một phòng
+          // có thể còn ghi AVAILABLE do dữ liệu cũ trong khi đã có người thuê.
+          contracts: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
+        }
       });
 
       if (!room) throw new AppError('Phòng không tồn tại', 404);
-      if (room.status !== 'AVAILABLE') throw new AppError('Phòng hiện không sẵn sàng để xem', 400);
+      if (room.status !== 'AVAILABLE' || room.contracts.length > 0) {
+        throw new AppError('Phòng hiện không sẵn sàng để xem', 400);
+      }
       landlordId = room.property.landlordId;
     } else if (postId) {
       const post = await prisma.post.findUnique({
         where: { id: postId },
-        include: { property: true }
+        include: {
+          property: true,
+          room: {
+            select: {
+              id: true,
+              status: true,
+              contracts: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
+            },
+          },
+        }
       });
 
       if (!post) throw new AppError('Bài đăng không tồn tại', 404);
@@ -36,6 +52,11 @@ export const appointmentService = {
       }
       if (post.postType !== PostType.RENT_OUT) {
         throw new AppError('Chỉ bài đăng cho thuê phòng mới cho phép đặt lịch xem', 400);
+      }
+      // Bài đăng trỏ tới một phòng cụ thể: phòng đã thuê/bảo trì thì không còn
+      // lịch xem nào hợp lệ, kể cả khi tin đăng chưa kịp đóng.
+      if (post.roomId && (!post.room || post.room.status !== 'AVAILABLE' || post.room.contracts.length > 0)) {
+        throw new AppError('Phòng trong bài đăng đã có người thuê hoặc không sẵn sàng để xem', 400);
       }
 
       // Nếu bài đăng gắn với nhà trọ thì lấy landlord của nhà trọ

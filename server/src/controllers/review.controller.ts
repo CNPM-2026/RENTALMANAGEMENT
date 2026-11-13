@@ -24,5 +24,25 @@ export const reviewController = {
     } catch (error) {
       return next(error);
     }
-  }
+  },
+
+  /** 🆕 Batch 4 — trạng thái đánh giá của một công việc với người xem hiện tại. */
+  getTaskState: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await reviewService.getTaskReviewState(req.user!.id, String(req.params.taskId));
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  /** 🆕 Batch 4 — điểm đánh giá tổng hợp của một thợ (tính từ review TASK). */
+  getStaffSummary: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await reviewService.getStaffRatingSummary(String(req.params.staffId));
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
 };

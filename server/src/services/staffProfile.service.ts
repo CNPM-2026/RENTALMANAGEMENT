@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import type { KycStatus, Prisma } from '@prisma/client';
 import type { StaffProfileUpsertInput } from '../validations/staffProfile.validation';
 import { assertKycApproved, kycStateOf, loadKycState } from './kycGate.service';
+import { boundingBox, haversineDistanceKm, longitudeRanges, roundDistanceKm, toCoordinates } from '../utils/geo';
 
 /**
  * Hồ sơ THỢ ĐỘC LẬP (staff marketplace).
@@ -69,6 +70,13 @@ const activeStaffUser: Prisma.UserWhereInput = {
   isActive: true,
   kycSubmission: { is: { status: 'APPROVED' } },
 };
+
+/**
+ * Trần số hồ sơ được nạp khi sắp xếp theo khoảng cách. Việc LỌC theo bán kính
+ * đã diễn ra ở SQL (bounding box); trần này chỉ để chặn bộ nhớ trong trường hợp
+ * xấu nhất, và được báo lại trong `meta.distanceCapped`.
+ */
+const MAX_DISTANCE_CANDIDATES = 500;
 
 export const staffProfileService = {
   /** Hồ sơ của chính mình; `null` = chưa hoàn thiện hồ sơ (không phải lỗi). */
@@ -154,13 +162,30 @@ export const staffProfileService = {
 
   /**
    * Danh sách thợ cho chủ trọ khám phá: lọc theo kỹ năng + trạng thái.
-   * Thứ tự xác định: sẵn sàng trước, mới cập nhật trước, rồi `id` để không bao
-   * giờ phụ thuộc thứ tự ngẫu nhiên của DB. Sắp xếp theo khoảng cách được thêm
-   * ở Batch 2 (khi có toạ độ bất động sản để so sánh).
+   *
+   * Sắp xếp theo khoảng cách (Batch 2):
+   * 1. Nếu có toạ độ của chủ trọ, lọc bounding box NGAY Ở SQL để chỉ nạp các hồ
+   *    sơ có khả năng nằm trong bán kính.
+   * 2. Tính Haversine chính xác, lọc `radiusKm`, sắp xếp gần → xa (hoà: đang
+   *    nhận việc trước, rồi `id` để thứ tự luôn xác định).
+   * 3. Hồ sơ thiếu toạ độ: `distanceKm = null` và KHÔNG được đưa vào kết quả khi
+   *    lọc theo bán kính — không chứng minh được khoảng cách thì không bịa.
+   * Toạ độ của thợ chỉ dùng để tính toán, luôn bị bỏ khỏi payload trả về.
    */
-  browse: async (query: { category?: string; isAvailable?: boolean; search?: string; page?: number; limit?: number }) => {
+  browse: async (query: {
+    category?: string;
+    isAvailable?: boolean;
+    search?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    radiusKm?: number | null;
+    sort?: 'newest' | 'nearest';
+    page?: number;
+    limit?: number;
+  }) => {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const center = toCoordinates(query.latitude, query.longitude);
     const where: Prisma.StaffProfileWhereInput = {
       ...(typeof query.isAvailable === 'boolean' ? { isAvailable: query.isAvailable } : {}),
       ...(query.category ? { skills: { some: { category: query.category as never } } } : {}),
@@ -170,17 +195,75 @@ export const staffProfileService = {
       },
     };
 
-    const [total, items] = await prisma.$transaction([
-      prisma.staffProfile.count({ where }),
-      prisma.staffProfile.findMany({
-        where,
-        select: publicProfileSelect,
-        orderBy: [{ isAvailable: 'desc' }, { updatedAt: 'desc' }, { id: 'asc' }],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+    if (center && query.radiusKm != null) {
+      const box = boundingBox(center, query.radiusKm);
+      if (box) {
+        where.AND = [
+          { latitude: { not: null, gte: box.minLatitude, lte: box.maxLatitude } },
+          {
+            OR: longitudeRanges(box).map((range) => ({
+              longitude: { not: null, gte: range.min, lte: range.max },
+            })),
+          },
+        ];
+      }
+    }
 
-    return { items, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    // Cần toạ độ để tính khoảng cách nhưng TUYỆT ĐỐI không trả chúng về client.
+    const select = { ...publicProfileSelect, latitude: true, longitude: true } as const;
+    const stripCoordinates = <T extends { latitude: number | null; longitude: number | null }>(row: T) => {
+      const { latitude: _latitude, longitude: _longitude, ...profile } = row;
+      return profile;
+    };
+
+    if (!center) {
+      const [total, rows] = await prisma.$transaction([
+        prisma.staffProfile.count({ where }),
+        prisma.staffProfile.findMany({
+          where,
+          select,
+          orderBy: [{ isAvailable: 'desc' }, { updatedAt: 'desc' }, { id: 'asc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
+      return {
+        items: rows.map((row) => ({ ...stripCoordinates(row), distanceKm: null })),
+        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    }
+
+    const candidates = await prisma.staffProfile.findMany({
+      where,
+      select,
+      orderBy: [{ isAvailable: 'desc' }, { updatedAt: 'desc' }, { id: 'asc' }],
+      take: MAX_DISTANCE_CANDIDATES,
+    });
+
+    const ranked = candidates
+      .map((row) => ({ row, distanceKm: haversineDistanceKm(center, toCoordinates(row.latitude, row.longitude)) }))
+      .filter((item): item is { row: (typeof candidates)[number]; distanceKm: number } => item.distanceKm != null)
+      .filter((item) => query.radiusKm == null || item.distanceKm <= query.radiusKm)
+      .sort(
+        (a, b) =>
+          a.distanceKm - b.distanceKm ||
+          Number(b.row.isAvailable) - Number(a.row.isAvailable) ||
+          a.row.id.localeCompare(b.row.id),
+      );
+
+    const pageRows = ranked.slice((page - 1) * limit, page * limit);
+    return {
+      items: pageRows.map((item) => ({
+        ...stripCoordinates(item.row),
+        distanceKm: roundDistanceKm(item.distanceKm),
+      })),
+      meta: {
+        page,
+        limit,
+        total: ranked.length,
+        totalPages: Math.ceil(ranked.length / limit),
+        distanceCapped: candidates.length === MAX_DISTANCE_CANDIDATES,
+      },
+    };
   },
 };

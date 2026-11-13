@@ -17,6 +17,9 @@ router.put(
   userController.updateProfile
 );
 router.get('/kyc', userController.getMyKyc);
+
+// Trang cá nhân công khai của bất kỳ người dùng nào (trừ email/SĐT/toạ độ).
+router.get('/:id/public-profile', userController.getPublicProfile);
 router.post(
   '/kyc',
   upload.fields([{ name: 'frontId', maxCount: 1 }, { name: 'backId', maxCount: 1 }]),

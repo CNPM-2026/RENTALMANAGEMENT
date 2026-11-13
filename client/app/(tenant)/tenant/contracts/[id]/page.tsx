@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
 import { Contract } from "@/types/models";
+import { ContractLifecyclePanel } from "@/components/contracts/contract-lifecycle-panel";
 
 function TenantContractDetailContent() {
   const params = useParams();
@@ -52,6 +53,23 @@ function TenantContractDetailContent() {
         setIsSigned(found.status === "ACTIVE");
       })
       .catch((error) => setLoadError(error instanceof Error ? error.message : "Không tải được hợp đồng."));
+  }, [contractId]);
+
+  // Sau khi gửi / phản hồi yêu cầu vòng đời, tải lại để header và trạng thái hợp
+  // đồng phản ánh dữ liệu server (ví dụ hợp đồng đã TERMINATED hoặc đã ký tiếp).
+  const reloadContract = React.useCallback(() => {
+    void apiClient.contracts
+      .getMyContracts()
+      .then((items) => {
+        const found = items.find((item) => item.id === contractId);
+        if (!found) return;
+        setContract(found);
+        setIsSigned(found.status === "ACTIVE");
+        setLoadError(null);
+      })
+      .catch((error) =>
+        setLoadError(error instanceof Error ? error.message : "Không tải được hợp đồng."),
+      );
   }, [contractId]);
 
   function handleSignContract() {
@@ -148,6 +166,15 @@ function TenantContractDetailContent() {
           </Button>
         </div>
       </div>
+
+      {contract && (
+        <ContractLifecyclePanel
+          contract={contract}
+          role="TENANT"
+          currentUserId={contract.tenantId}
+          onChanged={reloadContract}
+        />
+      )}
 
       {/* =======================================================================
           2. TWO-COLUMN CONTRACT VIEWER (Figma Node 44:65148)
@@ -400,7 +427,7 @@ function TenantContractDetailContent() {
                       ✓ ĐÃ KÝ SỐ ĐIỆN TỬ
                     </p>
                     <p className="text-[10px] text-[#74817b]">
-                      Chủ sở hữu: {landlordName}
+                      Chủ trọ: {landlordName}
                     </p>
                     <p className="text-[9px] text-[#74817b]">
                       Thời gian: {contractTimestamp}

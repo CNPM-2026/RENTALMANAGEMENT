@@ -14,5 +14,15 @@ export const meterReadingController = {
     } catch (error) {
       return next(error);
     }
-  }
+  },
+
+  getLatest: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const roomId = String(req.query.roomId ?? '');
+      const result = await meterReadingService.getLatest(resourceOwnerId(req), roomId);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
 };

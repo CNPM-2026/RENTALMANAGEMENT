@@ -192,8 +192,19 @@ const resolveGoogleAccount = async (identity: GoogleIdentity, attempt = 1): Prom
   });
 };
 
-/** Thời gian sống của refresh token (30 ngày) — dùng chung cho mọi luồng cấp phiên. */
-const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * Thời gian sống TỐI ĐA của một phiên đăng nhập: 2 giờ.
+ *
+ * Đây là hạn TUYỆT ĐỐI tính từ lần đăng nhập, không phải hạn trượt: mỗi lần
+ * rotate refresh token, token mới giữ nguyên `expiresAt` của token gốc (xem
+ * `refresh`), nên người dùng không thể gia hạn phiên vô hạn bằng cách gọi
+ * `/auth/refresh` liên tục.
+ */
+const REFRESH_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
+
+/** Phiên cũ (phát trước khi áp hạn 2 giờ) không được sống lâu hơn hạn mới. */
+const refreshTokenExpiry = (sessionExpiresAt: Date) =>
+  new Date(Math.min(sessionExpiresAt.getTime(), Date.now() + REFRESH_TOKEN_TTL_MS));
 
 /**
  * Khóa row `users` bằng `SELECT ... FOR UPDATE`.
@@ -480,7 +491,9 @@ export const authService = {
       }
 
       await tx.refreshToken.create({
-        data: { userId: user.id, tokenHash: nextTokenHash, expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) },
+        // Hạn TUYỆT ĐỐI của phiên: kế thừa token gốc, KHÔNG cộng thêm 2 giờ.
+        // Nhờ vậy refresh nhiều lần cũng không thể kéo dài phiên quá 2 giờ.
+        data: { userId: user.id, tokenHash: nextTokenHash, expiresAt: refreshTokenExpiry(stored.expiresAt) },
       });
 
       // `av` lấy từ row users VỪA đọc lại sau khi khóa, nên refresh không bao giờ

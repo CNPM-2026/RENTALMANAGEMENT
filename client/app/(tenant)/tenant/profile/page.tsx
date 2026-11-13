@@ -69,7 +69,10 @@ export default function TenantProfilePage() {
 
   React.useEffect(() => {
     if (dobInputRef.current) {
+      const earliest = new Date();
+      earliest.setFullYear(earliest.getFullYear() - 120);
       dobInputRef.current.max = getLocalDateString(new Date());
+      dobInputRef.current.min = getLocalDateString(earliest);
     }
   }, []);
 
@@ -136,10 +139,19 @@ export default function TenantProfilePage() {
     setIsSaving(true);
     setFeedback(null);
 
-    if (dob && dob > getLocalDateString(new Date())) {
-      setFeedback({ type: "error", message: "Ngày sinh không được là ngày trong tương lai." });
-      setIsSaving(false);
-      return;
+    if (dob) {
+      const earliest = new Date();
+      earliest.setFullYear(earliest.getFullYear() - 120);
+      if (dob > getLocalDateString(new Date())) {
+        setFeedback({ type: "error", message: "Ngày sinh không được là ngày trong tương lai." });
+        setIsSaving(false);
+        return;
+      }
+      if (dob < getLocalDateString(earliest)) {
+        setFeedback({ type: "error", message: "Ngày sinh không hợp lệ." });
+        setIsSaving(false);
+        return;
+      }
     }
 
     try {
@@ -423,6 +435,15 @@ export default function TenantProfilePage() {
                 {fullName || "Người dùng"}
               </h3>
               <p className="text-[13px] text-[#74817b] mt-0.5">{occupation || "Người thuê phòng"}</p>
+
+              {user?.id && (
+                <Link
+                  href={`/users/${user.id}`}
+                  className="mt-1 text-[12px] font-semibold text-[#15594f] hover:underline"
+                >
+                  Xem trang cá nhân công khai
+                </Link>
+              )}
 
               <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-[100px] bg-[#eaf2ed] text-[#15594f] text-[11px] font-bold">
                 <ShieldCheck className="size-3.5" />

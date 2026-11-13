@@ -46,6 +46,7 @@ jobs:
           DB_URL: postgresql://postgres:postgres@localhost:5432/rental_test
           JWT_SECRET: ci-test-secret-with-at-least-32-characters
       - run: npm run build
+      - run: npm run typecheck
       - run: npm test
         env:
           NODE_ENV: test

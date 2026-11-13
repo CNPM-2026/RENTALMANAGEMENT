@@ -1,5 +1,9 @@
 # Auth hardening (H-01/H-02) — deployment runbook
 
+> **Lưu ý đường dẫn test (cập nhật Batch 4):** test đã chuyển từ `server/src/**` sang `server/tests/**`
+> (`src/auth.integration.test.ts` → `tests/integration/auth.integration.test.ts`, v.v.). Các lệnh
+> `npx vitest run src/...` trong bảng kiểm chứng là bản ghi lịch sử.
+
 **Status: DRAFT — prepared, NOT executed against any production data.** Every SQL
 statement below is a proposal for a DBA/operator to review and run by hand.
 The §3 and §4 statements *were* exercised against the **test** database inside

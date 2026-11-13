@@ -16,6 +16,23 @@ export const roomController = {
     }
   },
 
+  update: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await roomService.updateRoom(
+        resourceOwnerId(req),
+        String(req.params.id),
+        req.body,
+      );
+      return res.status(200).json({
+        success: true,
+        message: 'Cập nhật phòng thành công',
+        data: result,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
   getByProperty: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await roomService.getRoomsByProperty(resourceOwnerId(req), String(req.params.propertyId));

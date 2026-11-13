@@ -107,4 +107,39 @@ export const adminController = {
       return res.json({ success: true, data: await adminService.deleteAmenity(String(req.params.id)) });
     } catch (error) { return next(error); }
   },
+
+  getLifestyleQuestions: async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try { return res.json({ success: true, data: await adminService.getLifestyleQuestions() }); }
+    catch (error) { return next(error); }
+  },
+
+  createLifestyleQuestion: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.status(201).json({
+        success: true,
+        message: 'Đã thêm câu hỏi sinh hoạt',
+        data: await adminService.createLifestyleQuestion(req.body),
+      });
+    } catch (error) { return next(error); }
+  },
+
+  updateLifestyleQuestion: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.json({
+        success: true,
+        message: 'Đã cập nhật câu hỏi sinh hoạt',
+        data: await adminService.updateLifestyleQuestion(String(req.params.id), req.body),
+      });
+    } catch (error) { return next(error); }
+  },
+
+  deleteLifestyleQuestion: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.json({
+        success: true,
+        message: 'Đã xóa câu hỏi sinh hoạt',
+        data: await adminService.deleteLifestyleQuestion(String(req.params.id)),
+      });
+    } catch (error) { return next(error); }
+  },
 };

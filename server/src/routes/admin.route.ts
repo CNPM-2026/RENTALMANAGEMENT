@@ -3,6 +3,7 @@ import { adminController } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { amenitySchema } from '../validations/resource.validation';
+import { lifestyleQuestionCreateSchema, lifestyleQuestionUpdateSchema } from '../validations/matching.validation';
 
 const router = Router();
 
@@ -23,5 +24,9 @@ router.delete('/content-filter/:id', adminController.removeContentFilterKeyword)
 router.get('/amenities', adminController.getAmenities);
 router.post('/amenities', validate(amenitySchema), adminController.createAmenity);
 router.delete('/amenities/:id', adminController.deleteAmenity);
+router.get('/lifestyle-questions', adminController.getLifestyleQuestions);
+router.post('/lifestyle-questions', validate(lifestyleQuestionCreateSchema), adminController.createLifestyleQuestion);
+router.patch('/lifestyle-questions/:id', validate(lifestyleQuestionUpdateSchema), adminController.updateLifestyleQuestion);
+router.delete('/lifestyle-questions/:id', adminController.deleteLifestyleQuestion);
 
 export default router;
