@@ -4,12 +4,15 @@ import type { AuthRequest } from '../../src/middlewares/auth.middleware';
 
 /**
  * Chống hồi quy cho cảnh báo CodeQL "Sensitive data read from GET request":
- * controller GET KHÔNG được đọc/forward `latitude`/`longitude`/`radiusKm` từ
- * `req.query`; các trường này chỉ được lấy từ `req.body` của route POST.
+ * controller GET KHÔNG được đọc/forward dữ liệu nhạy cảm (`latitude`,
+ * `longitude`, `radiusKm`, `lat`, `lng`, `radius`, `gender`) từ `req.query`;
+ * các trường này chỉ được lấy từ `req.body` của route POST.
  */
 const mocks = vi.hoisted(() => ({
   taskBrowseOpen: vi.fn(),
   staffBrowse: vi.fn(),
+  matchingPosts: vi.fn(),
+  postSearch: vi.fn(),
 }));
 
 vi.mock('../../src/services/maintenanceTask.service', () => ({
@@ -27,9 +30,17 @@ vi.mock('../../src/services/maintenanceOffer.service', () => ({
 vi.mock('../../src/services/staffProfile.service', () => ({
   staffProfileService: { browse: mocks.staffBrowse },
 }));
+vi.mock('../../src/services/matching.service', () => ({
+  matchingService: { getRoommatePosts: mocks.matchingPosts },
+}));
+vi.mock('../../src/services/post.service', () => ({
+  postService: { searchPosts: mocks.postSearch },
+}));
 
 import { maintenanceTaskController } from '../../src/controllers/maintenanceTask.controller';
 import { staffProfileController } from '../../src/controllers/staffProfile.controller';
+import { matchingController } from '../../src/controllers/matching.controller';
+import { postController } from '../../src/controllers/post.controller';
 
 const request = (body: Record<string, unknown>, query: Record<string, unknown> = {}) =>
   ({ user: { id: 'user-1', role: 'STAFF' }, body, query }) as unknown as AuthRequest;
@@ -111,6 +122,89 @@ describe('staffProfileController — geo chỉ nhận từ POST body', () => {
       longitude: 105.8342,
       radiusKm: undefined,
       sort: 'nearest',
+    });
+  });
+});
+
+describe('matchingController — gender chỉ nhận từ POST body', () => {
+  const statusResponse = () =>
+    ({ status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() }) as unknown as Response;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.matchingPosts.mockResolvedValue([]);
+  });
+
+  it('GET không forward gender từ query', async () => {
+    await matchingController.getRoommatePosts(
+      request({}, { keyword: 'quận 1', gender: 'MALE' }),
+      statusResponse(),
+      vi.fn(),
+    );
+
+    expect(mocks.matchingPosts).toHaveBeenCalledTimes(1);
+    const [filters, viewerId] = mocks.matchingPosts.mock.calls[0];
+    expect(filters).toMatchObject({ keyword: 'quận 1', limit: 60 });
+    expect(filters).not.toHaveProperty('gender');
+    expect(viewerId).toBe('user-1');
+  });
+
+  it('POST dùng gender từ body, kể cả khi query có giá trị khác', async () => {
+    await matchingController.browseRoommatePosts(
+      request({ keyword: 'quận 1', gender: 'FEMALE' }, { gender: 'MALE' }),
+      statusResponse(),
+      vi.fn(),
+    );
+
+    expect(mocks.matchingPosts).toHaveBeenCalledTimes(1);
+    const [filters] = mocks.matchingPosts.mock.calls[0];
+    expect(filters).toMatchObject({ keyword: 'quận 1', gender: 'FEMALE', limit: 60 });
+  });
+});
+
+describe('postController — toạ độ chỉ nhận từ POST body', () => {
+  const statusResponse = () =>
+    ({ status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() }) as unknown as Response;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.postSearch.mockResolvedValue({ data: [], meta: { page: 1, limit: 10, total: 0 } });
+  });
+
+  it('GET không forward lat/lng/radius từ query', async () => {
+    await postController.search(
+      request(
+        {},
+        { keyword: 'quận 1', amenityIds: 'a,b', lat: '10.1', lng: '106.2', radius: '5' },
+      ),
+      statusResponse(),
+      vi.fn(),
+    );
+
+    expect(mocks.postSearch).toHaveBeenCalledTimes(1);
+    const filters = mocks.postSearch.mock.calls[0][0];
+    expect(filters).toMatchObject({ keyword: 'quận 1', amenityIds: ['a', 'b'], page: 1, limit: 10 });
+    expect(filters).not.toHaveProperty('lat');
+    expect(filters).not.toHaveProperty('lng');
+    expect(filters).not.toHaveProperty('radius');
+  });
+
+  it('POST dùng toạ độ từ body, kể cả khi query có giá trị khác', async () => {
+    await postController.searchByLocation(
+      request(
+        { keyword: 'quận 1', lat: 21.0278, lng: 105.8342, radius: 5 },
+        { lat: '10.1', lng: '106.2' },
+      ),
+      statusResponse(),
+      vi.fn(),
+    );
+
+    expect(mocks.postSearch).toHaveBeenCalledTimes(1);
+    expect(mocks.postSearch.mock.calls[0][0]).toMatchObject({
+      keyword: 'quận 1',
+      lat: 21.0278,
+      lng: 105.8342,
+      radius: 5,
     });
   });
 });

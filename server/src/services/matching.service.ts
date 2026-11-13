@@ -10,6 +10,10 @@ type RoommatePostQuery = {
   ward?: string;
   minPrice?: number;
   maxPrice?: number;
+  /**
+   * Chỉ được lấy từ body của `POST /matching/posts/browse`; GET không nhận
+   * trường này vì giới tính là dữ liệu nhạy cảm khi nằm trong URL.
+   */
   gender?: string;
   hasRoom?: boolean;
   sleepSchedule?: string;

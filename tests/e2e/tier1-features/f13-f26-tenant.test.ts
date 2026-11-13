@@ -170,7 +170,7 @@ export const tier1TenantTests: TestCase[] = [
     tier: 1,
     name: 'Verify geo-radius search parameters (lat, lng, radius)',
     run: async () => {
-      const res = await api.request('GET', '/posts/search?lat=20.998&lng=105.845&radius=5');
+      const res = await api.request('POST', '/posts/search', { lat: 20.998, lng: 105.845, radius: 5 });
       Assert.strictEqual(res.status, 200);
       Assert.strictEqual(res.data.success, true);
     },

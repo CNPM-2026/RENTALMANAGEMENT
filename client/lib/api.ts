@@ -527,8 +527,12 @@ export const apiClient = {
   posts: {
     getApproved: (query?: { postType?: string; province?: string }) =>
       apiClient.get<Post[]>('/posts', query, { skipAuth: true }),
+    /**
+     * Tìm bài đăng. Dùng POST vì bộ lọc có thể chứa `lat`/`lng`/`radius`
+     * (dữ liệu nhạy cảm); đưa lên URL sẽ lộ trong access log/history/referer.
+     */
     search: (query: SearchPostsQuery) =>
-      apiClient.get<{ meta: PaginationMeta; data: Post[] }>('/posts/search', query as unknown as RequestOptions['params'], { skipAuth: true }),
+      apiClient.post<{ meta: PaginationMeta; data: Post[] }>('/posts/search', query, { skipAuth: true }),
     getMyPosts: () =>
       apiClient.get<Post[]>('/posts/my-posts'),
     getById: (id: string) =>
@@ -678,11 +682,16 @@ export const apiClient = {
       apiClient.get<RoommatePreference | null>('/matching/preferences'),
     getSuggestions: () =>
       apiClient.get<SuggestedRoommate[]>('/matching/suggestions'),
-    /** Bài đăng tìm bạn ở ghép đã duyệt, kèm bộ lọc công khai. */
+    /**
+     * Bài đăng tìm bạn ở ghép đã duyệt, kèm bộ lọc công khai.
+     *
+     * Dùng POST vì bộ lọc có `gender` (dữ liệu nhạy cảm); đưa lên URL sẽ lộ
+     * trong access log, browser history và referer.
+     */
     getRoommatePosts: (query?: RoommatePostFilters) =>
-      apiClient.get<RoommatePostItem[]>(
-        '/matching/posts',
-        query as unknown as RequestOptions['params'],
+      apiClient.post<RoommatePostItem[]>(
+        '/matching/posts/browse',
+        query ?? {},
         { skipAuth: false },
       ),
     /** Hồ sơ của một người đang có bài đăng tìm bạn ở ghép được duyệt. */

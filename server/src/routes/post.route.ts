@@ -4,7 +4,7 @@ import { postController } from '../controllers/post.controller';
 import { authenticate, authenticateOptional } from '../middlewares/auth.middleware';
 import { upload, validateUploadedImages } from '../config/multer';
 import { validate } from '../middlewares/validate.middleware';
-import { searchPostSchema } from '../validations/post.validation';
+import { searchPostBodySchema, searchPostGetQuerySchema } from '../validations/post.validation';
 import { postWriteSchema, postUpdateSchema } from '../validations/resource.validation';
 
 const router = Router();
@@ -17,7 +17,10 @@ const postWriteLimiter = rateLimit({
 });
 
 router.get('/', postController.getApprovedPosts);
-router.get('/search', validate(searchPostSchema, 'query'), postController.search);
+// GET chỉ nhận filter thường. Toạ độ là dữ liệu nhạy cảm nên đi qua POST body
+// để không bị lộ trong URL (access log, browser history, referer).
+router.post('/search', validate(searchPostBodySchema), postController.searchByLocation);
+router.get('/search', validate(searchPostGetQuerySchema, 'query'), postController.search);
 router.get('/my-posts', authenticate, postController.getMyPosts);
 router.get('/:id', authenticateOptional, postController.getById);
 router.post(

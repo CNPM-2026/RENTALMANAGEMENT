@@ -55,25 +55,58 @@ const optionalBooleanQuery = z.preprocess((value) => {
   return value;
 }, z.boolean().optional());
 
-export const roommatePostSearchSchema = z.object({
+/**
+ * Filter KHÔNG nhạy cảm — dùng được qua GET query string.
+ *
+ * `gender` KHÔNG nằm ở đây: CodeQL coi giới tính đọc từ GET là dữ liệu nhạy cảm
+ * (có thể lộ qua access log, browser history, referer). Trường này chỉ được nhận
+ * qua body của `POST /matching/posts/browse`.
+ */
+const roommatePostFilterFields = {
   keyword: z.string().trim().max(200).optional(),
   province: z.string().trim().max(100).optional(),
   district: z.string().trim().max(100).optional(),
   ward: z.string().trim().max(100).optional(),
   minPrice: z.coerce.number().finite().nonnegative().optional(),
   maxPrice: z.coerce.number().finite().nonnegative().optional(),
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   hasRoom: optionalBooleanQuery,
   sleepSchedule: z.string().trim().max(30).optional(),
   smokingAllowed: optionalBooleanQuery,
   petAllowed: optionalBooleanQuery,
   minCleanliness: z.coerce.number().int().min(1).max(5).optional(),
+};
+
+const roommatePostSortFields = {
   sortBy: z.enum(['best_match', 'newest', 'price_asc', 'price_desc']).default('best_match'),
   limit: z.coerce.number().int().min(1).max(100).default(60),
-}).refine((value) => value.minPrice === undefined || value.maxPrice === undefined || value.minPrice <= value.maxPrice, {
-  message: 'Ngân sách tối thiểu phải nhỏ hơn hoặc bằng ngân sách tối đa',
-  path: ['maxPrice'],
-});
+};
+
+const hasValidPriceRange = (value: { minPrice?: number; maxPrice?: number }) =>
+  value.minPrice === undefined || value.maxPrice === undefined || value.minPrice <= value.maxPrice;
+
+/** GET chỉ nhận filter thường; `gender` bị từ chối thay vì âm thầm bỏ qua. */
+export const roommatePostGetQuerySchema = z
+  .object({
+    ...roommatePostFilterFields,
+    ...roommatePostSortFields,
+  })
+  .strict()
+  .refine(hasValidPriceRange, {
+    message: 'Ngân sách tối thiểu phải nhỏ hơn hoặc bằng ngân sách tối đa',
+    path: ['maxPrice'],
+  });
+
+/** Body của `POST /matching/posts/browse` (có filter giới tính). */
+export const roommatePostBrowseBodySchema = z
+  .object({
+    ...roommatePostFilterFields,
+    gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
+    ...roommatePostSortFields,
+  })
+  .refine(hasValidPriceRange, {
+    message: 'Ngân sách tối thiểu phải nhỏ hơn hoặc bằng ngân sách tối đa',
+    path: ['maxPrice'],
+  });
 
 const lifestyleOptionInputSchema = z.object({
   id: z.string().uuid().optional(),

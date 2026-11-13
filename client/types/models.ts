@@ -1334,6 +1334,12 @@ export interface UpdatePostPayload {
   status?: PostStatus;
 }
 
+/**
+ * Body của `POST /posts/search`.
+ *
+ * `lat`/`lng`/`radius` là dữ liệu nhạy cảm nên được gửi trong body, không đưa
+ * lên query string của GET.
+ */
 export interface SearchPostsQuery {
   keyword?: string;
   minPrice?: number;
@@ -1541,6 +1547,12 @@ export interface SuggestedRoommate {
 
 export type RoommatePostItem = SuggestedRoommate;
 
+/**
+ * Body của `POST /matching/posts/browse`.
+ *
+ * `gender` là dữ liệu nhạy cảm nên bộ lọc được gửi trong body, không đưa lên
+ * query string của GET.
+ */
 export interface RoommatePostFilters {
   keyword?: string;
   province?: string;

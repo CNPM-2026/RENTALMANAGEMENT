@@ -309,7 +309,9 @@ export class ApiAdapter {
       };
     }
 
-    if (path === '/posts/search' && method === 'GET') {
+    // POST là contract hiện tại (body có thể chứa lat/lng/radius nhạy cảm).
+    // Giữ GET để các test cũ chỉ dùng filter thường vẫn chạy được.
+    if (path === '/posts/search' && (method === 'GET' || method === 'POST')) {
       return {
         status: 200,
         data: {
