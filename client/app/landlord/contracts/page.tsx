@@ -18,6 +18,27 @@ function formatCurrency(val: number) {
   return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
 }
 
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateOffset(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return toDateInput(date);
+}
+
+function addYears(dateString: string, years: number) {
+  if (!dateString) return "";
+  const date = new Date(`${dateString}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setFullYear(date.getFullYear() + years);
+  return toDateInput(date);
+}
+
 export default function LandlordContractsPage() {
   const [contracts, setContracts] = React.useState<Contract[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -26,6 +47,24 @@ export default function LandlordContractsPage() {
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [form, setForm] = React.useState({ roomId: "", tenantId: "", startDate: "", endDate: "", depositPaid: "", monthlyRent: "", terms: "" });
   const [formError, setFormError] = React.useState("");
+  const [dateBounds, setDateBounds] = React.useState({
+    minStart: "",
+    maxStart: "",
+    defaultEndMin: "",
+    defaultEndMax: "",
+  });
+
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setDateBounds({
+        minStart: dateOffset(-30),
+        maxStart: dateOffset(365),
+        defaultEndMin: dateOffset(0),
+        defaultEndMax: dateOffset(365 * 5),
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   React.useEffect(() => {
     Promise.all([apiClient.contracts.getMyContracts(), apiClient.rentalRequests.getMine()])
@@ -47,6 +86,26 @@ export default function LandlordContractsPage() {
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
     setFormError("");
+    if (!form.startDate) {
+      setFormError("Vui lòng chọn ngày bắt đầu hợp đồng.");
+      return;
+    }
+    if (form.startDate < dateOffset(-30)) {
+      setFormError("Ngày bắt đầu hợp đồng không được lùi quá 30 ngày.");
+      return;
+    }
+    if (form.startDate > dateOffset(365)) {
+      setFormError("Ngày bắt đầu hợp đồng không được vượt quá 1 năm.");
+      return;
+    }
+    if (form.endDate && form.endDate <= form.startDate) {
+      setFormError("Ngày kết thúc phải sau ngày bắt đầu.");
+      return;
+    }
+    if (form.endDate && form.endDate > addYears(form.startDate, 5)) {
+      setFormError("Thời hạn hợp đồng không được vượt quá 5 năm.");
+      return;
+    }
     try {
       const created = await apiClient.contracts.create({ ...form, depositPaid: Number(form.depositPaid), monthlyRent: Number(form.monthlyRent), endDate: form.endDate || undefined });
       setContracts((prev) => [created, ...prev]);
@@ -66,7 +125,14 @@ export default function LandlordContractsPage() {
           <p className="text-[14px] text-[#74817b] mt-0.5">Quản lý các hợp đồng thuê nhà điện tử và tiền cọc phòng.</p>
         </div>
         <button
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => {
+            setForm((current) => ({
+              ...current,
+              startDate: current.startDate || dateOffset(0),
+            }));
+            setFormError("");
+            setIsCreateOpen(true);
+          }}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-medium hover:bg-[#124b42] transition-colors shadow-sm self-start cursor-pointer"
         >
           <Plus className="size-4" />
@@ -135,11 +201,11 @@ export default function LandlordContractsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <Link
-                          href={`/tenant/contracts/${item.id}`}
+                          href={`/landlord/contracts/${item.id}`}
                           className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#15594f] hover:underline"
                         >
                           <Eye className="size-3.5" />
-                          <span>Xem</span>
+                          <span>Quản lý</span>
                         </Link>
                       </td>
                     </tr>
@@ -176,8 +242,23 @@ export default function LandlordContractsPage() {
               </option>
             ))}
           </select>
-          <input required type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="rounded border p-2 text-sm" />
-          <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="rounded border p-2 text-sm" />
+          <input
+            required
+            type="date"
+            value={form.startDate}
+            min={dateBounds.minStart}
+            max={dateBounds.maxStart}
+            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+            className="rounded border p-2 text-sm"
+          />
+          <input
+            type="date"
+            value={form.endDate}
+            min={form.startDate || dateBounds.defaultEndMin}
+            max={form.startDate ? addYears(form.startDate, 5) : dateBounds.defaultEndMax}
+            onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+            className="rounded border p-2 text-sm"
+          />
           <input required readOnly type="number" placeholder="Tiền cọc (1 tháng thuê)" value={form.depositPaid} className="rounded border bg-[#f7f6f2] p-2 text-sm" />
           <input required readOnly type="number" placeholder="Tiền thuê/tháng" value={form.monthlyRent} className="rounded border bg-[#f7f6f2] p-2 text-sm" />
           <textarea placeholder="Điều khoản" value={form.terms} onChange={(e) => setForm({ ...form, terms: e.target.value })} className="col-span-2 rounded border p-2 text-sm" />

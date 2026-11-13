@@ -16,6 +16,26 @@ export const invoiceController = {
     }
   },
 
+  preview: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const query = req.query as unknown as {
+        roomId: string;
+        month: number;
+        year: number;
+        otherFee?: number;
+      };
+      const result = await invoiceService.previewInvoice(resourceOwnerId(req), {
+        roomId: query.roomId,
+        month: Number(query.month),
+        year: Number(query.year),
+        otherFee: query.otherFee,
+      });
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
   getMyInvoices: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await invoiceService.getMyInvoices(resourceOwnerId(req), req.user!.landlordId ? 'LANDLORD' : req.user!.role);

@@ -9,6 +9,7 @@ import {
   Building,
   Home,
   FileText,
+  FileWarning,
   Activity,
   Users,
   ShieldCheck,
@@ -24,8 +25,10 @@ import {
   History,
   Settings,
   Sparkles,
+  ListChecks,
   Search,
   User,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +66,7 @@ export function AdminSidebar() {
         { label: "Quản lý nội dung cấm", href: "/admin/content-filter", icon: Filter },
         { label: "Quản lý yêu cầu hỗ trợ", href: "/admin/support", icon: LifeBuoy },
         { label: "Quản lý khiếu nại", href: "/admin/disputes", icon: Scale },
+        { label: "Duyệt chấm dứt HĐ", href: "/admin/contracts", icon: FileWarning },
       ],
     },
     {
@@ -73,11 +77,13 @@ export function AdminSidebar() {
         { label: "Nhật ký hoạt động", href: "/admin/audit-logs", icon: History },
         { label: "Cấu hình hệ thống", href: "/admin/settings", icon: Settings },
         { label: "Tiện ích phòng", href: "/admin/amenities", icon: Sparkles },
+        { label: "Câu hỏi ở ghép", href: "/admin/lifestyle-questions", icon: ListChecks },
       ],
     },
     {
       title: "DÙNG CHUNG",
       items: [
+        { label: "Thông báo quản trị", href: "/admin/notifications", icon: Bell },
         { label: "Tìm phòng", href: "/rooms", icon: Search },
         { label: "Tìm bạn ở ghép", href: "/roommates", icon: Users },
         { label: "Hồ sơ cá nhân", href: "/tenant/profile", icon: User },

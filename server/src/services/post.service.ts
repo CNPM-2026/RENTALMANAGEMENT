@@ -37,7 +37,7 @@ export const postService = {
     return post;
   },
   createPost: async (authorId: string, data: any, files: Express.Multer.File[]) => {
-    const { title, description, postType, propertyId, roomId } = data;
+    const { title, description, postType, propertyId, roomId, price, expiredAt } = data;
     const bannedKeywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } });
     const content = `${title ?? ""} ${description ?? ""}`.toLocaleLowerCase("vi-VN");
     const matchedKeyword = bannedKeywords.find(({ keyword }) => content.includes(keyword));
@@ -45,12 +45,32 @@ export const postService = {
       throw new AppError(`Nội dung chứa từ khóa bị cấm: "${matchedKeyword.keyword}"`, 400);
     }
     let roomPrice: number | null = null;
+    let normalizedPropertyId = propertyId || null;
+    let normalizedRoomId = roomId || null;
 
     if (propertyId || roomId) {
       const room = roomId ? await prisma.room.findUnique({ where: { id: roomId }, include: { property: true } }) : null;
-      if (room) roomPrice = Number(room.priceMonthly);
-      if (room && room.property.landlordId !== authorId) {
-        throw new AppError('Bạn không có quyền đăng tin cho phòng này', 403);
+      if (roomId && !room) throw new AppError('Phòng không tồn tại', 404);
+      if (room) {
+        roomPrice = Number(room.priceMonthly);
+        normalizedPropertyId = normalizedPropertyId || room.propertyId;
+
+        const isRoomOwner = room.property.landlordId === authorId;
+        if (!isRoomOwner) {
+          if (postType === 'FIND_ROOMMATE') {
+            // Khách thuê được gắn tin ở ghép với chính phòng mình đang thuê. Đây là
+            // dữ liệu gốc để kiểm tra sức chứa khi chấp nhận lời mời ở ghép.
+            const activeContract = await prisma.contract.findFirst({
+              where: { roomId: room.id, tenantId: authorId, status: 'ACTIVE' },
+              select: { id: true },
+            });
+            if (!activeContract) {
+              throw new AppError('Bạn cần có hợp đồng đang hiệu lực cho phòng này để đăng tin ở ghép', 403);
+            }
+          } else {
+            throw new AppError('Bạn không có quyền đăng tin cho phòng này', 403);
+          }
+        }
       }
       if (roomId && propertyId && room && room.propertyId !== propertyId) {
         throw new AppError('Phòng không thuộc nhà trọ đã chọn', 400);
@@ -58,10 +78,36 @@ export const postService = {
       if (propertyId) {
         const property = await prisma.property.findUnique({ where: { id: propertyId }, select: { landlordId: true } });
         if (!property) throw new AppError('Nhà trọ không tồn tại', 404);
-        if (property.landlordId !== authorId) throw new AppError('Bạn không có quyền đăng tin cho nhà trọ này', 403);
+        // Chủ trọ sở hữu nhà, hoặc tenant đang thuê phòng thuộc nhà đó (tin ở ghép).
+        if (property.landlordId !== authorId && postType !== 'FIND_ROOMMATE') {
+          throw new AppError('Bạn không có quyền đăng tin cho nhà trọ này', 403);
+        }
+        if (property.landlordId !== authorId && postType === 'FIND_ROOMMATE' && !roomId) {
+          const activeContractInProperty = await prisma.contract.findFirst({
+            where: {
+              tenantId: authorId,
+              status: 'ACTIVE',
+              room: { propertyId },
+            },
+            select: { id: true },
+          });
+          if (!activeContractInProperty) {
+            throw new AppError('Bạn cần có hợp đồng đang hiệu lực tại nhà trọ này để đăng tin ở ghép', 403);
+          }
+        }
       }
-      if (roomId && !room) throw new AppError('Phòng không tồn tại', 404);
     }
+
+    const defaultRoommateExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const normalizedExpiredAt = expiredAt
+      ? new Date(expiredAt)
+      : postType === 'FIND_ROOMMATE'
+        ? defaultRoommateExpiry
+        : null;
+
+    const resolvedPrice = postType === 'FIND_ROOMMATE'
+      ? (price !== undefined && price !== null && price !== '' ? Number(price) : roomPrice)
+      : (roomPrice ?? (price !== undefined && price !== null && price !== '' ? Number(price) : null));
 
     // 1. Tạo bài đăng
     const post = await prisma.post.create({
@@ -69,10 +115,11 @@ export const postService = {
         authorId,
         title,
         description,
-        price: roomPrice,
+        price: resolvedPrice,
         postType: postType as PostType,
-        propertyId: propertyId || null,
-        roomId: roomId || null,
+        propertyId: normalizedPropertyId,
+        roomId: normalizedRoomId,
+        expiredAt: normalizedExpiredAt,
         status: 'PENDING', // Mặc định chờ duyệt
       },
     });
@@ -259,7 +306,7 @@ export const postService = {
     if (!post) throw new AppError('Bài đăng không tồn tại', 404);
     if (post.authorId !== userId) throw new AppError('Bạn không có quyền sửa bài này', 403);
 
-    const { title, description, status } = data;
+    const { title, description, status, price, expiredAt } = data;
     const bannedKeywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } });
     const content = `${title ?? post.title} ${description ?? post.description}`.toLocaleLowerCase("vi-VN");
     const matchedKeyword = bannedKeywords.find(({ keyword }) => content.includes(keyword));
@@ -267,14 +314,21 @@ export const postService = {
       throw new AppError(`Nội dung chứa từ khóa bị cấm: "${matchedKeyword.keyword}"`, 400);
     }
     let roomPrice: number | null | undefined;
-    if (post.roomId) {
+    if (post.roomId && post.postType !== 'FIND_ROOMMATE') {
       const room = await prisma.room.findUnique({ where: { id: post.roomId }, select: { priceMonthly: true } });
       if (!room) throw new AppError('Phòng của bài đăng không còn tồn tại', 400);
       roomPrice = Number(room.priceMonthly);
     }
 
+    const nextPrice = roomPrice !== undefined
+      ? roomPrice
+      : (price !== undefined && price !== null && price !== '' ? Number(price) : undefined);
+    const nextExpiredAt = expiredAt !== undefined ? new Date(expiredAt) : undefined;
+
     // Nếu sửa thông tin -> Đưa về trạng thái PENDING để Admin duyệt lại
-    const newStatus = (title || description) ? 'PENDING' : post.status;
+    const newStatus = (title || description || nextPrice !== undefined || nextExpiredAt !== undefined)
+      ? 'PENDING'
+      : post.status;
 
     // Cập nhật
     const updatedPost = await prisma.post.update({
@@ -282,7 +336,8 @@ export const postService = {
       data: {
         ...(title && { title }),
         ...(description && { description }),
-        ...(roomPrice !== undefined && { price: roomPrice }),
+        ...(nextPrice !== undefined && { price: nextPrice }),
+        ...(nextExpiredAt !== undefined && { expiredAt: nextExpiredAt }),
         status: newStatus,
       }
     });

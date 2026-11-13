@@ -73,6 +73,41 @@ enum ContractStatus {
   TERMINATED
 }
 
+// 🆕 Yêu cầu chấm dứt hợp đồng phải qua Admin duyệt. Tách khỏi
+// `ContractStatus` vì một hợp đồng vẫn ACTIVE trong lúc yêu cầu còn PENDING;
+// chỉ khi Admin APPROVED mới chuyển hợp đồng sang TERMINATED.
+enum ContractTerminationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// Lý do quyết định nghĩa vụ hoàn cọc:
+// - LANDLORD_VIOLATION: chủ trọ sai ⇒ BẮT BUỘC hoàn đủ tiền cọc.
+// - TENANT_MOVED_OUT / TENANT_VIOLATION: không mặc định hoàn cọc.
+// - MUTUAL_AGREEMENT / OTHER: Admin quyết định mức hoàn khi duyệt.
+enum ContractTerminationReason {
+  TENANT_MOVED_OUT
+  TENANT_VIOLATION
+  LANDLORD_VIOLATION
+  MUTUAL_AGREEMENT
+  OTHER
+}
+
+enum DepositRefundStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+}
+
+enum ContractRenewalStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
 enum SupportTicketStatus {
   OPEN
   IN_PROGRESS
@@ -91,6 +126,65 @@ enum MaintenanceStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+// 🆕 Batch 2 (điều chỉnh luồng) — TRẠNG THÁI TIẾP NHẬN sự cố của chủ trọ.
+// Tách khỏi `MaintenanceStatus` (vòng đời xử lý: PENDING/IN_PROGRESS/COMPLETED/
+// CANCELLED) vì hai câu hỏi khác nhau: "chủ trọ đã xem xét báo cáo này chưa?"
+// và "sự cố đã được xử lý xong chưa?". Gộp chung một enum sẽ không biểu diễn
+// được "cần bổ sung thông tin" và "bị từ chối" mà không làm hỏng vòng đời cũ.
+enum MaintenanceTriageStatus {
+  PENDING
+  REVIEWED
+  NEEDS_INFO
+  REJECTED
+}
+
+// 🆕 Batch 2 — trạng thái CÔNG VIỆC của marketplace thợ.
+// Chỉ 3 trạng thái cần cho Batch 2: `OPEN` (đang tìm thợ), `ASSIGNED` (đã chốt
+// đúng MỘT thợ), `CANCELLED` (chủ trọ huỷ khi chưa giao việc).
+// KHÔNG có `APPLIED`: "đã có người ứng tuyển" là sự tồn tại của bản ghi trong
+// `maintenance_task_applications`, không phải trạng thái của công việc — gộp
+// hai khái niệm vào một enum sẽ khiến việc rút đơn/trượt phải sửa ngược trạng
+// thái công việc và tạo ra trạng thái không thể biểu diễn (2 thợ cùng lúc).
+// 🆕 Batch 3 — vòng đời THỰC THI sau khi giao việc:
+//   ASSIGNED → IN_PROGRESS (thợ bắt đầu) → SUBMITTED (thợ gửi nghiệm thu)
+//   → COMPLETED (chủ trọ xác nhận) | quay lại IN_PROGRESS (chủ trọ yêu cầu làm lại).
+// `SUBMITTED` là trạng thái RIÊNG chứ không phải một cờ phụ: "thợ đã gửi nghiệm
+// thu, chờ chủ trọ quyết định" là câu hỏi khác với "công việc đang được thực
+// hiện", và việc thu hồi/nộp lại phải là chuyển trạng thái có kiểm soát (một
+// cột boolean sẽ cho phép hai lần nộp chồng nhau).
+//
+// Thứ tự khai báo: PostgreSQL luôn THÊM nhãn mới vào CUỐI kiểu enum, nên thứ tự
+// trong file này không trùng thứ tự vật lý ở DB. Vì vậy KHÔNG endpoint nào được
+// sắp xếp theo `status` ở SQL — xem `TASK_STATUS_ORDER` trong
+// `maintenanceTask.service.ts`.
+enum MaintenanceTaskStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+// 🆕 Batch 3 — loại ảnh của công việc: ảnh HIỆN TRẠNG do chủ trọ tải lên lúc
+// đăng việc (`TASK`) và ảnh BẰNG CHỨNG NGHIỆM THU do thợ tải lên khi hoàn
+// thành (`COMPLETION`). Tách bằng một cột thay vì bảng thứ hai: cùng pipeline
+// Cloudinary `type: authenticated`, cùng `maintenance_task_images`,
+// cùng `canViewTaskEvidence`; chỉ khác ý nghĩa. Nhờ vậy yêu cầu làm lại không
+// bao giờ ghi đè/xoá ảnh hiện trạng (và ngược lại).
+enum MaintenanceTaskImageKind {
+  TASK
+  COMPLETION
+}
+
+// 🆕 Batch 2 — trạng thái ĐƠN ỨNG TUYỂN của một thợ cho một công việc.
+enum MaintenanceApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
 }
 
 enum RentalRequestStatus {
@@ -161,6 +255,18 @@ enum NotificationType {
   CONTRACT
   COMMISSION
   SYSTEM
+  // 🆕 Batch 2 — thông báo của marketplace công việc (ứng tuyển / nhận việc).
+  TASK
+  // 🆕 Batch 3 — thương lượng giá và vòng đời nghiệm thu.
+  OFFER
+  // 🆕 Batch 4 — đánh giá công việc và tranh chấp.
+  REVIEW
+  DISPUTE
+  // 🆕 Occupancy — khai báo số người ở / kết quả xác minh của chủ trọ.
+  OCCUPANCY
+  // 🆕 Chấm dứt / gia hạn hợp đồng — gửi cho các bên và Admin duyệt.
+  CONTRACT_TERMINATION
+  CONTRACT_RENEWAL
 }
 
 // 🆕 Enum cho đối tượng được đánh giá
@@ -168,6 +274,55 @@ enum ReviewTargetType {
   POST
   USER // chủ trọ / người ở ghép
   ROOM
+  // 🆕 Batch 4 — đánh giá CHÍNH CÔNG VIỆC đã hoàn thành; `target_id` = task id.
+  // Chỉ người tham gia công việc (chủ trọ / thợ được giao) mới được tạo, và chỉ
+  // khi công việc đã COMPLETED — xem `review.service.ts`.
+  TASK
+}
+
+// 🆕 Batch 3 — THƯƠNG LƯỢNG GIÁ.
+// `MaintenanceOfferStatus` chỉ mô tả QUYẾT ĐỊNH của một đề xuất, không mô tả
+// giá của công việc: giá đã chốt nằm ở `maintenance_tasks.agreed_amount`.
+// Nhờ tách hai thứ, lịch sử đề xuất là bất biến (chỉ đổi trạng thái, không đổi
+// số tiền/người đề xuất/thời điểm), còn giá hiện hành luôn đọc được ở một chỗ.
+enum MaintenanceOfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  // Bị thay thế bởi một đề xuất mới hơn (counter-proposal) trong cùng công việc.
+  SUPERSEDED
+  WITHDRAWN
+}
+
+enum MaintenanceOfferActor {
+  LANDLORD
+  STAFF
+}
+
+// 🆕 Batch 4 — phân loại tranh chấp/báo cáo gắn với công việc.
+enum DisputeCategory {
+  WORK_QUALITY
+  NO_SHOW
+  PRICE_DISPUTE
+  SAFETY
+  HARASSMENT
+  FRAUD
+  PROPERTY_DAMAGE
+  OTHER
+}
+
+// 🆕 Occupancy — trạng thái khai báo số người ở của khách thuê.
+// - PENDING:   khách vừa khai, chờ chủ trọ xác minh. KHÔNG dùng để tính tiền.
+// - VERIFIED:  chủ trọ đã xác minh. Chỉ trạng thái này (hoặc bản đã bị thay thế
+//              sau đó) mới được dùng cho hoá đơn của kỳ tương ứng.
+// - REJECTED:  chủ trọ từ chối kèm lý do. KHÔNG dùng để tính tiền.
+// - SUPERSEDED: đã bị một khai báo mới hơn thay thế. Vẫn là bằng chứng lịch sử
+//              cho các kỳ đã phát hành trước thời điểm bị thay thế.
+enum OccupancyDeclarationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  SUPERSEDED
 }
 
 // ==========================================
@@ -175,15 +330,15 @@ enum ReviewTargetType {
 // ==========================================
 
 model User {
-  id              String   @id @default(uuid())
-  email           String   @unique
-  passwordHash    String   @map("password_hash")
-  fullName        String   @map("full_name")
+  id              String  @id @default(uuid())
+  email           String  @unique
+  passwordHash    String  @map("password_hash")
+  fullName        String  @map("full_name")
   phone           String?
-  avatarUrl       String?  @map("avatar_url")
-  role            Role     @default(TENANT)
-  isActive        Boolean  @default(true) @map("is_active")
-  isEmailVerified Boolean  @default(false) @map("is_email_verified")
+  avatarUrl       String? @map("avatar_url")
+  role            Role    @default(TENANT)
+  isActive        Boolean @default(true) @map("is_active")
+  isEmailVerified Boolean @default(false) @map("is_email_verified")
 
   // H-05: credential provenance.
   // `authVersion` is bumped by every write that invalidates an in-flight
@@ -195,44 +350,61 @@ model User {
   passwordProvenVia String?   @map("password_proven_via")
   passwordSetVia    String?   @map("password_set_via")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Quan hệ
-  profile                     UserProfile?
-  roommatePreference          RoommatePreference? // 🆕 Tiêu chí tìm bạn ở ghép
-  properties                  Property[] // Dành cho Chủ trọ
-  posts                       Post[] // Bài đăng của user
-  lifestyleAnswers            UserLifestyleAnswer[]
-  tenantAppointments          Appointment[]           @relation("TenantAppointments")
-  landlordAppointments        Appointment[]           @relation("LandlordAppointments")
-  agentAppointments           Appointment[]           @relation("AgentAppointments")
-  contractsAsTenant           Contract[]              @relation("TenantContracts")
-  contractsAsAgent            Contract[]              @relation("AgentContracts")
-  commissions                 Commission[] // Hoa hồng dành cho AGENT
-  invoices                    Invoice[] // Hóa đơn của khách thuê
-  sentMessages                Message[]               @relation("SentMessages")
-  conversationMembers         ConversationMember[]
-  reports                     Report[]
-  notifications               Notification[] // 🆕 Thông báo
-  reviews                     Review[] // 🆕 Đánh giá của user
-  favorites                   Favorite[] // 🆕 Tin đăng yêu thích
-  refreshTokens               RefreshToken[]
-  passwordResetTokens         PasswordResetToken[]
-  emailVerificationCodes      EmailVerificationCode[]
-  auditLogs                   AuditLog[]
-  supportTickets              SupportTicket[]
-  maintenanceRequests         MaintenanceRequest[]    @relation("TenantMaintenanceRequests")
-  landlordMaintenanceRequests MaintenanceRequest[]    @relation("LandlordMaintenanceRequests")
-  rentalRequests              RentalRequest[]
-  landlordRentalRequests      RentalRequest[]         @relation("LandlordRentalRequests")
-  sentRoommateInvitations     RoommateInvitation[]    @relation("SentRoommateInvitations")
-  receivedRoommateInvitations RoommateInvitation[]    @relation("ReceivedRoommateInvitations")
-  kycSubmission               KycSubmission?
-  reviewedKycSubmissions      KycSubmission[]         @relation("KycReviewer")
-  staffMemberships            StaffMembership[]       @relation("StaffUser")
-  landlordStaff               StaffMembership[]       @relation("StaffLandlord")
-  staffProfile                StaffProfile? // 🆕 hồ sơ thợ độc lập (marketplace)
+  profile                       UserProfile?
+  roommatePreference            RoommatePreference? // 🆕 Tiêu chí tìm bạn ở ghép
+  properties                    Property[] // Dành cho Chủ trọ
+  posts                         Post[] // Bài đăng của user
+  lifestyleAnswers              UserLifestyleAnswer[]
+  tenantAppointments            Appointment[]                @relation("TenantAppointments")
+  landlordAppointments          Appointment[]                @relation("LandlordAppointments")
+  agentAppointments             Appointment[]                @relation("AgentAppointments")
+  contractsAsTenant             Contract[]                   @relation("TenantContracts")
+  contractsAsAgent              Contract[]                   @relation("AgentContracts")
+  requestedContractTerminations ContractTerminationRequest[] @relation("TerminationRequester")
+  reviewedContractTerminations  ContractTerminationRequest[] @relation("TerminationReviewer")
+  requestedContractRenewals     ContractRenewalRequest[]     @relation("RenewalRequester")
+  respondedContractRenewals     ContractRenewalRequest[]     @relation("RenewalResponder")
+  commissions                   Commission[] // Hoa hồng dành cho AGENT
+  invoices                      Invoice[] // Hóa đơn của khách thuê
+  sentMessages                  Message[]                    @relation("SentMessages")
+  conversationMembers           ConversationMember[]
+  reports                       Report[]
+  notifications                 Notification[] // 🆕 Thông báo
+  reviews                       Review[] // 🆕 Đánh giá của user
+  favorites                     Favorite[] // 🆕 Tin đăng yêu thích
+  refreshTokens                 RefreshToken[]
+  passwordResetTokens           PasswordResetToken[]
+  emailVerificationCodes        EmailVerificationCode[]
+  auditLogs                     AuditLog[]
+  supportTickets                SupportTicket[]
+  maintenanceRequests           MaintenanceRequest[]         @relation("TenantMaintenanceRequests")
+  landlordMaintenanceRequests   MaintenanceRequest[]         @relation("LandlordMaintenanceRequests")
+  rentalRequests                RentalRequest[]
+  landlordRentalRequests        RentalRequest[]              @relation("LandlordRentalRequests")
+  sentRoommateInvitations       RoommateInvitation[]         @relation("SentRoommateInvitations")
+  receivedRoommateInvitations   RoommateInvitation[]         @relation("ReceivedRoommateInvitations")
+  kycSubmission                 KycSubmission?
+  reviewedKycSubmissions        KycSubmission[]              @relation("KycReviewer")
+  staffMemberships              StaffMembership[]            @relation("StaffUser")
+  landlordStaff                 StaffMembership[]            @relation("StaffLandlord")
+  staffProfile                  StaffProfile? // 🆕 hồ sơ thợ độc lập (marketplace)
+  // 🆕 Batch 2 — marketplace công việc bảo trì
+  maintenanceTasks              MaintenanceTask[]            @relation("LandlordMaintenanceTasks")
+  assignedMaintenanceTasks      MaintenanceTask[]            @relation("AssignedMaintenanceTasks")
+  maintenanceTaskApplications   MaintenanceTaskApplication[] @relation("StaffTaskApplications")
+  // 🆕 Batch 3 — thương lượng giá (lịch sử bất biến, hai chiều chủ trọ/thợ)
+  offersProposed                MaintenanceTaskOffer[]       @relation("OfferProposer")
+  offersResponded               MaintenanceTaskOffer[]       @relation("OfferResponder")
+  // 🆕 Batch 4 — tranh chấp do admin xử lý
+  disputesResolved              Report[]                     @relation("DisputeResolver")
+  // 🆕 Occupancy — khai báo số người ở (tenant khai, chủ trọ xác minh)
+  occupancyDeclarations         RoomOccupancyDeclaration[]   @relation("TenantOccupancyDeclarations")
+  occupancyDeclarationsMade     RoomOccupancyDeclaration[]   @relation("DeclaredOccupancyDeclarations")
+  occupancyDeclarationsVerified RoomOccupancyDeclaration[]   @relation("VerifiedOccupancyDeclarations")
 
   @@index([role])
   @@map("users")
@@ -368,25 +540,56 @@ model SupportTicket {
 }
 
 model MaintenanceRequest {
-  id          String              @id @default(uuid())
-  tenantId    String              @map("tenant_id")
-  landlordId  String              @map("landlord_id")
-  roomId      String              @map("room_id")
-  title       String
-  description String
-  priority    MaintenancePriority @default(MEDIUM)
-  status      MaintenanceStatus   @default(PENDING)
-  resolvedAt  DateTime?           @map("resolved_at")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
+  id              String                  @id @default(uuid())
+  tenantId        String                  @map("tenant_id")
+  landlordId      String                  @map("landlord_id")
+  roomId          String                  @map("room_id")
+  title           String
+  description     String
+  priority        MaintenancePriority     @default(MEDIUM)
+  status          MaintenanceStatus       @default(PENDING)
+  // 🆕 Batch 2 (điều chỉnh luồng) — sự cố là BÁO CÁO của khách thuê, không phải
+  // công việc marketplace. `category` cho phép gợi ý sẵn danh mục khi chủ trọ
+  // chuyển báo cáo thành công việc; NULL = báo cáo cũ chưa phân loại.
+  category        ServiceCategory?
+  // Trạng thái tiếp nhận + lý do: chủ trọ từ chối hoặc yêu cầu bổ sung thông tin
+  // thì phải nói rõ lý do, ngược lại khách thuê không biết cần làm gì.
+  triageStatus    MaintenanceTriageStatus @default(PENDING) @map("triage_status")
+  triageNote      String?                 @map("triage_note")
+  triageUpdatedAt DateTime?               @map("triage_updated_at")
+  resolvedAt      DateTime?               @map("resolved_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
 
   tenant   User @relation("TenantMaintenanceRequests", fields: [tenantId], references: [id], onDelete: Cascade)
   landlord User @relation("LandlordMaintenanceRequests", fields: [landlordId], references: [id], onDelete: Cascade)
   room     Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
+  // 🆕 Ảnh hiện trạng do khách thuê gửi kèm báo cáo.
+  images MaintenanceRequestImage[]
+  // 🆕 Công việc marketplace được tạo TỪ sự cố này (1-n: sau khi huỷ công việc,
+  // chủ trọ được phép đăng lại từ cùng một sự cố).
+  tasks  MaintenanceTask[]
+
   @@index([tenantId, status])
   @@index([landlordId, status])
+  @@index([landlordId, triageStatus])
   @@map("maintenance_requests")
+}
+
+// 🆕 Batch 2 (điều chỉnh luồng) — ảnh hiện trạng của BÁO CÁO sự cố.
+// Tách khỏi `maintenance_task_images` vì hai vòng đời khác nhau: ảnh sự cố là
+// bằng chứng do khách thuê gửi (không được xoá khi chủ trọ sửa công việc).
+model MaintenanceRequestImage {
+  id        String   @id @default(uuid())
+  requestId String   @map("request_id")
+  imageUrl  String   @map("image_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  request MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("maintenance_request_images")
 }
 
 model RentalRequest {
@@ -470,24 +673,24 @@ model StaffMembership {
 // Không chứa email/số điện thoại: những trường đó thuộc `users` (một nguồn duy
 // nhất), tránh hai bản sao lệch nhau.
 model StaffProfile {
-  id      String @id @default(uuid())
-  userId  String @unique @map("user_id")
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
   // Mô tả năng lực / kinh nghiệm (text do chính thợ nhập)
-  description String?
+  description    String?
   // Khu vực hành nghề + toạ độ dùng để tính khoảng cách tới bất động sản.
   // NULL = thợ CHƯA khai báo toạ độ; caller phải xử lý riêng, tuyệt đối không
   // được coi NULL là (0,0) khi tính khoảng cách.
-  serviceAddress String? @map("service_address")
+  serviceAddress String?  @map("service_address")
   latitude       Float?
   longitude      Float?
   // Khoảng giá mong muốn (VNĐ). NULL = "thương lượng".
-  priceMin Decimal? @map("price_min") @db.Decimal(12, 2)
-  priceMax Decimal? @map("price_max") @db.Decimal(12, 2)
+  priceMin       Decimal? @map("price_min") @db.Decimal(12, 2)
+  priceMax       Decimal? @map("price_max") @db.Decimal(12, 2)
   // Trạng thái sẵn sàng nhận việc. Trạng thái tài khoản (khoá/mở) vẫn là
   // `users.is_active` — không nhân đôi khái niệm.
-  isAvailable Boolean  @default(true) @map("is_available")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  isAvailable    Boolean  @default(true) @map("is_available")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   skills StaffSkill[]
@@ -528,10 +731,11 @@ model Property {
   longitude   Float? // 🆕 Toạ độ cho Map View
   createdAt   DateTime @default(now()) @map("created_at")
 
-  landlord User            @relation(fields: [landlordId], references: [id], onDelete: Cascade)
-  rooms    Room[]
-  posts    Post[]
-  images   PropertyImage[] // 🆕 Ảnh cụm trọ
+  landlord         User              @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  rooms            Room[]
+  posts            Post[]
+  images           PropertyImage[] // 🆕 Ảnh cụm trọ
+  maintenanceTasks MaintenanceTask[] // 🆕 Batch 2 — công việc bảo trì gắn với cơ sở
 
   @@map("properties")
 }
@@ -565,16 +769,18 @@ model Room {
   status          RoomStatus @default(AVAILABLE)
   createdAt       DateTime   @default(now()) @map("created_at")
 
-  property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  roomAmenities       RoomAmenity[]
-  posts               Post[]
-  appointments        Appointment[]
-  contracts           Contract[]
-  meterReadings       MeterReading[]
-  invoices            Invoice[]
-  supportTickets      SupportTicket[]
-  maintenanceRequests MaintenanceRequest[]
-  rentalRequests      RentalRequest[]
+  property              Property                   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomAmenities         RoomAmenity[]
+  posts                 Post[]
+  appointments          Appointment[]
+  contracts             Contract[]
+  meterReadings         MeterReading[]
+  invoices              Invoice[]
+  supportTickets        SupportTicket[]
+  maintenanceRequests   MaintenanceRequest[]
+  rentalRequests        RentalRequest[]
+  maintenanceTasks      MaintenanceTask[] // 🆕 Batch 2 — công việc bảo trì gắn với phòng
+  occupancyDeclarations RoomOccupancyDeclaration[] // 🆕 số người ở do tenant khai
 
   @@index([status])
   @@map("rooms")
@@ -700,32 +906,32 @@ model UserLifestyleAnswer {
 
 // 🆕 Tiêu chí mong muốn về bạn ở ghép (dùng cho matching)
 model RoommatePreference {
-  id                   String   @id @default(uuid())
-  userId               String   @unique @map("user_id")
-  budgetMin            Decimal? @map("budget_min") @db.Decimal(10, 2)
-  budgetMax            Decimal? @map("budget_max") @db.Decimal(10, 2)
-  preferredGender      String?  @map("preferred_gender") // MALE / FEMALE / ANY
-  preferredProvince    String?  @map("preferred_province")
-  preferredDistrict    String?  @map("preferred_district")
-  preferredWard        String?  @map("preferred_ward")
-  hasRoom              Boolean? @map("has_room")
-  currentProvince      String?  @map("current_province")
-  currentDistrict      String?  @map("current_district")
-  currentWard          String?  @map("current_ward")
-  currentAddress       String?  @map("current_address")
-  currentRent          Decimal? @map("current_rent") @db.Decimal(10, 2)
-  currentArea          Decimal? @map("current_area") @db.Decimal(8, 2)
-  currentOccupants     Int?     @map("current_occupants")
-  roommateSlots        Int?     @map("roommate_slots")
+  id                   String    @id @default(uuid())
+  userId               String    @unique @map("user_id")
+  budgetMin            Decimal?  @map("budget_min") @db.Decimal(10, 2)
+  budgetMax            Decimal?  @map("budget_max") @db.Decimal(10, 2)
+  preferredGender      String?   @map("preferred_gender") // MALE / FEMALE / ANY
+  preferredProvince    String?   @map("preferred_province")
+  preferredDistrict    String?   @map("preferred_district")
+  preferredWard        String?   @map("preferred_ward")
+  hasRoom              Boolean?  @map("has_room")
+  currentProvince      String?   @map("current_province")
+  currentDistrict      String?   @map("current_district")
+  currentWard          String?   @map("current_ward")
+  currentAddress       String?   @map("current_address")
+  currentRent          Decimal?  @map("current_rent") @db.Decimal(10, 2)
+  currentArea          Decimal?  @map("current_area") @db.Decimal(8, 2)
+  currentOccupants     Int?      @map("current_occupants")
+  roommateSlots        Int?      @map("roommate_slots")
   moveInDate           DateTime? @map("move_in_date")
-  smokingAllowed       Boolean? @map("smoking_allowed")
-  petAllowed           Boolean? @map("pet_allowed")
-  cleanlinessLevel     Int?     @map("cleanliness_level") // 1-5
-  sleepSchedule        String?  @map("sleep_schedule") // EARLY / LATE / FLEXIBLE
-  occupationPreference String?  @map("occupation_preference")
+  smokingAllowed       Boolean?  @map("smoking_allowed")
+  petAllowed           Boolean?  @map("pet_allowed")
+  cleanlinessLevel     Int?      @map("cleanliness_level") // 1-5
+  sleepSchedule        String?   @map("sleep_schedule") // EARLY / LATE / FLEXIBLE
+  occupationPreference String?   @map("occupation_preference")
   note                 String?
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -772,12 +978,101 @@ model Contract {
   status      ContractStatus @default(ACTIVE)
   createdAt   DateTime       @default(now()) @map("created_at")
 
-  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tenant      User         @relation("TenantContracts", fields: [tenantId], references: [id], onDelete: Cascade)
-  agent       User?        @relation("AgentContracts", fields: [agentId], references: [id], onDelete: SetNull)
-  commissions Commission[]
+  room                  Room                         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant                User                         @relation("TenantContracts", fields: [tenantId], references: [id], onDelete: Cascade)
+  agent                 User?                        @relation("AgentContracts", fields: [agentId], references: [id], onDelete: SetNull)
+  commissions           Commission[]
+  occupancyDeclarations RoomOccupancyDeclaration[] // 🆕 khai báo số người gắn hợp đồng
+  terminationRequests   ContractTerminationRequest[]
+  renewalRequests       ContractRenewalRequest[]
 
   @@map("contracts")
+}
+
+// 🆕 YÊU CẦU CHẤM DỨT HỢP ĐỒNG.
+//
+// Luồng: một bên (chủ trọ hoặc người thuê) gửi yêu cầu kèm BẰNG CHỨNG ảnh →
+// Admin xem và APPROVED/REJECTED. Hợp đồng chỉ chuyển TERMINATED khi Admin
+// duyệt, nhờ vậy không bên nào đơn phương xoá hiệu lực hợp đồng.
+//
+// `depositRefundAmount` được chốt tại thời điểm Admin duyệt và đóng băng trên
+// yêu cầu; `refundStatus` theo dõi việc chủ trọ đã chuyển tiền hay chưa.
+model ContractTerminationRequest {
+  id                     String                    @id @default(uuid())
+  contractId             String                    @map("contract_id")
+  requestedById          String                    @map("requested_by_id")
+  initiatorRole          Role                      @map("initiator_role")
+  reason                 ContractTerminationReason
+  details                String
+  requestedEffectiveDate DateTime?                 @map("requested_effective_date")
+  status                 ContractTerminationStatus @default(PENDING)
+
+  // Nghĩa vụ hoàn cọc — server tự tính mặc định, Admin chốt khi duyệt.
+  depositRefundRequired Boolean             @default(false) @map("deposit_refund_required")
+  depositRefundAmount   Decimal?            @map("deposit_refund_amount") @db.Decimal(10, 2)
+  refundStatus          DepositRefundStatus @default(NOT_REQUIRED) @map("refund_status")
+  refundPaidAt          DateTime?           @map("refund_paid_at")
+
+  reviewedById String?   @map("reviewed_by_id")
+  reviewedAt   DateTime? @map("reviewed_at")
+  reviewNote   String?   @map("review_note")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contract    Contract                        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  requestedBy User                            @relation("TerminationRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?                           @relation("TerminationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  attachments ContractTerminationAttachment[]
+
+  @@index([contractId, status])
+  @@index([status, createdAt])
+  @@map("contract_termination_requests")
+}
+
+// Ảnh bằng chứng lưu Cloudinary `authenticated`; DB chỉ giữ public_id.
+model ContractTerminationAttachment {
+  id        String   @id @default(uuid())
+  requestId String   @map("request_id")
+  fileRef   String   @map("file_ref")
+  mimeType  String   @map("mime_type")
+  byteSize  Int      @map("byte_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  request ContractTerminationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("contract_termination_attachments")
+}
+
+// 🆕 YÊU CẦU GIA HẠN / KÝ TIẾP.
+//
+// `proposedEndDate = null` nghĩa là ký tiếp KHÔNG THỜI HẠN. Chỉ bên còn lại
+// được phản hồi; khi APPROVED, hợp đồng được cập nhật và chuyển lại ACTIVE
+// (nếu đã EXPIRED), phòng được giữ/claim lại trong cùng transaction.
+model ContractRenewalRequest {
+  id                  String                @id @default(uuid())
+  contractId          String                @map("contract_id")
+  requestedById       String                @map("requested_by_id")
+  proposedEndDate     DateTime?             @map("proposed_end_date")
+  proposedMonthlyRent Decimal?              @map("proposed_monthly_rent") @db.Decimal(10, 2)
+  note                String?
+  status              ContractRenewalStatus @default(PENDING)
+
+  respondedById String?   @map("responded_by_id")
+  respondedAt   DateTime? @map("responded_at")
+  responseNote  String?   @map("response_note")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  requestedBy User     @relation("RenewalRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  respondedBy User?    @relation("RenewalResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+
+  @@index([contractId, status])
+  @@index([status, createdAt])
+  @@map("contract_renewal_requests")
 }
 
 model Commission {
@@ -817,26 +1112,88 @@ model MeterReading {
 }
 
 model Invoice {
-  id             String        @id @default(uuid())
-  roomId         String        @map("room_id")
-  tenantId       String        @map("tenant_id")
-  month          Int
-  year           Int
-  roomFee        Decimal       @map("room_fee") @db.Decimal(10, 2)
-  electricityFee Decimal       @map("electricity_fee") @db.Decimal(10, 2)
-  waterFee       Decimal       @map("water_fee") @db.Decimal(10, 2)
-  otherFee       Decimal       @default(0) @map("other_fee") @db.Decimal(10, 2)
-  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
-  status         InvoiceStatus @default(UNPAID)
-  dueDate        DateTime      @map("due_date")
-  paidAt         DateTime?     @map("paid_at")
-  createdAt      DateTime      @default(now()) @map("created_at")
+  id                     String        @id @default(uuid())
+  roomId                 String        @map("room_id")
+  tenantId               String        @map("tenant_id")
+  month                  Int
+  year                   Int
+  roomFee                Decimal       @map("room_fee") @db.Decimal(10, 2)
+  electricityFee         Decimal       @map("electricity_fee") @db.Decimal(10, 2)
+  waterFee               Decimal       @map("water_fee") @db.Decimal(10, 2)
+  // Phí cố định lấy từ cấu hình phòng tại thời điểm phát hành (snapshot).
+  // Cột mặc định 0 để hoá đơn cũ/thiếu cấu hình vẫn đọc và cộng tiền được.
+  internetFee            Decimal       @default(0) @map("internet_fee") @db.Decimal(10, 2)
+  serviceFee             Decimal       @default(0) @map("service_fee") @db.Decimal(10, 2)
+  parkingFee             Decimal       @default(0) @map("parking_fee") @db.Decimal(10, 2)
+  otherFee               Decimal       @default(0) @map("other_fee") @db.Decimal(10, 2)
+  totalAmount            Decimal       @map("total_amount") @db.Decimal(10, 2)
+  // 🆕 Snapshot tính tiền tại thời điểm PHÁT HÀNH. Các cột nullable để hoá đơn
+  // cũ (trước delta này) vẫn đọc được; hoá đơn mới luôn ghi đủ. Nhờ vậy đổi giá
+  // điện/nước hoặc số người sau đó KHÔNG làm sai lịch sử.
+  electricityStart       Int?          @map("electricity_start")
+  electricityEnd         Int?          @map("electricity_end")
+  electricityConsumption Int?          @map("electricity_consumption")
+  waterConsumption       Int?          @map("water_consumption")
+  // Số người ĐÃ ĐƯỢC CHỦ TRỌ XÁC MINH dùng để tính tiền nước của kỳ này.
+  waterOccupants         Int?          @map("water_occupants")
+  electricityUnitPrice   Decimal?      @map("electricity_unit_price") @db.Decimal(12, 2)
+  waterUnitPrice         Decimal?      @map("water_unit_price") @db.Decimal(12, 2)
+  // Bản khai báo đã dùng — truy vết khi có tranh chấp.
+  occupancyDeclarationId String?       @map("occupancy_declaration_id")
+  status                 InvoiceStatus @default(UNPAID)
+  dueDate                DateTime      @map("due_date")
+  paidAt                 DateTime?     @map("paid_at")
+  createdAt              DateTime      @default(now()) @map("created_at")
 
-  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tenant User @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room                 Room                      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant               User                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  occupancyDeclaration RoomOccupancyDeclaration? @relation(fields: [occupancyDeclarationId], references: [id], onDelete: SetNull)
 
   @@unique([roomId, month, year]) // 🆕 Tránh tạo trùng hóa đơn cho cùng phòng/tháng/năm
+  @@index([occupancyDeclarationId])
   @@map("invoices")
+}
+
+// 🆕 OCCUPANCY — lịch sử khai báo số người ở của một khách thuê cho một phòng.
+//
+// Mỗi lần số người thay đổi, một ROW MỚI được tạo; row cũ chuyển SUPERSEDED
+// (không sửa nội dung đã khai). Nhờ vậy:
+//  - "mọi thay đổi đều phải được chủ trọ xác minh lại" là hệ quả tự nhiên: row
+//    mới luôn PENDING;
+//  - hoá đơn đã phát hành giữ snapshot riêng, nên lịch sử không bị diễn giải lại;
+//  - hàng đợi duyệt chỉ cần lọc `status = PENDING`.
+//
+// Partial unique index `room_occupancy_declarations_one_active_per_tenant`
+// (WHERE status IN ('PENDING','VERIFIED') AND superseded_at IS NULL) do script
+// DDL tạo — Prisma không quản lý được partial index.
+model RoomOccupancyDeclaration {
+  id              String                     @id @default(uuid())
+  roomId          String                     @map("room_id")
+  tenantId        String                     @map("tenant_id")
+  // Hợp đồng đang hiệu lực tại thời điểm khai (bằng chứng quan hệ thuê).
+  contractId      String?                    @map("contract_id")
+  occupants       Int
+  status          OccupancyDeclarationStatus @default(PENDING)
+  declaredById    String                     @map("declared_by_id")
+  declaredAt      DateTime                   @default(now()) @map("declared_at")
+  verifiedById    String?                    @map("verified_by_id")
+  verifiedAt      DateTime?                  @map("verified_at")
+  // Bắt buộc khi REJECTED — khách thuê phải biết vì sao.
+  rejectionReason String?                    @map("rejection_reason")
+  // Thời điểm bị khai báo mới hơn thay thế (NULL = còn hiệu lực).
+  supersededAt    DateTime?                  @map("superseded_at")
+  createdAt       DateTime                   @default(now()) @map("created_at")
+
+  room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant     User      @relation("TenantOccupancyDeclarations", fields: [tenantId], references: [id], onDelete: Cascade)
+  declaredBy User      @relation("DeclaredOccupancyDeclarations", fields: [declaredById], references: [id], onDelete: Cascade)
+  verifiedBy User?     @relation("VerifiedOccupancyDeclarations", fields: [verifiedById], references: [id], onDelete: SetNull)
+  contract   Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  invoices   Invoice[]
+
+  @@index([roomId, tenantId, verifiedAt])
+  @@index([status, declaredAt])
+  @@map("room_occupancy_declarations")
 }
 
 // ==========================================
@@ -845,12 +1202,19 @@ model Invoice {
 
 model Conversation {
   id        String   @id @default(uuid())
+  // 🆕 Batch 5 — hội thoại có thể được NEO vào một công việc. Đây là ranh giới
+  // quyền cho cặp STAFF ↔ TENANT: khách thuê và thợ chỉ được nói chuyện khi cùng
+  // một công việc (tenant = chủ phiếu sự cố nguồn, staff = thợ được giao).
+  // NULL = hội thoại không gắn việc (các cặp role khác, không cần neo).
+  taskId    String?  @map("task_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   members  ConversationMember[]
   messages Message[]
+  task     MaintenanceTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
+  @@index([taskId])
   @@map("conversations")
 }
 
@@ -866,33 +1230,79 @@ model ConversationMember {
 }
 
 model Message {
-  id             String      @id @default(uuid())
-  conversationId String      @map("conversation_id")
-  senderId       String      @map("sender_id")
-  messageType    MessageType @default(TEXT) @map("message_type") // 🆕 Loại tin nhắn
-  content        String
-  isRead         Boolean     @default(false) @map("is_read")
-  createdAt      DateTime    @default(now()) @map("created_at")
+  id              String      @id @default(uuid())
+  conversationId  String      @map("conversation_id")
+  senderId        String      @map("sender_id")
+  messageType     MessageType @default(TEXT) @map("message_type")
+  content         String
+  // 🆕 Batch 5 — idempotency của lần gửi: client sinh `clientMessageId`, retry
+  // (mất mạng, double-click, socket gửi lại sau reconnect) không tạo tin nhắn
+  // thứ hai. Unique theo (conversation_id, client_message_id); NULL được phép
+  // lặp nên tin nhắn cũ (không có id này) không bị ảnh hưởng.
+  clientMessageId String?     @map("client_message_id")
+  // 🆕 Batch 5 — tệp đính kèm PRIVATE. `attachment_ref` là `public_id` Cloudinary
+  // (`type: authenticated`), KHÔNG bao giờ là URL do client gửi. Client chỉ nhận
+  // đường dẫn có token qua `attachmentResolver` sau khi server kiểm tra lại tư
+  // cách thành viên hội thoại.
+  attachmentRef   String?     @map("attachment_ref")
+  attachmentMime  String?     @map("attachment_mime")
+  attachmentBytes Int?        @map("attachment_bytes")
+  attachmentName  String?     @map("attachment_name")
+  isRead          Boolean     @default(false) @map("is_read")
+  createdAt       DateTime    @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
+  @@unique([conversationId, clientMessageId])
   @@index([conversationId, createdAt])
   @@map("messages")
 }
 
 model Report {
-  id         String   @id @default(uuid())
-  reporterId String   @map("reporter_id")
-  targetType String   @map("target_type") // POST / USER
-  targetId   String   @map("target_id")
-  reason     String
-  status     String   @default("PENDING") // PENDING / RESOLVED
-  createdAt  DateTime @default(now()) @map("created_at")
+  id           String          @id @default(uuid())
+  reporterId   String          @map("reporter_id")
+  targetType   String          @map("target_type") // POST / USER / ROOM / TASK
+  targetId     String          @map("target_id")
+  // 🆕 Batch 4 — phân loại + mô tả: một báo cáo phải nói rõ LOẠI vi phạm và
+  // gắn được với công việc cụ thể. `reason` giữ nguyên (mô tả chi tiết) để dữ
+  // liệu cũ không bị diễn giải lại.
+  category     DisputeCategory @default(OTHER)
+  taskId       String?         @map("task_id")
+  reason       String
+  // Giữ kiểu String (không chuyển sang enum) để không phải migrate dữ liệu cũ;
+  // tập giá trị hợp lệ được kiểm soát ở `report.validation.ts`.
+  status       String          @default("PENDING") // PENDING / UNDER_REVIEW / RESOLVED / REJECTED
+  resolution   String?
+  resolvedById String?         @map("resolved_by_id")
+  resolvedAt   DateTime?       @map("resolved_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @default(now()) @updatedAt @map("updated_at")
 
-  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter    User               @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy  User?              @relation("DisputeResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  task        MaintenanceTask?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  attachments ReportAttachment[]
 
+  @@index([status, createdAt])
+  @@index([reporterId, createdAt])
+  @@index([taskId])
   @@map("reports")
+}
+
+// 🆕 Batch 4 — bằng chứng của báo cáo/tranh chấp, lưu PRIVATE như ảnh hiện trạng.
+model ReportAttachment {
+  id        String   @id @default(uuid())
+  reportId  String   @map("report_id")
+  fileRef   String   @map("file_ref") // Cloudinary public_id (type: authenticated)
+  mimeType  String   @map("mime_type")
+  byteSize  Int      @map("byte_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_attachments")
 }
 
 // ==========================================
@@ -906,12 +1316,18 @@ model Notification {
   content     String
   type        NotificationType
   isRead      Boolean          @default(false) @map("is_read")
-  referenceId String?          @map("reference_id") // id của post/appointment/invoice...
+  readAt      DateTime?        @map("read_at")
+  referenceId String?          @map("reference_id") // id của post/appointment/invoice/task...
+  // 🆕 Batch 6 — khoá chống trùng: cùng một sự kiện nghiệp vụ (ví dụ "đã giao
+  // việc X cho thợ Y") chỉ tạo đúng MỘT thông báo, kể cả khi handler chạy lại
+  // hoặc hai request song song cùng commit. NULL = không cần chống trùng.
+  dedupeKey   String?          @unique @map("dedupe_key")
   createdAt   DateTime         @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
+  @@index([userId, createdAt])
   @@map("notifications")
 }
 
@@ -930,4 +1346,216 @@ model Review {
   @@unique([reviewerId, targetType, targetId]) // Mỗi user chỉ review 1 lần cho 1 target
   @@index([targetType, targetId])
   @@map("reviews")
+}
+
+// ==========================================
+// 10. MARKETPLACE CÔNG VIỆC BẢO TRÌ (🆕 Batch 2)
+// ==========================================
+//
+// Luồng: chủ trọ đăng công việc (`maintenance_tasks`, status = OPEN) → thợ đã
+// duyệt KYC ứng tuyển (`maintenance_task_applications`, status = PENDING) →
+// chủ trọ chấp nhận ĐÚNG MỘT đơn (`task.status = ASSIGNED`,
+// `task.assigned_application_id` được chốt) và các đơn còn lại thành REJECTED.
+//
+// Không tái sử dụng `MaintenanceRequest` (phiếu sự cố do KHÁCH THUÊ gửi cho chủ
+// trọ): đó là kênh báo hỏng nội bộ của một hợp đồng thuê, có `tenant_id` bắt
+// buộc và không có khái niệm ứng tuyển/giao việc. Gộp hai thứ vào một bảng sẽ
+// khiến mọi truy vấn nội bộ phải lọc thêm loại bản ghi.
+
+model MaintenanceTask {
+  id                     String                @id @default(uuid())
+  landlordId             String                @map("landlord_id")
+  // Bắt buộc gắn với cơ sở: đây là ranh giới quyền sở hữu được kiểm tra ở
+  // server (`property.landlord_id`). `roomId` là tuỳ chọn (công việc có thể ở
+  // khu vực chung như mái, hành lang, sân).
+  propertyId             String                @map("property_id")
+  roomId                 String?               @map("room_id")
+  title                  String
+  description            String
+  category               ServiceCategory
+  // Địa chỉ/toạ độ của NƠI LÀM VIỆC (không phải địa chỉ thợ).
+  address                String
+  latitude               Float?
+  longitude              Float?
+  // Khoảng ngân sách dự kiến (VNĐ). NULL = "thương lượng".
+  budgetMin              Decimal?              @map("budget_min") @db.Decimal(12, 2)
+  budgetMax              Decimal?              @map("budget_max") @db.Decimal(12, 2)
+  urgency                MaintenancePriority   @default(MEDIUM)
+  // Khung thời gian mong muốn. NULL = linh hoạt.
+  preferredStartAt       DateTime?             @map("preferred_start_at")
+  preferredEndAt         DateTime?             @map("preferred_end_at")
+  additionalInstructions String?               @map("additional_instructions")
+  status                 MaintenanceTaskStatus @default(OPEN)
+  // Chốt việc giao: đúng một thợ và đúng một đơn.
+  // `assignedApplicationId` là UNIQUE ở DB nên hai đơn của cùng một công việc
+  // không thể cùng được chấp nhận, kể cả khi hai request chạy song song.
+  assignedStaffId        String?               @map("assigned_staff_id")
+  assignedApplicationId  String?               @unique @map("assigned_application_id")
+  assignedAt             DateTime?             @map("assigned_at")
+  // 🆕 Batch 3 — dấu vết THỰC THI & NGHIỆM THU.
+  //
+  // `startedAt`: thời điểm thợ bắt đầu (chỉ ghi MỘT lần; làm lại sau khi bị từ
+  // chối không đặt lại vì công việc chưa từng rời trạng thái đang làm).
+  // `completionSubmittedAt`: thời điểm của lần nộp GẦN NHẤT (giữ lại sau khi bị
+  // từ chối để chủ trọ/ thợ thấy mốc nộp trước đó — mốc của các lần trước nằm
+  // trong `audit_logs`).
+  // `completionNote`: ghi chú của thợ cho lần nộp gần nhất.
+  // `completionReviewedAt` + `completionReviewNote`: kết quả duyệt GẦN NHẤT.
+  // Chỉ chủ trọ sở hữu công việc duyệt được (quyền đã kiểm tra ở server) nên
+  // người duyệt luôn suy ra được từ `landlord_id`; không thêm cột
+  // `reviewed_by_id` trùng lặp.
+  // `completionAttempts`: số lần nộp (đơn điệu tăng) — chống nộp trùng và cho
+  // UI biết "đã làm lại lần thứ N" mà không phải đếm log.
+  startedAt              DateTime?             @map("started_at")
+  completionSubmittedAt  DateTime?             @map("completion_submitted_at")
+  completionNote         String?               @map("completion_note")
+  completionReviewedAt   DateTime?             @map("completion_reviewed_at")
+  completionReviewNote   String?               @map("completion_review_note")
+  completionAttempts     Int                   @default(0) @map("completion_attempts")
+  // 🆕 Batch 3 — GIÁ ĐÃ CHỐT. NULL = hai bên chưa thống nhất giá, và khi đó
+  // KHÔNG được bắt đầu công việc (server trả 409 `PRICE_NOT_AGREED`).
+  // Chỉ thay đổi bằng một đề xuất được bên còn lại CHẤP NHẬN (xem
+  // `maintenanceOffer.service.ts`) — không endpoint nào ghi trực tiếp cột này.
+  agreedAmount           Decimal?              @map("agreed_amount") @db.Decimal(12, 2)
+  agreedAt               DateTime?             @map("agreed_at")
+  // 🆕 Batch 3 — bộ đếm phiên bản thương lượng, tăng mỗi lần có quyết định giá
+  // (đề xuất mới / chấp nhận / từ chối / rút). Client gửi kèm `expectedVersion`
+  // khi chấp nhận/từ chối để một tab cũ không thể áp quyết định lên trạng thái
+  // thương lượng mới hơn.
+  negotiationVersion     Int                   @default(0) @map("negotiation_version")
+  // 🆕 Batch 2 (điều chỉnh luồng, Variant B) — BẮT BUỘC: mọi công việc marketplace
+  // phải bắt nguồn từ một báo cáo sự cố của khách thuê. Không còn đường tạo tự do
+  // (`POST /maintenance-tasks` đã bị gỡ) nên cột này NOT NULL ở mức DB.
+  //
+  // `onDelete: Cascade` (không phải `Restrict`): sự cố bị xoá theo tenant/phòng
+  // (cascade sẵn có từ Batch 1) thì công việc dẫn xuất cũng biến mất. `Restrict`
+  // sẽ làm hỏng các luồng xoá phòng/cơ sở/tài khoản hiện có với lỗi khoá ngoại.
+  // Lịch sử sự cố không bị sửa khi tạo công việc; chiều ngược lại mới là ràng buộc.
+  sourceIssueId          String                @map("source_issue_id")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+
+  landlord            User                         @relation("LandlordMaintenanceTasks", fields: [landlordId], references: [id], onDelete: Cascade)
+  assignedStaff       User?                        @relation("AssignedMaintenanceTasks", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  property            Property                     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  room                Room?                        @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  sourceIssue         MaintenanceRequest           @relation(fields: [sourceIssueId], references: [id], onDelete: Cascade)
+  skills              MaintenanceTaskSkill[]
+  images              MaintenanceTaskImage[]
+  applications        MaintenanceTaskApplication[]
+  assignedApplication MaintenanceTaskApplication?  @relation("AssignedApplication", fields: [assignedApplicationId], references: [id], onDelete: SetNull)
+  // 🆕 Batch 3 — lịch sử thương lượng giá (bất biến, chỉ đổi trạng thái).
+  offers              MaintenanceTaskOffer[]
+  // 🆕 Batch 4 — tranh chấp gắn với công việc; 🆕 Batch 5 — hội thoại theo việc.
+  reports             Report[]
+  conversations       Conversation[]
+
+  @@index([status, category]) // thợ lọc theo danh mục trong danh sách OPEN
+  @@index([status, urgency]) // sắp xếp theo độ khẩn cấp
+  @@index([landlordId, status]) // chủ trọ xem công việc của mình
+  @@index([assignedStaffId, status]) // 🆕 Batch 3: thợ xem "việc của tôi" theo trạng thái
+  @@index([sourceIssueId]) // chặn đăng trùng công việc từ cùng một sự cố
+  @@map("maintenance_tasks")
+}
+
+// 🆕 Kỹ năng YÊU CẦU của công việc — cùng hình dạng với `staff_skills` để so
+// khớp (staff_skills.category = maintenance_task_skills.category) bằng một câu
+// SQL, không phải parse text.
+model MaintenanceTaskSkill {
+  taskId    String          @map("task_id")
+  category  ServiceCategory
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  task MaintenanceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, category])
+  @@index([category])
+  @@map("maintenance_task_skills")
+}
+
+// 🆕 Ảnh của công việc (URL Cloudinary đã upload qua `storage.service` — không
+// bao giờ lưu đường dẫn do client gửi).
+//
+// 🆕 Batch 3: `kind` phân biệt ảnh HIỆN TRẠNG (`TASK`, chủ trọ tải lúc đăng
+// việc) với ảnh BẰNG CHỨNG NGHIỆM THU (`COMPLETION`, thợ tải khi gửi hoàn
+// thành). Cùng bảng + cùng pipeline upload riêng tư, nên quyền xem vẫn do
+// `canViewTaskEvidence` quyết định và không có bảng ảnh thứ hai lệch quyền.
+model MaintenanceTaskImage {
+  id        String                   @id @default(uuid())
+  taskId    String                   @map("task_id")
+  imageUrl  String                   @map("image_url")
+  // Dữ liệu cũ (trước Batch 3) đều là ảnh hiện trạng.
+  kind      MaintenanceTaskImageKind @default(TASK)
+  createdAt DateTime                 @default(now()) @map("created_at")
+
+  task MaintenanceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, kind])
+  @@map("maintenance_task_images")
+}
+
+// 🆕 ĐƠN ỨNG TUYỂN của thợ.
+//
+// `@@unique([taskId, staffId])` là chốt chống trùng ở tầng DB: mỗi thợ chỉ có
+// một bản ghi cho một công việc. Ứng tuyển lại sau khi rút/bị từ chối sẽ dùng
+// lại chính bản ghi đó (đưa về PENDING) nên lịch sử không bị nhân bản và không
+// cần partial index (Prisma `db push` không quản lý được partial index).
+model MaintenanceTaskApplication {
+  id             String                       @id @default(uuid())
+  taskId         String                       @map("task_id")
+  staffId        String                       @map("staff_id")
+  message        String?
+  // 🆕 Batch 3 — giá thợ đề nghị khi ứng tuyển (NULL = "theo ngân sách / thương
+  // lượng sau"). Chủ trọ chấp nhận đơn = chấp nhận giá này, nên đây là một
+  // trong hai nguồn hợp lệ của `maintenance_tasks.agreed_amount`.
+  proposedAmount Decimal?                     @map("proposed_amount") @db.Decimal(12, 2)
+  status         MaintenanceApplicationStatus @default(PENDING)
+  reviewedAt     DateTime?                    @map("reviewed_at")
+  createdAt      DateTime                     @default(now()) @map("created_at")
+  updatedAt      DateTime                     @updatedAt @map("updated_at")
+
+  task         MaintenanceTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignedTask MaintenanceTask? @relation("AssignedApplication")
+  staff        User             @relation("StaffTaskApplications", fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, staffId])
+  @@index([taskId, status])
+  @@index([staffId, status])
+  @@map("maintenance_task_applications")
+}
+
+// 🆕 Batch 3 — ĐỀ XUẤT GIÁ (bất biến).
+//
+// Vì sao là bảng riêng thay vì cột trên công việc: yêu cầu là "persist immutable
+// proposal history, actor, amount, timestamp". Một cột `last_offer` sẽ ghi đè
+// lịch sử và không thể trả lời "ai đã đề xuất bao nhiêu, khi nào, ai từ chối".
+//
+// Ràng buộc bất biến (được service bảo vệ, không chỉ ở tầng ứng dụng):
+// - `amount`, `proposedById`, `proposedByRole`, `createdAt`, `version` KHÔNG
+//   bao giờ được UPDATE.
+// - Chỉ `status` (+ `respondedById`/`respondedAt`/`responseNote`) chuyển từ
+//   PENDING sang đúng MỘT trạng thái kết thúc.
+// - `version` đơn điệu tăng trong một công việc; `@@unique([taskId, version])`
+//   khiến hai đề xuất đồng thời không thể trùng số thứ tự.
+model MaintenanceTaskOffer {
+  id             String                 @id @default(uuid())
+  taskId         String                 @map("task_id")
+  version        Int
+  proposedById   String                 @map("proposed_by_id")
+  proposedByRole MaintenanceOfferActor  @map("proposed_by_role")
+  amount         Decimal                @db.Decimal(12, 2)
+  note           String?
+  status         MaintenanceOfferStatus @default(PENDING)
+  respondedById  String?                @map("responded_by_id")
+  respondedAt    DateTime?              @map("responded_at")
+  responseNote   String?                @map("response_note")
+  createdAt      DateTime               @default(now()) @map("created_at")
+
+  task        MaintenanceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  proposedBy  User            @relation("OfferProposer", fields: [proposedById], references: [id], onDelete: Cascade)
+  respondedBy User?           @relation("OfferResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+
+  @@unique([taskId, version])
+  @@index([taskId, status])
+  @@map("maintenance_task_offers")
 }

@@ -77,6 +77,12 @@ function LoginForm() {
     ? "Mật khẩu đã được thiết lập. Vui lòng đăng nhập bằng email và mật khẩu mới."
     : null;
 
+  // Phiên đăng nhập có hạn tuyệt đối 2 giờ; SessionGuard/api client chuyển về đây
+  // với `?expired=1` khi hết hạn (không phải lỗi đăng nhập).
+  const sessionExpiredMessage = searchParams.get("expired")
+    ? "Phiên đăng nhập đã hết hạn sau 2 giờ. Vui lòng đăng nhập lại."
+    : null;
+
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrorMessage(null);
@@ -99,7 +105,9 @@ function LoginForm() {
 
       setAuthSession(response.token, response.refreshToken, response.user);
 
-      router.push("/");
+      // Mọi vai trò đều về trang chủ sau khi đăng nhập. Không gian riêng
+      // (chủ trọ/quản trị/thợ) được mở từ menu tài khoản trên navbar.
+      router.replace("/");
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setErrorMessage(err.message || "Tài khoản hoặc mật khẩu không chính xác.");
@@ -126,6 +134,13 @@ function LoginForm() {
         <div className="mb-6 p-4 rounded-[8px] bg-[#eaf2ed] border border-[#cfe3d7] text-[#15594f] text-[13px] flex items-center gap-2.5">
           <CheckCircle2 className="size-4 shrink-0" />
           <span>{passwordSetMessage}</span>
+        </div>
+      )}
+
+      {sessionExpiredMessage && (
+        <div className="mb-6 p-4 rounded-[8px] bg-[#fdf8ec] border border-[#f4deb4] text-[#9a6a12] text-[13px] flex items-center gap-2.5">
+          <AlertCircle className="size-4 shrink-0" />
+          <span>{sessionExpiredMessage}</span>
         </div>
       )}
 

@@ -10,6 +10,26 @@ const staffSelect = {
 } as const;
 
 export const staffService = {
+  /**
+   * Quyền nhân viên của CHÍNH người đang đăng nhập.
+   *
+   * Dùng cho client biết được mình đang được chủ trọ nào cấp quyền gì (để hiện
+   * đúng menu `/landlord/*`). Trả `null` nếu không phải nhân viên — không lỗi,
+   * vì phần lớn tài khoản không có membership nào.
+   */
+  getMyMembership: async (userId: string) =>
+    prisma.staffMembership.findFirst({
+      where: { userId, isActive: true },
+      select: {
+        id: true,
+        landlordId: true,
+        permissions: true,
+        createdAt: true,
+        landlord: { select: { id: true, fullName: true, avatarUrl: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+
   list: (landlordId: string) => prisma.staffMembership.findMany({
     where: { landlordId },
     select: staffSelect,

@@ -4,6 +4,18 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { storageService } from '../services/storage.service';
 
 export const userController = {
+  /**
+   * Hồ sơ công khai (không có email/số điện thoại/toạ độ). Mọi tài khoản đã đăng
+   * nhập đều xem được — dùng cho trang cá nhân `/users/[id]`.
+   */
+  getPublicProfile: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await userService.getPublicProfile(String(req.params.id));
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
   updateProfile: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // req.file chứa thông tin ảnh (nếu có)

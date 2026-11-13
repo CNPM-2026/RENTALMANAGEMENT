@@ -19,6 +19,7 @@ import {
   Lock,
   LogOut,
   ShieldCheck,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -38,6 +39,11 @@ export function PortalSidebar({ onLogout }: PortalSidebarProps) {
     { label: "Lịch xem phòng", href: "/tenant/appointments", icon: Calendar },
     { label: "Yêu cầu thuê", href: "/tenant/rental-requests", icon: Send },
     { label: "Hợp đồng của tôi", href: "/tenant/contracts", icon: FileText },
+    // 🆕 Số người ở: tenant khai, chủ trọ xác minh; hoá đơn dùng số ĐÃ xác minh.
+    { label: "Khai báo số người ở", href: "/tenant/occupancy", icon: UserCheck },
+    // 🆕 Batch 2 — điểm bắt đầu của luồng marketplace: khách thuê báo sự cố,
+    // chủ trọ tiếp nhận rồi chuyển thành việc cần thợ.
+    { label: "Báo cáo sự cố", href: "/tenant/maintenance", icon: Wrench },
     {
       label: "Hồ sơ gu sống & Ở ghép",
       href: "/tenant/roommate-profile",

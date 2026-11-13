@@ -5,6 +5,7 @@
  */
 
 import { Role, PostStatus, RoomStatus, ContractStatus, InvoiceStatus, AppointmentStatus } from '@/types/models';
+import { translateRole } from '@/lib/labels';
 
 /**
  * ClassValue type definition compatible with clsx
@@ -154,20 +155,11 @@ export function formatArea(area: number | null | undefined): string {
 
 /**
  * Returns human-friendly Vietnamese label for user roles.
+ * Giữ hàm này cho code cũ nhưng uỷ quyền cho `translateRole` để chỉ có một
+ * nguồn nhãn vai trò duy nhất.
  */
 export function getRoleLabel(role?: Role | null): string {
-  switch (role) {
-    case 'ADMIN':
-      return 'Quản trị viên';
-    case 'LANDLORD':
-      return 'Chủ trọ';
-    case 'TENANT':
-      return 'Người thuê';
-    case 'STAFF':
-      return 'Thợ / Dịch vụ';
-    default:
-      return 'Khách';
-  }
+  return translateRole(role);
 }
 
 /**

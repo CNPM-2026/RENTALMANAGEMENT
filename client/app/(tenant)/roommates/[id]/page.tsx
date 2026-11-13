@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Sparkles,
   UserPlus,
   MessageCircle,
   Flag,
@@ -14,13 +13,12 @@ import {
   Calendar,
   DollarSign,
   MapPin,
-  Clock,
-  Heart,
   ChevronLeft,
+  FileText,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { apiClient } from "@/lib/api";
 import { Avatar } from "@/components/ui/avatar";
@@ -49,27 +47,45 @@ function RoommateDetailContent() {
   const [suggestion, setSuggestion] = React.useState<SuggestedRoommate | null>(null);
 
   React.useEffect(() => {
-    apiClient.matching.getSuggestions()
-      .then((items) => setSuggestion(items.find((item) => item.user.id === candidateId) ?? null))
-      .catch(() => setSuggestion(null));
+    apiClient.matching.getRoommateProfile(candidateId)
+      .then((item) => setSuggestion(item))
+      .catch(() => {
+        apiClient.matching.getSuggestions()
+          .then((items) => setSuggestion(items.find((item) => item.user.id === candidateId) ?? null))
+          .catch(() => setSuggestion(null));
+      });
   }, [candidateId]);
 
   const candidate = suggestion ? {
     id: suggestion.user.id,
     fullName: suggestion.user.fullName,
-    age: 0,
-    gender: suggestion.user.gender ?? "Chưa cập nhật",
+    age: suggestion.user.age ?? 0,
+    gender: suggestion.user.gender === "MALE" ? "Nam" : suggestion.user.gender === "FEMALE" ? "Nữ" : suggestion.user.gender ?? "Chưa cập nhật",
     occupation: suggestion.user.occupation ?? "Chưa cập nhật",
     avatarUrl: suggestion.user.avatarUrl ?? "/images/default-avatar.svg",
     matchScore: suggestion.compatibilityPercent,
+    postId: suggestion.post.id,
+    postTitle: suggestion.post.title,
+    postDescription: suggestion.post.description,
+    postRoomNumber: suggestion.post.room?.roomNumber ?? null,
+    postMaxOccupants: suggestion.post.room?.maxOccupants ?? null,
+    postExpiredAt: suggestion.post.expiredAt ?? null,
     statusNote: suggestion.post.title,
-    budgetMonthly: suggestion.post.price ? `${formatCurrency(suggestion.post.price, { showUnit: false })} đ/tháng` : "Chưa cập nhật",
-    targetLocation: suggestion.post.property?.district ?? "Chưa cập nhật",
-    moveInDate: "Chưa cập nhật",
-    bio: suggestion.post.description,
+    budgetMonthly: suggestion.post.price ? `${formatCurrency(suggestion.post.price, { showUnit: false })} đ/tháng` : "Thương lượng",
+    targetLocation: suggestion.location?.district
+      ?? suggestion.location?.province
+      ?? suggestion.preference?.currentDistrict
+      ?? suggestion.preference?.preferredDistrict
+      ?? "Chưa cập nhật",
+    moveInDate: suggestion.preference?.moveInDate
+      ? new Date(suggestion.preference.moveInDate).toLocaleDateString("vi-VN")
+      : "Chưa cập nhật",
+    bio: suggestion.user.bio || "Người dùng chưa cập nhật giới thiệu.",
   } : {
     id: candidateId, fullName: "Đang tải hồ sơ", age: 0, gender: "Chưa cập nhật",
     occupation: "Chưa cập nhật", avatarUrl: "/images/default-avatar.svg", matchScore: 0,
+    postId: "", postTitle: "Chưa có dữ liệu bài đăng", postDescription: "",
+    postRoomNumber: null, postMaxOccupants: null, postExpiredAt: null,
     statusNote: "Chưa có dữ liệu hồ sơ", budgetMonthly: "Chưa cập nhật",
     targetLocation: "Chưa cập nhật", moveInDate: "Chưa cập nhật", bio: "",
   };
@@ -80,7 +96,11 @@ function RoommateDetailContent() {
     setIsSubmitting(true);
     setInviteError(null);
     try {
-      await apiClient.roommateInvitations.create({ recipientId: candidate.id, message: inviteNote });
+      await apiClient.roommateInvitations.create({
+        recipientId: candidate.id,
+        message: inviteNote,
+        ...(candidate.postId ? { postId: candidate.postId } : {}),
+      });
       setIsSent(true);
       setInviteModalOpen(false);
     } catch (error) {
@@ -128,9 +148,27 @@ function RoommateDetailContent() {
                 </div>
               </div>
 
-              {/* Status Note */}
-              <div className="bg-[#f7f6f2] p-3.5 rounded-[8px] text-[13px] text-[#203c37] font-medium leading-relaxed">
-                {candidate.statusNote}
+              {/* Bài đăng của người này */}
+              <div className="space-y-2 rounded-[10px] border border-[#d2e4d7] bg-[#f7faf8] p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#15594f]">
+                    <FileText className="size-3.5" /> Bài đăng ở ghép
+                  </span>
+                  {candidate.postExpiredAt && (
+                    <span className="flex items-center gap-1 text-[10px] text-[#74817b]">
+                      <CalendarDays className="size-3" />
+                      Hạn {new Date(candidate.postExpiredAt).toLocaleDateString("vi-VN")}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[14px] font-bold leading-snug text-[#203c37]">{candidate.postTitle}</p>
+                <p className="text-[13px] leading-relaxed text-[#5d6b65]">{candidate.postDescription}</p>
+                {candidate.postRoomNumber && (
+                  <p className="text-[11px] font-medium text-[#15594f]">
+                    Phòng {candidate.postRoomNumber}
+                    {candidate.postMaxOccupants ? ` · tối đa ${candidate.postMaxOccupants} người` : ""}
+                  </p>
+                )}
               </div>
 
               {/* Key Specs */}

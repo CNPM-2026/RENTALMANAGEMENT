@@ -6,14 +6,7 @@ import {
   CalendarDays,
   Clock,
   MapPin,
-  Phone,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
   Info,
-  Calendar,
-  RotateCcw,
-  MessageCircle,
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,10 +29,33 @@ interface AppointmentItem {
   note: string;
 }
 
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateOffset(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return toDateInput(date);
+}
+
 export default function TenantAppointmentsPage() {
   const [activeTab, setActiveTab] = React.useState<"UPCOMING" | "COMPLETED" | "CANCELLED">("UPCOMING");
   const [appointments, setAppointments] = React.useState<AppointmentItem[]>([]);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [minRescheduleDate, setMinRescheduleDate] = React.useState("");
+  const [maxRescheduleDate, setMaxRescheduleDate] = React.useState("");
+
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setMinRescheduleDate(dateOffset(1));
+      setMaxRescheduleDate(dateOffset(365));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   React.useEffect(() => {
     apiClient.appointments.getMyAppointments()
@@ -69,6 +85,7 @@ export default function TenantAppointmentsPage() {
   const [newDate, setNewDate] = React.useState("");
   const [newSlot, setNewSlot] = React.useState("14:00 - 15:00");
   const [rescheduleReason, setRescheduleReason] = React.useState("");
+  const [rescheduleError, setRescheduleError] = React.useState<string | null>(null);
 
   // Cancel Form State
   const [cancelReason, setCancelReason] = React.useState("Bận việc đột xuất");
@@ -90,22 +107,49 @@ export default function TenantAppointmentsPage() {
 
   async function handleRescheduleSubmit() {
     if (!selectedAppointment) return;
-    await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" });
+    setRescheduleError(null);
+    if (!newDate) {
+      setRescheduleError("Vui lòng chọn ngày hẹn mới.");
+      return;
+    }
     const [hour, minute] = newSlot.split(" - ")[0].split(":").map(Number);
-    await apiClient.appointments.create({
-      roomId: selectedAppointment.roomId,
-      appointmentTime: new Date(`${newDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`).toISOString(),
-      note: `Đề xuất đổi lịch: ${rescheduleReason || "Lịch hẹn mới"}`,
-    });
-    const items = await apiClient.appointments.getMyAppointments();
-    setAppointments(items.map((item) => ({
-      id: item.id, roomTitle: item.room?.property?.name ?? "Phòng thuê", roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
-      roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/images/default-room.svg", roomId: item.roomId ?? "",
-      landlordName: item.landlord?.fullName ?? "Chủ trọ", landlordPhone: item.landlord?.phone ?? "", appointmentTime: item.appointmentTime,
-      dateStr: new Date(item.appointmentTime).toLocaleDateString("vi-VN"), timeSlot: new Date(item.appointmentTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-      status: item.status, note: item.note ?? "",
-    })));
-    setRescheduleModalOpen(false);
+    const proposedTime = new Date(
+      `${newDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`,
+    );
+    if (Number.isNaN(proposedTime.getTime())) {
+      setRescheduleError("Ngày/giờ hẹn không hợp lệ.");
+      return;
+    }
+    if (proposedTime.getTime() < Date.now() + 60 * 60 * 1000) {
+      setRescheduleError("Thời gian hẹn mới phải cách hiện tại ít nhất 1 tiếng.");
+      return;
+    }
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 365);
+    if (proposedTime > maxDate) {
+      setRescheduleError("Chỉ được đặt lịch trong vòng 365 ngày tới.");
+      return;
+    }
+
+    try {
+      await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" });
+      await apiClient.appointments.create({
+        roomId: selectedAppointment.roomId,
+        appointmentTime: proposedTime.toISOString(),
+        note: `Đề xuất đổi lịch: ${rescheduleReason || "Lịch hẹn mới"}`,
+      });
+      const items = await apiClient.appointments.getMyAppointments();
+      setAppointments(items.map((item) => ({
+        id: item.id, roomTitle: item.room?.property?.name ?? "Phòng thuê", roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
+        roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/images/default-room.svg", roomId: item.roomId ?? "",
+        landlordName: item.landlord?.fullName ?? "Chủ trọ", landlordPhone: item.landlord?.phone ?? "", appointmentTime: item.appointmentTime,
+        dateStr: new Date(item.appointmentTime).toLocaleDateString("vi-VN"), timeSlot: new Date(item.appointmentTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+        status: item.status, note: item.note ?? "",
+      })));
+      setRescheduleModalOpen(false);
+    } catch (error) {
+      setRescheduleError(error instanceof Error ? error.message : "Không thể đổi lịch hẹn.");
+    }
   }
 
   async function handleCancelSubmit() {
@@ -286,6 +330,8 @@ export default function TenantAppointmentsPage() {
                       size="sm"
                       onClick={() => {
                         setSelectedAppointment(apt);
+                        setNewDate(dateOffset(1));
+                        setRescheduleError(null);
                         setRescheduleModalOpen(true);
                       }}
                       className="font-medium"
@@ -361,9 +407,19 @@ export default function TenantAppointmentsPage() {
             <input
               type="date"
               value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
+              min={minRescheduleDate}
+              max={maxRescheduleDate}
+              onChange={(e) => {
+                setNewDate(e.target.value);
+                setRescheduleError(null);
+              }}
               className="w-full h-[46px] px-3 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] outline-none"
             />
+            {rescheduleError && (
+              <p className="mt-2 rounded-[6px] border border-[#efc6bb] bg-[#fbeae6] px-3 py-2 text-[12px] text-[#a4422c]">
+                {rescheduleError}
+              </p>
+            )}
           </div>
 
           <div>

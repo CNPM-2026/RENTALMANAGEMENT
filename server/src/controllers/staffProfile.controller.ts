@@ -47,6 +47,10 @@ export const staffProfileController = {
         category?: string;
         isAvailable?: boolean;
         search?: string;
+        latitude?: string | number;
+        longitude?: string | number;
+        radiusKm?: string | number;
+        sort?: 'newest' | 'nearest';
         page?: string | number;
         limit?: string | number;
       };
@@ -54,6 +58,10 @@ export const staffProfileController = {
         category: query.category,
         isAvailable: typeof query.isAvailable === 'boolean' ? query.isAvailable : undefined,
         search: query.search,
+        latitude: toOptionalNumber(query.latitude),
+        longitude: toOptionalNumber(query.longitude),
+        radiusKm: toOptionalNumber(query.radiusKm),
+        sort: query.sort,
         page: toPositiveInt(query.page, 1),
         limit: toPositiveInt(query.limit, 20),
       });
@@ -68,4 +76,11 @@ export const staffProfileController = {
 function toPositiveInt(value: unknown, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Query string rỗng/không phải số -> `undefined` (KHÔNG thành 0). */
+function toOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

@@ -2,23 +2,23 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, Settings, LogOut, HelpCircle, UserRound } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ChevronDown, Settings, LogOut, HelpCircle, UserRound } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { clearAuthSession, getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, logout } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
-import { useNotifications } from "@/hooks/use-notifications";
+import { translateRole } from "@/lib/labels";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
 
 export function LandlordTopbar() {
   const pathname = usePathname();
   const currentPath = pathname ?? "";
-  const router = useRouter();
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
-  const { unreadCount } = useNotifications();
+  const roleLabel = translateRole(currentUser?.role);
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setCurrentUser(getCurrentUser());
@@ -46,9 +46,9 @@ export function LandlordTopbar() {
   }
 
   function handleLogout() {
-    clearAuthSession();
     setLogoutModalOpen(false);
-    router.push("/login");
+    // Xoá phiên + điều hướng tải lại toàn trang (không cần F5).
+    void logout();
   }
 
   return (
@@ -86,15 +86,8 @@ export function LandlordTopbar() {
           {/* Chat Messenger (Next to Notifications) */}
           <TopbarChatButton />
 
-          {/* Notification Bell */}
-          <Link
-            href="/landlord/notifications"
-            title="Thông báo mới"
-            className="relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors"
-          >
-            <Bell className="size-4.5" />
-            {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />}
-          </Link>
+          {/* Notification dropdown */}
+          <NotificationDropdown portal="landlord" badgeMode="dot" iconClassName="size-4.5" />
 
           <div className="h-5 w-px bg-[#e2e7e1]" />
 
@@ -110,7 +103,7 @@ export function LandlordTopbar() {
                   {currentUser?.fullName ?? "Chủ trọ"}
                 </span>
                 <span className="text-[10px] text-[#74817b] leading-tight">
-                  Chủ sở hữu ⌄
+                  {roleLabel} ⌄
                 </span>
               </div>
               <ChevronDown className="size-3.5 text-[#74817b] hidden md:block" />
@@ -124,6 +117,9 @@ export function LandlordTopbar() {
                   </p>
                   <p className="text-[11px] text-[#74817b]">
                     {currentUser?.email ?? ""}
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#15594f]">
+                    {roleLabel}
                   </p>
                 </div>
 

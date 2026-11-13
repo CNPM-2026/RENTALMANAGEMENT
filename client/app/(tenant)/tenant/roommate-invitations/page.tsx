@@ -10,15 +10,10 @@ import {
   Check,
   X,
   MessageCircle,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
 import { RoommateInvitation as ApiInvitation } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
@@ -42,6 +37,7 @@ export default function TenantRoommateInvitationsPage() {
 
   // State for invitations
   const [invitations, setInvitations] = React.useState<Invitation[]>([]);
+  const [actionMessage, setActionMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
 
   React.useEffect(() => {
     Promise.all([
@@ -68,13 +64,44 @@ export default function TenantRoommateInvitationsPage() {
   }, []);
 
   const handleAccept = async (id: string) => {
-    await apiClient.roommateInvitations.updateStatus(id, "ACCEPTED");
-    setInvitations((prev) => prev.map((item) => item.id === id ? { ...item, status: "ACCEPTED" } : item));
+    setActionMessage(null);
+    try {
+      const updated = await apiClient.roommateInvitations.updateStatus(id, "ACCEPTED");
+      if (updated.autoRejected) {
+        setInvitations((prev) => prev.map((item) => item.id === id ? { ...item, status: "DECLINED" } : item));
+        setActionMessage({
+          type: "error",
+          text: updated.rejectionReason
+            ?? "Yêu cầu ở ghép bị từ chối tự động vì vượt sức chứa của phòng.",
+        });
+        return;
+      }
+      setInvitations((prev) => prev.map((item) => item.id === id ? { ...item, status: "ACCEPTED" } : item));
+      setActionMessage({
+        type: "success",
+        text: updated.capacity
+          ? `Đã chấp nhận ở ghép. Khai báo ${updated.capacity.requestedOccupants}/${updated.capacity.maxOccupants} người đã được gửi tới chủ trọ để xác minh.`
+          : "Đã chấp nhận lời mời ở ghép.",
+      });
+    } catch (error) {
+      setActionMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể chấp nhận lời mời.",
+      });
+    }
   };
 
   const handleDecline = async (id: string) => {
-    await apiClient.roommateInvitations.updateStatus(id, "DECLINED");
-    setInvitations((prev) => prev.map((item) => item.id === id ? { ...item, status: "DECLINED" } : item));
+    setActionMessage(null);
+    try {
+      await apiClient.roommateInvitations.updateStatus(id, "DECLINED");
+      setInvitations((prev) => prev.map((item) => item.id === id ? { ...item, status: "DECLINED" } : item));
+    } catch (error) {
+      setActionMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể từ chối lời mời.",
+      });
+    }
   };
 
   const receivedList = invitations.filter((inv) => inv.type === "RECEIVED");
@@ -94,6 +121,18 @@ export default function TenantRoommateInvitationsPage() {
           Theo dõi các lời mời kết nối bạn cùng phòng đã nhận và đã gửi trên nền tảng 5K-Rental Manager.
         </p>
       </div>
+
+      {actionMessage && (
+        <div
+          className={`rounded-[8px] border px-4 py-3 text-[13px] font-medium ${
+            actionMessage.type === "success"
+              ? "border-[#b2d3c2] bg-[#eaf2ed] text-[#15594f]"
+              : "border-[#efc6bb] bg-[#fbeae6] text-[#a4422c]"
+          }`}
+        >
+          {actionMessage.text}
+        </div>
+      )}
 
       {/* Tabs (Figma 44:63966) */}
       <div className="flex border-b border-[#e2e7e1] gap-8">

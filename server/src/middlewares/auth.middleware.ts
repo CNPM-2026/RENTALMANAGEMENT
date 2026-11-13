@@ -176,6 +176,24 @@ export const authorizeStaff = (permission: string): RequestHandler => {
   };
 };
 
+/**
+ * Cho phép chủ trọ HOẶC bất kỳ nhân viên nào đang có membership hiệu lực, không
+ * phụ thuộc một quyền cụ thể. Dùng cho dữ liệu tổng hợp mà mọi nhân viên đều
+ * cần thấy (ví dụ thống kê tổng quan của chủ trọ).
+ */
+export const authorizeStaffAny = (): RequestHandler => {
+  return (req, res, next) => {
+    const user = (req as AuthRequest).user;
+    const role = user?.role?.toUpperCase();
+    const isAdminAlias = role === 'ADMIN' || role === 'SUPER_ADMIN';
+    const isMember = !!user && Array.isArray(user.staffPermissions);
+    if (!user || (!isAdminAlias && user.role !== 'LANDLORD' && !isMember)) {
+      return next(new AppError('Bạn không có quyền thực hiện hành động này', 403));
+    }
+    next();
+  };
+};
+
 export const authorizeStaffOr = (permission: string, ...roles: string[]): RequestHandler => {
   return (req, res, next) => {
     const authReq = req as AuthRequest;

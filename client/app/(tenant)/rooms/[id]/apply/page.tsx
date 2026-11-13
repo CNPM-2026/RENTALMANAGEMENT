@@ -23,6 +23,15 @@ import { apiClient } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import { Post, Appointment } from "@/types/models";
 
+function dateOffset(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function ApplyRentalContent() {
   const params = useParams();
   const router = useRouter();
@@ -35,6 +44,8 @@ function ApplyRentalContent() {
   const [email, setEmail] = React.useState("");
 
   const [moveInDate, setMoveInDate] = React.useState("");
+  const [minMoveInDate, setMinMoveInDate] = React.useState("");
+  const [maxMoveInDate, setMaxMoveInDate] = React.useState("");
   const [leaseTermMonths, setLeaseTermMonths] = React.useState<number>(12);
   const [occupantsCount, setOccupantsCount] = React.useState<number>(1);
   const [motorcyclesCount, setMotorcyclesCount] = React.useState<number>(1);
@@ -64,9 +75,9 @@ function ApplyRentalContent() {
         setEmail(user.email ?? "");
       }
 
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setMoveInDate(tomorrow.toISOString().slice(0, 10));
+      setMoveInDate(dateOffset(1));
+      setMinMoveInDate(dateOffset(1));
+      setMaxMoveInDate(dateOffset(365));
     }, 0);
 
     // Load post info
@@ -136,6 +147,10 @@ function ApplyRentalContent() {
     today.setHours(0, 0, 0, 0);
     if (!moveInDate || Number.isNaN(selectedDate.getTime()) || selectedDate <= today) {
       setErrorMsg("Ngày dọn vào phải sau ngày hiện tại.");
+      return;
+    }
+    if (moveInDate > dateOffset(365)) {
+      setErrorMsg("Ngày dọn vào không được vượt quá 1 năm.");
       return;
     }
     setErrorMsg(null);
@@ -310,6 +325,8 @@ function ApplyRentalContent() {
                   label="Ngày dự kiến dọn vào"
                   type="date"
                   value={moveInDate}
+                  min={minMoveInDate}
+                  max={maxMoveInDate}
                   onChange={(e) => setMoveInDate(e.target.value)}
                   required
                   leftIcon={<Calendar className="size-4" />}

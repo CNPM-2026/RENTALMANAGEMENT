@@ -1,15 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Users, Search, ShieldCheck, Lock, Unlock, Mail, Phone } from "lucide-react";
+import Link from "next/link";
+import { Search, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { translateRole } from "@/lib/labels";
+import { Avatar } from "@/components/ui/avatar";
 import { User, Role } from "@/types/models";
 
-const ROLE_LABELS: Record<Role, { label: string; bg: string; text: string }> = {
-  ADMIN: { label: "Quản trị viên", bg: "bg-[#fbeae6]", text: "text-[#a4422c]" },
-  LANDLORD: { label: "Chủ trọ", bg: "bg-[#eaf2ed]", text: "text-[#15594f]" },
-  TENANT: { label: "Người thuê", bg: "bg-[#e8f0fb]", text: "text-[#2d5d8c]" },
-  STAFF: { label: "Thợ / Dịch vụ", bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]" },
+/** Chỉ giữ màu badge; nhãn lấy từ nguồn chung `translateRole`. */
+const ROLE_STYLES: Record<Role, { bg: string; text: string }> = {
+  ADMIN: { bg: "bg-[#fbeae6]", text: "text-[#a4422c]" },
+  LANDLORD: { bg: "bg-[#eaf2ed]", text: "text-[#15594f]" },
+  TENANT: { bg: "bg-[#e8f0fb]", text: "text-[#2d5d8c]" },
+  STAFF: { bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]" },
 };
 
 export default function AdminUsersPage() {
@@ -72,11 +76,17 @@ export default function AdminUsersPage() {
                   : "bg-[#f7f6f2] text-[#74817b] hover:text-[#203c37]"
               }`}
             >
-              {r === "ALL" ? "Tất cả" : ROLE_LABELS[r as Role]?.label}
+              {r === "ALL" ? "Tất cả" : translateRole(r)}
             </button>
           ))}
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-4 py-3 text-[13px] text-[#a4422c]">
+          {error}
+        </div>
+      )}
 
       <div className="rounded-[12px] border border-[#e2e7e1] bg-white overflow-hidden shadow-xs">
         <table className="w-full text-left border-collapse text-[13px]">
@@ -91,18 +101,45 @@ export default function AdminUsersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef3ef] text-[#203c37]">
-            {filtered.map((u) => {
-              const roleCfg = ROLE_LABELS[u.role] || ROLE_LABELS.TENANT;
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-[#74817b]">
+                  Đang tải danh sách người dùng...
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-[#74817b]">
+                  Không tìm thấy người dùng phù hợp.
+                </td>
+              </tr>
+            ) : filtered.map((u) => {
+              const roleCfg = ROLE_STYLES[u.role] || ROLE_STYLES.TENANT;
               return (
                 <tr key={u.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
                   <td className="py-3.5 px-4">
-                    <p className="font-semibold text-[#203c37]">{u.fullName}</p>
-                    <p className="text-[12px] text-[#74817b]">{u.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={u.avatarUrl}
+                        alt={u.fullName}
+                        className="size-9 shrink-0 rounded-full border border-[#e2e7e1] object-cover"
+                      />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/users/${u.id}`}
+                          className="font-semibold text-[#203c37] hover:text-[#15594f] hover:underline"
+                          title="Xem trang cá nhân công khai"
+                        >
+                          {u.fullName}
+                        </Link>
+                        <p className="truncate text-[12px] text-[#74817b]">{u.email}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="py-3.5 px-4 text-[#74817b]">{u.phone || "---"}</td>
                   <td className="py-3.5 px-4">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${roleCfg.bg} ${roleCfg.text}`}>
-                      {roleCfg.label}
+                      {translateRole(u.role)}
                     </span>
                   </td>
                   <td className="py-3.5 px-4">

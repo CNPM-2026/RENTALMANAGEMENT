@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { apiClient } from "@/lib/api";
-import { RoommatePreference, UserWithProfile } from "@/types/models";
+import { LifestyleQuestion, RoommatePreference, UserLifestyleAnswer, UserWithProfile } from "@/types/models";
 import administrativeData from "@/data/vietnam-administrative-hierarchy.json";
 
 const DEFAULT_SLEEP_SCHEDULE = "22:00";
@@ -29,10 +29,10 @@ function getLocalDateString(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function getTomorrowDateString() {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return getLocalDateString(tomorrow);
+function getDateAfterDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return getLocalDateString(date);
 }
 
 function getSleepScheduleLabel(value: string) {
@@ -75,8 +75,9 @@ export default function TenantRoommateProfilePage() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [currentUser, setCurrentUser] = React.useState<UserWithProfile | null>(null);
-  const [minMoveInDate, setMinMoveInDate] = React.useState("");
-  const [todayDate, setTodayDate] = React.useState("");
+  const [lifestyleQuestions, setLifestyleQuestions] = React.useState<LifestyleQuestion[]>([]);
+  const [lifestyleAnswers, setLifestyleAnswers] = React.useState<Record<string, string>>({});
+  const [moveInDateError, setMoveInDateError] = React.useState<string | undefined>(undefined);
   const selectedPreferredProvince = React.useMemo(
     () => administrativeData.data.find((province) => province.name.local === preferredProvince),
     [preferredProvince],
@@ -87,14 +88,21 @@ export default function TenantRoommateProfilePage() {
   );
 
   React.useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setTodayDate(getLocalDateString());
-      setMoveInDate(getTomorrowDateString());
-      setMinMoveInDate(getTomorrowDateString());
-    });
-    Promise.all([apiClient.auth.getMe() as Promise<UserWithProfile>, apiClient.matching.getPreferences()])
-      .then(([user, preferences]) => {
+    // Không đặt ngày mặc định trong effect: `new Date()` ở đây có thể bị Next
+    // đánh giá trong lượt prerender và làm route bị chặn. Ngày chỉ được tính
+    // khi người dùng thao tác (onChange/submit).
+    Promise.all([
+      apiClient.auth.getMe() as Promise<UserWithProfile>,
+      apiClient.matching.getPreferences(),
+      apiClient.matching.getQuestions(),
+      apiClient.matching.getAnswers().catch(() => [] as UserLifestyleAnswer[]),
+    ])
+      .then(([user, preferences, questions, answers]) => {
         setCurrentUser(user);
+        setLifestyleQuestions(questions);
+        setLifestyleAnswers(
+          Object.fromEntries(answers.map((answer) => [answer.questionId, answer.optionId])),
+        );
         const value = preferences as RoommatePreference | null;
         if (!value) return;
         setBudgetMin(value.budgetMin == null ? "" : String(value.budgetMin));
@@ -121,7 +129,6 @@ export default function TenantRoommateProfilePage() {
       })
       .catch((error) => setErrorMessage(error instanceof Error ? error.message : "Không thể tải hồ sơ ở ghép."))
       .finally(() => setIsLoading(false));
-    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const validateProfile = () => {
@@ -130,9 +137,18 @@ export default function TenantRoommateProfilePage() {
     const maxBudget = Number(budgetMax);
 
     if (!moveInDate || moveInDate <= today) {
-      setErrorMessage("Ngày dự kiến dọn vào phải sau ngày hiện tại.");
+      const message = "Ngày dự kiến dọn vào phải sau ngày hiện tại.";
+      setMoveInDateError(message);
+      setErrorMessage(message);
       return false;
     }
+    if (moveInDate > getDateAfterDays(730)) {
+      const message = "Ngày dự kiến dọn vào không được vượt quá 2 năm.";
+      setMoveInDateError(message);
+      setErrorMessage(message);
+      return false;
+    }
+    setMoveInDateError(undefined);
     if (!budgetMin || !budgetMax || !Number.isFinite(minBudget) || !Number.isFinite(maxBudget) || minBudget <= 0 || maxBudget <= 0) {
       setErrorMessage("Vui lòng nhập ngân sách hợp lệ lớn hơn 0.");
       return false;
@@ -149,8 +165,15 @@ export default function TenantRoommateProfilePage() {
   const handleMoveInDateChange = (value: string) => {
     setMoveInDate(value);
     if (value && value <= getLocalDateString()) {
-      setErrorMessage("Ngày dự kiến dọn vào phải sau ngày hiện tại.");
+      const message = "Ngày dự kiến dọn vào phải sau ngày hiện tại.";
+      setMoveInDateError(message);
+      setErrorMessage(message);
+    } else if (value && value > getDateAfterDays(730)) {
+      const message = "Ngày dự kiến dọn vào không được vượt quá 2 năm.";
+      setMoveInDateError(message);
+      setErrorMessage(message);
     } else {
+      setMoveInDateError(undefined);
       setErrorMessage(null);
     }
   };
@@ -189,6 +212,12 @@ export default function TenantRoommateProfilePage() {
         preferredGender,
         note: bioNote,
       });
+      const surveyAnswers = Object.entries(lifestyleAnswers)
+        .filter(([, optionId]) => Boolean(optionId))
+        .map(([questionId, optionId]) => ({ questionId, optionId }));
+      if (surveyAnswers.length > 0) {
+        await apiClient.matching.submitAnswers({ answers: surveyAnswers });
+      }
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
     } catch (error) {
@@ -333,9 +362,8 @@ export default function TenantRoommateProfilePage() {
                   label="Ngày dự kiến dọn vào"
                   type="date"
                   value={moveInDate}
-                  min={minMoveInDate}
                   onChange={(e) => handleMoveInDateChange(e.target.value)}
-                  error={moveInDate && todayDate && moveInDate <= todayDate ? "Ngày phải sau ngày hiện tại." : undefined}
+                  error={moveInDateError}
                   required
                 />
 
@@ -496,6 +524,47 @@ export default function TenantRoommateProfilePage() {
                       </button>
                     </div>
                   </div>
+
+                  {lifestyleQuestions.length > 0 && (
+                    <div className="space-y-4 border-t border-[#e2e7e1] pt-5">
+                      <div>
+                        <h4 className="text-[15px] font-semibold text-[#203c37]">
+                          Khảo sát lối sống do quản trị viên cấu hình
+                        </h4>
+                        <p className="mt-1 text-[12px] text-[#74817b]">
+                          Trả lời càng đầy đủ, điểm tương thích với bạn ở ghép càng chính xác.
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        {lifestyleQuestions.map((question) => (
+                          <div key={question.id} className="space-y-1.5">
+                            <label className="block text-[13px] font-medium text-[#203c37]">
+                              {question.questionText}
+                              <span className="ml-2 rounded-full bg-[#f7f6f2] px-2 py-0.5 text-[10px] font-semibold text-[#74817b]">
+                                {question.category} · trọng số {question.weight}
+                              </span>
+                            </label>
+                            <select
+                              value={lifestyleAnswers[question.id] ?? ""}
+                              onChange={(event) => setLifestyleAnswers((previous) => ({
+                                ...previous,
+                                [question.id]: event.target.value,
+                              }))}
+                              className="w-full min-h-[48px] px-3.5 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] outline-none"
+                            >
+                              <option value="">Chọn câu trả lời</option>
+                              {question.options.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.optionText}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-between pt-2">

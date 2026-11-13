@@ -1,14 +1,23 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { notificationService } from './notification.service';
+import { roomDemandService } from './roomDemand.service';
 
 export const rentalRequestService = {
   create: async (tenantId: string, data: { roomId: string; moveInDate: string; leaseTermMonths: number; occupantsCount?: number; note?: string }) => {
     const room = await prisma.room.findFirst({
-      where: { id: data.roomId, status: 'AVAILABLE' },
-      include: { property: { select: { landlordId: true } } },
+      where: { id: data.roomId },
+      include: {
+        property: { select: { landlordId: true } },
+        // Hợp đồng ACTIVE thắng `rooms.status`: không cho gửi yêu cầu mới cho
+        // phòng đã có người thuê kể cả khi trạng thái phòng còn sai (dữ liệu cũ).
+        contracts: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
+      },
     });
-    if (!room) throw new AppError('Phòng không tồn tại hoặc không còn trống', 400);
+    if (!room) throw new AppError('Không tìm thấy phòng', 404);
+    if (room.status !== 'AVAILABLE' || room.contracts.length > 0) {
+      throw new AppError('Phòng không tồn tại hoặc không còn trống', 400);
+    }
     const duplicate = await prisma.rentalRequest.findFirst({
       where: { tenantId, roomId: data.roomId, status: 'SUBMITTED' },
       select: { id: true },
@@ -33,7 +42,10 @@ export const rentalRequestService = {
     orderBy: { updatedAt: 'desc' },
   }),
   updateStatus: async (userId: string, role: string, id: string, status: 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'SIGNED') => {
-    const request = await prisma.rentalRequest.findUnique({ where: { id } });
+    const request = await prisma.rentalRequest.findUnique({
+      where: { id },
+      include: { room: { select: { roomNumber: true } } },
+    });
     if (!request) throw new AppError('Không tìm thấy yêu cầu thuê phòng', 404);
     if (role === 'TENANT' && status === 'SIGNED') {
       if (request.tenantId !== userId || !['APPROVED', 'CONTRACT_READY'].includes(request.status)) {
@@ -65,7 +77,7 @@ export const rentalRequestService = {
       return updated;
     }
 
-    const approved = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const roomClaim = await tx.room.updateMany({
         where: { id: request.roomId, status: 'AVAILABLE' },
         data: { status: 'RENTED' },
@@ -82,16 +94,15 @@ export const rentalRequestService = {
         where: { id: request.id, status: 'SUBMITTED' },
         data: { status: 'APPROVED' },
       });
-      await tx.rentalRequest.updateMany({
-        where: {
-          roomId: request.roomId,
-          id: { not: request.id },
-          status: 'SUBMITTED',
-        },
-        data: { status: 'REJECTED' },
+      // Phòng vừa chuyển sang RENTED ⇒ huỷ ngay mọi yêu cầu thuê/lịch xem khác
+      // trong CÙNG transaction để không còn nhu cầu nào trỏ vào phòng đã thuê.
+      const cancelled = await roomDemandService.cancelOpenDemand(tx, {
+        roomId: request.roomId,
+        excludeRentalRequestId: request.id,
       });
-      return approved;
+      return { approved, cancelled };
     });
+    await roomDemandService.notifyCancelledDemand(result.cancelled, request.room.roomNumber);
     await notificationService.createNotification(
       request.tenantId,
       'Yêu cầu thuê phòng được chấp thuận',
@@ -99,6 +110,6 @@ export const rentalRequestService = {
       'SYSTEM',
       request.id
     );
-    return approved;
+    return result.approved;
   },
 };

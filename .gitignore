@@ -77,6 +77,9 @@ pids
 *.seed
 *.pid.lock
 
+# Báo cáo/trạng thái chạy script bảo trì (chứa id asset & hàng DB — không commit)
+server/scripts/reports/
+
 # Editor directories and files
 .vscode/
 .idea/

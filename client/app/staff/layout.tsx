@@ -1,12 +1,14 @@
 import * as React from "react";
-import Link from "next/link";
-import { Wrench } from "lucide-react";
+import { Suspense } from "react";
+import { StaffSidebar } from "@/components/staff/sidebar";
+import { StaffTopbar } from "@/components/staff/topbar";
 
 /**
  * Không gian của THỢ ĐỘC LẬP (role = STAFF).
  *
- * Cố tình tách khỏi layout của chủ trọ: thợ không thuộc bất kỳ chủ trọ nào, nên
- * không có sidebar quản lý tài sản/phòng/hợp đồng.
+ * Cùng mô hình portal với chủ trọ/quản trị/khách thuê: sidebar cố định cho các
+ * nhóm "Việc làm", "Hồ sơ & kỹ năng", "Xác minh CCCD", thông báo. Thợ không
+ * thuộc bất kỳ chủ trọ nào nên không có menu quản lý tài sản/phòng/hợp đồng.
  */
 export default function StaffLayout({
   children,
@@ -14,40 +16,28 @@ export default function StaffLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="min-h-screen bg-[#f7f6f2]">
-      <header className="h-16 bg-white border-b border-[#e2e7e1] flex items-center justify-between gap-4 px-4 md:px-6">
-        <Link href="/staff/profile" className="flex items-center gap-2.5">
-          <span className="size-8 rounded-[8px] bg-[#15594f] text-white flex items-center justify-center">
-            <Wrench className="size-4" />
-          </span>
-          <span className="text-[15px] font-semibold text-[#203c37]">Không gian thợ</span>
-        </Link>
+    <div className="flex min-h-screen bg-[#f7f6f2] text-[#203c37] font-sans antialiased">
+      {/* Sidebar dùng usePathname() nên cần Suspense khi prerender (Next 16). */}
+      <Suspense
+        fallback={
+          <aside className="w-[224px] shrink-0 min-h-screen bg-white border-r border-[#e2e7e1]" />
+        }
+      >
+        <StaffSidebar />
+      </Suspense>
 
-        <nav className="flex items-center gap-1.5 text-[13px]">
-          <Link
-            href="/staff/profile"
-            className="px-3 py-1.5 rounded-[7px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
-          >
-            Hồ sơ &amp; kỹ năng
-          </Link>
-          <Link
-            href="/staff/kyc"
-            className="px-3 py-1.5 rounded-[7px] text-[#74817b] hover:bg-[#f7f6f2] hover:text-[#203c37]"
-          >
-            Xác minh CCCD
-          </Link>
-          <Link
-            href="/"
-            className="px-3 py-1.5 rounded-[7px] text-[#74817b] hover:bg-[#f7f6f2] hover:text-[#203c37]"
-          >
-            Về trang chủ
-          </Link>
-        </nav>
-      </header>
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
+        {/* Topbar dùng usePathname() nên cần Suspense khi prerender (Next 16). */}
+        <Suspense
+          fallback={<header className="h-[72px] bg-white border-b border-[#e2e7e1] w-full" />}
+        >
+          <StaffTopbar />
+        </Suspense>
 
-      <main className="p-4 md:p-6">
-        <div className="max-w-[1100px] mx-auto">{children}</div>
-      </main>
+        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+          <div className="max-w-[1200px] mx-auto w-full">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

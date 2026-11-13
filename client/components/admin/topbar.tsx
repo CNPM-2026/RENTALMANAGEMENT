@@ -2,25 +2,23 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Search, Bell, ChevronDown, Settings, LogOut, Shield, UserRound } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Search, ChevronDown, Settings, LogOut, Shield, UserRound } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { clearAuthSession, getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, logout } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
 import { translateRole } from "@/lib/labels";
-import { useNotifications } from "@/hooks/use-notifications";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
 
 export function AdminTopbar() {
   const pathname = usePathname();
   const currentPath = pathname ?? "";
-  const router = useRouter();
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
-  const { unreadCount } = useNotifications(Boolean(currentUser));
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -56,9 +54,9 @@ export function AdminTopbar() {
   }
 
   function handleLogout() {
-    clearAuthSession();
     setLogoutModalOpen(false);
-    router.push("/login");
+    // Xoá phiên + điều hướng tải lại toàn trang (không cần F5).
+    void logout();
   }
 
   return (
@@ -100,15 +98,13 @@ export function AdminTopbar() {
           {/* Chat Shortcut (Next to Notification Bell) */}
           <TopbarChatButton />
 
-          {/* Security Alert Bell */}
-          <Link
-            href="/admin/reports"
-            title="Cảnh báo an toàn & Vi phạm"
-            className="relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#991b1b] hover:bg-[#f7f6f2] transition-colors"
-          >
-            <Bell className="size-4.5" />
-            {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />}
-          </Link>
+          {/* Notification dropdown */}
+          <NotificationDropdown
+            portal="admin"
+            title="Thông báo quản trị"
+            badgeMode="dot"
+            iconClassName="size-4.5"
+          />
 
           <div className="h-5 w-px bg-[#e2e7e1]" />
 
@@ -138,6 +134,9 @@ export function AdminTopbar() {
                   </p>
                   <p className="text-[11px] text-[#74817b]">
                     {currentUser?.email || "admin.test@rental.local"}
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#15594f]">
+                    {roleLabel}
                   </p>
                 </div>
 

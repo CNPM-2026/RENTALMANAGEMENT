@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { UserCog, Plus, ShieldCheck, Mail, Phone, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, Mail, Phone, Trash2, Power } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { Avatar } from "@/components/ui/avatar";
 import { StaffMembership, StaffPermission } from "@/types/models";
 
 export default function LandlordStaffPage() {
@@ -10,6 +12,8 @@ export default function LandlordStaffPage() {
   const [email, setEmail] = React.useState("");
   const [permissions, setPermissions] = React.useState<StaffPermission[]>(["MAINTENANCE", "APPOINTMENTS"]);
   const [showForm, setShowForm] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [message, setMessage] = React.useState<string | null>(null);
 
   const loadStaff = React.useCallback(() => {
     apiClient.staff.getMine().then(setStaffList).catch(() => setStaffList([]));
@@ -19,22 +23,45 @@ export default function LandlordStaffPage() {
 
   const invite = async (event: React.FormEvent) => {
     event.preventDefault();
-    await apiClient.staff.invite({ email, permissions });
-    setEmail("");
-    setShowForm(false);
-    loadStaff();
+    setError(null);
+    setMessage(null);
+    try {
+      await apiClient.staff.invite({ email, permissions });
+      setEmail("");
+      setShowForm(false);
+      setMessage("Đã cấp quyền. Nhân viên đăng nhập sẽ thấy đúng các mục được cấp trong không gian chủ trọ.");
+      loadStaff();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không gửi được lời mời.");
+    }
   };
 
   const remove = async (id: string) => {
-    await apiClient.staff.remove(id);
-    setStaffList((items) => items.filter((item) => item.id !== id));
+    setError(null);
+    try {
+      await apiClient.staff.remove(id);
+      setStaffList((items) => items.filter((item) => item.id !== id));
+      setMessage("Đã thu hồi quyền của nhân viên.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thu hồi được quyền.");
+    }
+  };
+
+  const toggleActive = async (staff: StaffMembership) => {
+    setError(null);
+    try {
+      const updated = await apiClient.staff.update(staff.id, { isActive: !staff.isActive });
+      setStaffList((items) => items.map((item) => (item.id === staff.id ? updated : item)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không cập nhật được trạng thái.");
+    }
   };
 
   const permissionLabels: Record<StaffPermission, string> = {
-    PROPERTIES_ROOMS: "Property & phòng",
-    MAINTENANCE: "Bảo trì",
-    INVOICES: "Hóa đơn",
-    APPOINTMENTS: "Lịch hẹn",
+    PROPERTIES_ROOMS: "Bất động sản & phòng",
+    MAINTENANCE: "Bảo trì & công việc",
+    INVOICES: "Hoá đơn & tài chính",
+    APPOINTMENTS: "Lịch hẹn, thuê & hợp đồng",
   };
 
   return (
@@ -53,6 +80,19 @@ export default function LandlordStaffPage() {
           <span>Thêm nhân viên</span>
         </button>
       </div>
+
+      {error && (
+        <div className="rounded-[8px] border border-[#f6cbc1] bg-[#fbeae6] px-4 py-3 text-[13px] text-[#a4422c]">{error}</div>
+      )}
+      {message && (
+        <div className="rounded-[8px] border border-[#cce1d5] bg-[#eaf2ed] px-4 py-3 text-[13px] text-[#15594f]">{message}</div>
+      )}
+
+      <p className="rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] px-4 py-3 text-[12px] text-[#74817b]">
+        Quyền được áp dụng ngay cho API và menu: nhân viên chỉ thấy/mở đúng nhóm trang
+        tương ứng (bất động sản &amp; phòng, bảo trì, hoá đơn, lịch hẹn &amp; hợp đồng).
+        Quản lý nhân viên và cấp quyền chỉ dành cho chủ trọ.
+      </p>
 
       {showForm && (
         <form onSubmit={invite} className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 space-y-4 shadow-xs">
@@ -77,14 +117,20 @@ export default function LandlordStaffPage() {
           <div key={staff.id} className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="size-10 rounded-full bg-[#eaf2ed] text-[#15594f] flex items-center justify-center font-bold text-sm">
-                  {staff.user.fullName.charAt(0)}
-                </span>
+                <Avatar
+                  src={staff.user.avatarUrl}
+                  alt={staff.user.fullName}
+                  className="size-10 rounded-full border border-[#e2e7e1] object-cover"
+                />
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#eaf2ed] text-[#15594f]">
                   {staff.isActive ? "Hoạt động" : "Đã khóa"}
                 </span>
               </div>
-              <h3 className="text-[16px] font-semibold text-[#203c37] mt-3">{staff.user.fullName}</h3>
+              <h3 className="text-[16px] font-semibold text-[#203c37] mt-3">
+                <Link href={`/users/${staff.user.id}`} className="hover:text-[#15594f] hover:underline">
+                  {staff.user.fullName}
+                </Link>
+              </h3>
               <p className="text-[12px] font-medium text-[#15594f]">{staff.permissions.map((permission) => permissionLabels[permission]).join(" / ")}</p>
 
               <div className="mt-3 space-y-1 text-[12px] text-[#74817b]">
@@ -100,6 +146,13 @@ export default function LandlordStaffPage() {
             </div>
 
             <div className="mt-5 pt-3 border-t border-[#e2e7e1] flex items-center justify-between text-[12px]">
+              <button
+                onClick={() => toggleActive(staff)}
+                className="inline-flex items-center gap-1 font-semibold text-[#15594f] hover:underline cursor-pointer"
+              >
+                <Power className="size-3.5" />
+                {staff.isActive ? "Tạm khóa" : "Mở lại"}
+              </button>
               <button onClick={() => remove(staff.id)} className="inline-flex items-center gap-1 text-[#a4422c] font-semibold hover:underline cursor-pointer">
                 <Trash2 className="size-3.5" />
                 Xóa quyền

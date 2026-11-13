@@ -5,8 +5,8 @@ import { verifyToken } from '../utils/jwt';
 import { setIoInstance } from './socket.instance'; // Thêm import
 import { SESSION_REJECTED_MESSAGE } from './sessionInvalidation';
 import { env } from '../config/env';
-import { findBannedChatKeyword } from '../services/chat.service';
-import { notificationService } from '../services/notification.service';
+import { chatService } from '../services/chat.service';
+import { AppError } from '../utils/AppError';
 
 // Mở rộng kiểu dữ liệu của Socket để lưu thông tin user
 interface AuthSocket extends Socket {
@@ -147,83 +147,33 @@ export const initSocket = (server: HttpServer) => {
       if (typeof conversationId === 'string') socket.leave(`conversation_${conversationId}`);
     });
 
-    // Sự kiện: Gửi tin nhắn
+    // Gửi tin nhắn: toàn bộ việc ghi DB + phát realtime nằm trong `chatService`
+    // (một nguồn duy nhất, dùng chung với route HTTP có tệp đính kèm).
     socket.on('send_message', async (
-      data: { conversationId: string; content: string; messageType?: string },
-      acknowledge?: (result: { success: boolean; message?: string }) => void,
+      data: { conversationId: string; content: string; messageType?: string; clientMessageId?: string },
+      acknowledge?: (result: { success: boolean; message?: string; messageId?: string }) => void,
     ) => {
       try {
-        const { conversationId, content, messageType = 'TEXT' } = data;
         if (!userId) return acknowledge?.({ success: false, message: 'Phiên đăng nhập không hợp lệ' });
-        if (typeof content !== 'string' || content.trim().length === 0 || content.length > 5000) {
-          acknowledge?.({ success: false, message: 'Nội dung tin nhắn không hợp lệ' });
-          return socket.emit('error_message', 'Nội dung tin nhắn không hợp lệ');
-        }
-        const matchedKeyword = await findBannedChatKeyword(content);
-        if (matchedKeyword) {
-          const warning = `Tin nhắn chứa từ khóa bị cấm "${matchedKeyword.keyword}". Vui lòng chỉnh sửa nội dung trước khi gửi.`;
-          acknowledge?.({ success: false, message: warning });
-          return socket.emit('error_message', warning);
-        }
-        const member = await prisma.conversationMember.findUnique({
-          where: { conversationId_userId: { conversationId, userId } }
-        });
-        if (!member) {
-          acknowledge?.({ success: false, message: 'Bạn không thuộc cuộc trò chuyện này' });
-          return socket.emit('error_message', 'Bạn không thuộc cuộc trò chuyện này');
+        if (typeof data?.conversationId !== 'string') {
+          acknowledge?.({ success: false, message: 'Hội thoại không hợp lệ' });
+          return socket.emit('error_message', 'Hội thoại không hợp lệ');
         }
 
-        // 1. Lưu tin nhắn vào Database (Prisma)
-        const newMessage = await prisma.message.create({
-          data: {
-            conversationId,
-            senderId: userId,
-            content,
-            messageType: messageType as 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM',
-          },
-          include: {
-            sender: { select: { fullName: true, avatarUrl: true } }
-          }
+        const message = await chatService.sendMessage(userId, data.conversationId, {
+          content: typeof data.content === 'string' ? data.content : '',
+          messageType: data.messageType === 'SYSTEM' ? 'TEXT' : (data.messageType as 'TEXT' | 'IMAGE' | 'FILE') ?? 'TEXT',
+          clientMessageId: typeof data.clientMessageId === 'string' ? data.clientMessageId : undefined,
         });
 
-        // 2. Cập nhật thời gian updatedAt của Conversation để nó nổi lên đầu danh sách
-        await prisma.conversation.update({
-          where: { id: conversationId },
-          data: { updatedAt: new Date() }
-        });
-
-        // 3. Phát tin nhắn tới tất cả những ai đang ở trong phòng chat này (kể cả người gửi)
-        io.to(`conversation_${conversationId}`).emit('receive_message', newMessage);
-        const recipients = await prisma.conversationMember.findMany({
-          where: { conversationId, userId: { not: userId } },
-          select: { userId: true },
-        });
-
-        // Phát tin nhắn trực tiếp đến phòng riêng của từng người nhận (để cập nhật badge đỏ realtime)
-        recipients.forEach((recipient) => {
-          io.to(`user_${recipient.userId}`).emit('receive_message', newMessage);
-        });
-
-        await Promise.all(recipients.map(async (recipient) => {
-          try {
-            await notificationService.createNotification(
-              recipient.userId,
-              'Tin nhắn mới',
-              'Bạn có tin nhắn mới trong cuộc trò chuyện.',
-              'MESSAGE',
-              conversationId,
-            );
-          } catch (notificationError) {
-            console.error('Không thể tạo thông báo tin nhắn:', notificationError);
-          }
-        }));
-        acknowledge?.({ success: true });
-
+        acknowledge?.({ success: true, messageId: message.id });
       } catch (error) {
-        acknowledge?.({ success: false, message: 'Không thể gửi tin nhắn' });
-        socket.emit('error_message', 'Không thể gửi tin nhắn');
+        const reason = error instanceof AppError ? error.message : 'Không thể gửi tin nhắn';
+        acknowledge?.({ success: false, message: reason });
+        socket.emit('error_message', reason);
       }
     });
+
 
     // Sự kiện: Đang gõ phím (Typing)
     socket.on('typing', async (data: { conversationId: string; isTyping: boolean }) => {

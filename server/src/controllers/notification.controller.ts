@@ -5,7 +5,22 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 export const notificationController = {
   getMyNotifications: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const result = await notificationService.getMyNotifications(req.user!.id);
+      const since = typeof req.query.since === 'string' && req.query.since ? new Date(req.query.since) : undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const result = await notificationService.getMyNotifications(req.user!.id, {
+        since: since && !Number.isNaN(since.getTime()) ? since : undefined,
+        unreadOnly: req.query.unreadOnly === 'true',
+        limit: Number.isFinite(limit) ? limit : undefined,
+      });
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  getUnreadCount: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await notificationService.getUnreadCount(req.user!.id);
       return res.status(200).json({ success: true, data: result });
     } catch (error) {
       return next(error);

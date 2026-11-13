@@ -43,7 +43,11 @@ export function TopbarChatButton({ className = "", iconClassName = "size-4.5" }:
   });
 
   const fullInboxHref =
-    userRole === "LANDLORD" ? "/landlord/messages" : "/tenant/messages";
+    userRole === "LANDLORD"
+      ? "/landlord/messages"
+      : userRole === "ADMIN"
+        ? "/admin/messages"
+        : "/tenant/messages";
 
   return (
     <div className="relative" ref={dropdownRef}>

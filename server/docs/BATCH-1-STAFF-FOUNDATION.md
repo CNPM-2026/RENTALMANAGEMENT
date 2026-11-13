@@ -1,5 +1,9 @@
 # Batch 1 — Role & Staff Foundation (staff marketplace)
 
+> **Lưu ý đường dẫn test (cập nhật Batch 4):** test đã chuyển từ `server/src/**` sang `server/tests/**`
+> (giữ nguyên tên file; `src/services/x.test.ts` → `tests/services/x.test.ts`). Các lệnh
+> `npx vitest run src/...` dưới đây là bản ghi lịch sử; chạy lại bằng `npm test` hoặc đổi tiền tố.
+
 **Status: IMPLEMENTED IN SOURCE — database change NOT applied.**
 Every schema statement in §4 is a proposal for explicit approval before
 `prisma db push` / any migration is run against Supabase DEV. No `.env`, credential
@@ -313,6 +317,8 @@ system.
    ordering for `GET /staff-marketplace`. Distance ordering must skip staff with
    `latitude`/`longitude` = NULL explicitly (never treat missing as `(0,0)`) and
    must fall back to a deterministic secondary order (`updatedAt desc, id asc`).
+   **→ delivered in `docs/BATCH-2-TASK-MARKETPLACE.md`** (schema delta awaiting
+   approval; no DB applied).
 3. Runtime checks owed to the release gate once a DB is approved: register a STAFF
    account end-to-end (OTP → login → profile save → availability toggle), confirm a
    LANDLORD can browse and that a TENANT cannot, and confirm an old AGENT token now
@@ -323,6 +329,9 @@ system.
    `assertKycApproved(await loadKycState(userId, tx), '<action>')` **inside** the same
    transaction as the write, so a re-submitted (now `PENDING`) KYC cannot be raced
    against an acceptance.
+   **→ apply + accept are done** (`maintenanceApplication.service.ts`, see
+   `docs/BATCH-2-TASK-MARKETPLACE.md` §5). "Marking work complete" has no table yet
+   and belongs to Batch 3.
 5. KYC runtime checks to add to the release gate: submit as STAFF → admin rejects with
    a reason → staff sees the reason and can resubmit → admin approves → only then can
    the staff turn availability on; and a LANDLORD submission still lands in the same

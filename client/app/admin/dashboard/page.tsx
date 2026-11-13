@@ -2,14 +2,8 @@
 
 import * as React from "react";
 import { apiClient } from "@/lib/api";
-import { AdminStatsResponse, Role } from "@/types/models";
-
-const ROLE_LABELS: Record<Role, string> = {
-  ADMIN: "Quản trị viên",
-  LANDLORD: "Chủ trọ",
-  TENANT: "Người thuê",
-  STAFF: "Thợ / Dịch vụ",
-};
+import { translateRole } from "@/lib/labels";
+import { AdminStatsResponse } from "@/types/models";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("vi-VN").format(value);
@@ -56,7 +50,7 @@ export default function AdminDashboardPage() {
           <div className="mt-5 divide-y divide-[#eef3ef]">
             {(stats?.usersByRole ?? []).map((item) => (
               <div key={item.role} className="flex items-center justify-between py-3 text-[14px] text-[#203c37]">
-                <span>{ROLE_LABELS[item.role] ?? item.role}</span>
+                <span>{translateRole(item.role)}</span>
                 <span className="font-semibold">{formatNumber(item.count)}</span>
               </div>
             ))}

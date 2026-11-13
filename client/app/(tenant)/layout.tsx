@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { PublicNavbar } from "@/components/tenant/public-navbar";
 import { Footer } from "@/components/tenant/footer";
 import { PortalSidebar } from "@/components/tenant/portal-sidebar";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser, clearAuthSession } from "@/lib/auth";
+import { getCurrentUser, logout } from "@/lib/auth";
 
 function TenantLayoutContent({
   children,
@@ -15,7 +15,6 @@ function TenantLayoutContent({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
 
   const currentPath = pathname ?? "";
@@ -54,10 +53,10 @@ function TenantLayoutContent({
   }, [isPortalRoute]);
 
   function handleConfirmLogout() {
-    clearAuthSession();
     setCurrentUser(null);
     setLogoutModalOpen(false);
-    router.push("/login");
+    // Xoá mọi dữ liệu tài khoản trên thiết bị và tải lại trang đăng nhập.
+    void logout();
   }
 
   return (
@@ -81,7 +80,7 @@ function TenantLayoutContent({
           </main>
         </div>
       ) : (
-        // Full-width layout for Public marketing pages (/, /rooms, /roommates, /about)
+        // Full-width layout for public pages (/, /rooms, /roommates, /about, /privacy, /terms)
         <main className="flex-1 min-w-0 w-full">{children}</main>
       )}
 

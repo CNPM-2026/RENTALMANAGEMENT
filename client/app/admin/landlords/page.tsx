@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ShieldCheck, Search, Building, BadgeCheck, FileText, CheckCircle, XCircle } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { Avatar } from "@/components/ui/avatar";
 import { User } from "@/types/models";
 
 export default function AdminLandlordsPage() {
@@ -39,9 +40,11 @@ export default function AdminLandlordsPage() {
           <div key={l.id} className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="size-10 rounded-full bg-[#eaf2ed] text-[#15594f] flex items-center justify-center font-bold text-sm">
-                  {l.fullName.charAt(0)}
-                </span>
+                <Avatar
+                  src={l.avatarUrl}
+                  alt={l.fullName}
+                  className="size-10 rounded-full border border-[#e2e7e1] object-cover"
+                />
                 <span
                   className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                     l.isActive ? "bg-[#eaf2ed] text-[#15594f]" : "bg-[#fbeae6] text-[#a4422c]"

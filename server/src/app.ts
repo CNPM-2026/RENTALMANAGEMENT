@@ -28,6 +28,12 @@ import rentalRequestRoute from './routes/rental-request.route'
 import roommateInvitationRoute from './routes/roommate-invitation.route'
 import staffRoute from './routes/staff.route'
 import staffProfileRoute from './routes/staffProfile.route'
+import maintenanceTaskRoute from './routes/maintenanceTask.route'
+import maintenanceImageRoute from './routes/maintenanceImage.route'
+import chatAttachmentRoute from './routes/chatAttachment.route'
+import reportAttachmentRoute from './routes/reportAttachment.route'
+import contractTerminationAttachmentRoute from './routes/contractTerminationAttachment.route'
+import occupancyRoute from './routes/occupancy.route'
 import { env } from './config/env';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
@@ -37,7 +43,18 @@ const app: Application = express();
 app.use(helmet());
 app.use(compression());
 app.use(cors({ origin: env.CORS_ORIGIN.split(',').map((origin) => origin.trim()) }));
-app.use(morgan('dev'));
+/**
+ * 🆕 Batch 2.1 (M2) — KHÔNG BAO GIỜ log token ảnh: morgan in nguyên query
+ * string, mà `?token=` là thẻ truy cập ảnh hiện trạng của khách thuê trong 10
+ * phút. Route ảnh vì vậy bị loại khỏi access log (nó có limiter riêng).
+ */
+app.use(morgan('dev', {
+  skip: (req) =>
+    req.originalUrl.startsWith('/api/v1/maintenance-images') ||
+    req.originalUrl.startsWith('/api/v1/chat-attachments') ||
+    req.originalUrl.startsWith('/api/v1/report-attachments') ||
+    req.originalUrl.startsWith('/api/v1/contract-termination-attachments'),
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(path.join(process.cwd(), 'public'))); // Nếu có
@@ -46,6 +63,14 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'Server is running 🚀' });
 });
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// 🆕 Batch 2.1 (M2): ảnh hiện trạng bảo trì dùng limiter riêng (xem route), nên
+// phải gắn TRƯỚC `apiLimiter` để không tiêu hạn mức API chung của người dùng.
+app.use('/api/v1/maintenance-images', maintenanceImageRoute);
+// 🆕 Batch 4/5: tệp riêng tư của tranh chấp và chat — cùng lý do (token trong
+// query string, limiter riêng) nên phải đứng trước `apiLimiter`.
+app.use('/api/v1/chat-attachments', chatAttachmentRoute);
+app.use('/api/v1/report-attachments', reportAttachmentRoute);
+app.use('/api/v1/contract-termination-attachments', contractTerminationAttachmentRoute);
 app.use('/api/v1', apiLimiter);
 
 // --- Gắn các Routes sau này vào đây ---
@@ -73,6 +98,8 @@ app.use('/api/v1/rental-requests', rentalRequestRoute);
 app.use('/api/v1/roommate-invitations', roommateInvitationRoute);
 app.use('/api/v1/staff', staffRoute);
 app.use('/api/v1/staff-marketplace', staffProfileRoute);
+app.use('/api/v1/maintenance-tasks', maintenanceTaskRoute);
+app.use('/api/v1/occupancy-declarations', occupancyRoute);
 // Bắt lỗi 404 (Route không tồn tại)
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });

@@ -5,7 +5,42 @@ import Link from "next/link";
 import { AlertCircle, BadgeCheck, CheckCircle2, Loader2, MapPin, Save, ShieldAlert, Wallet } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { SERVICE_CATEGORY_OPTIONS, translateKycState, translateServiceCategory } from "@/lib/labels";
+import { AddressFields, type AddressValue } from "@/components/address/address-fields";
+import administrativeData from "@/data/vietnam-administrative-hierarchy.json";
 import type { ServiceCategory, StaffProfile, StaffProfilePayload } from "@/types/models";
+
+/**
+ * Tách chuỗi địa chỉ đã lưu thành các phần để điền sẵn bộ chọn tỉnh/phường.
+ *
+ * Dữ liệu cũ có thể là chuỗi tự do không khớp danh mục: khi đó toàn bộ chuỗi
+ * được giữ ở ô "địa chỉ chi tiết" và người dùng chỉ cần chọn lại tỉnh/phường
+ * nếu muốn — không bắt nhập lại từ đầu.
+ */
+function parseAddressValue(raw: string | null | undefined): AddressValue {
+  const empty: AddressValue = { address: "", province: "", district: "", ward: "" };
+  const value = (raw ?? "").trim();
+  if (!value) return empty;
+  const parts = value.split(",").map((part) => part.trim()).filter(Boolean);
+  const province = administrativeData.data.find((item) => item.name.local === parts[parts.length - 1]);
+  if (!province) return { ...empty, address: value };
+  const ward = province.ward.find((item) => item.name.local === parts[parts.length - 2]);
+  const detailParts = parts.slice(0, ward ? parts.length - 2 : parts.length - 1);
+  return {
+    address: detailParts.join(", "),
+    province: province.name.local,
+    ward: ward?.name.local ?? "",
+    district: "",
+  };
+}
+
+/** Ghép lại thành chuỗi gửi server; bỏ phần rỗng, giữ thứ tự địa chỉ → phường → tỉnh. */
+function composeAddress(value: AddressValue): string | null {
+  const composed = [value.address, value.ward, value.province]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+  return composed || null;
+}
 
 /**
  * Parse một ô nhập số của người dùng.
@@ -37,6 +72,12 @@ const EMPTY_FORM = {
 export default function StaffProfilePage() {
   const [profile, setProfile] = React.useState<StaffProfile | null>(null);
   const [form, setForm] = React.useState(EMPTY_FORM);
+  const [addressValue, setAddressValue] = React.useState<AddressValue>({
+    address: "",
+    province: "",
+    district: "",
+    ward: "",
+  });
   const [skills, setSkills] = React.useState<ServiceCategory[]>([]);
   const [isAvailable, setIsAvailable] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -58,6 +99,7 @@ export default function StaffProfilePage() {
       priceMin: data?.priceMin != null ? String(data.priceMin) : "",
       priceMax: data?.priceMax != null ? String(data.priceMax) : "",
     });
+    setAddressValue(parseAddressValue(data?.serviceAddress));
     setSkills((data?.skills ?? []).map((skill) => skill.category));
     // Mặc định TẮT nhận việc khi chưa có hồ sơ: server chỉ cho bật khi KYC đã
     // duyệt, nên mặc định `true` sẽ làm lần lưu hồ sơ đầu tiên bị 403.
@@ -104,7 +146,9 @@ export default function StaffProfilePage() {
 
       const payload: StaffProfilePayload = {
         description: form.description.trim() === "" ? null : form.description.trim(),
-        serviceAddress: form.serviceAddress.trim() === "" ? null : form.serviceAddress.trim(),
+        // Địa chỉ được chọn từ danh mục tỉnh/phường (file JSON có sẵn), không
+        // còn là ô nhập tự do duy nhất.
+        serviceAddress: composeAddress(addressValue),
         latitude,
         longitude,
         priceMin,
@@ -158,6 +202,14 @@ export default function StaffProfilePage() {
           <h1 className="text-[26px] font-semibold text-[#203c37] mt-0.5">Hồ sơ &amp; kỹ năng</h1>
           <p className="text-[14px] text-[#74817b] mt-0.5">
             Hồ sơ này hiển thị cho chủ trọ khi họ tìm thợ theo kỹ năng và khoảng cách.
+            {profile?.userId && (
+              <>
+                {" "}
+                <Link href={`/users/${profile.userId}`} className="font-semibold text-[#15594f] hover:underline">
+                  Xem trang cá nhân công khai
+                </Link>
+              </>
+            )}
           </p>
         </div>
 
@@ -276,44 +328,42 @@ export default function StaffProfilePage() {
             <MapPin className="size-4 text-[#15594f]" />
             Khu vực hành nghề
           </h2>
-          <label className="block text-[13px] font-semibold text-[#203c37]">
-            Địa chỉ / khu vực làm việc
-            <input
-              type="text"
-              value={form.serviceAddress}
-              onChange={updateField("serviceAddress")}
-              placeholder="Ví dụ: Quận 7, TP.HCM"
-              className={inputClass}
-            />
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="block text-[13px] font-semibold text-[#203c37]">
-              Vĩ độ (latitude)
-              <input
-                type="text"
-                inputMode="decimal"
-                value={form.latitude}
-                onChange={updateField("latitude")}
-                placeholder="10.762622"
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-[13px] font-semibold text-[#203c37]">
-              Kinh độ (longitude)
-              <input
-                type="text"
-                inputMode="decimal"
-                value={form.longitude}
-                onChange={updateField("longitude")}
-                placeholder="106.660172"
-                className={inputClass}
-              />
-            </label>
-          </div>
-          <p className="text-[12px] text-[#74817b]">
-            Toạ độ dùng để tính khoảng cách tới bất động sản của chủ trọ và không hiển thị công
-            khai. Bỏ trống cả hai ô nếu bạn chưa muốn khai báo vị trí.
-          </p>
+          {/* Chọn từ danh mục hành chính có sẵn (tỉnh → phường/xã), không bắt
+              người dùng gõ tay toàn bộ địa chỉ. */}
+          <AddressFields value={addressValue} onChange={setAddressValue} showMap={false} />
+          <details className="rounded-[8px] border border-[#e2e7e1] bg-[#f8faf9] p-3">
+            <summary className="cursor-pointer text-[13px] font-semibold text-[#203c37]">
+              Toạ độ để tính khoảng cách (tuỳ chọn)
+            </summary>
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="block text-[13px] font-semibold text-[#203c37]">
+                Vĩ độ (latitude)
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.latitude}
+                  onChange={updateField("latitude")}
+                  placeholder="10.762622"
+                  className={inputClass}
+                />
+              </label>
+              <label className="block text-[13px] font-semibold text-[#203c37]">
+                Kinh độ (longitude)
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.longitude}
+                  onChange={updateField("longitude")}
+                  placeholder="106.660172"
+                  className={inputClass}
+                />
+              </label>
+            </div>
+            <p className="mt-2 text-[12px] text-[#74817b]">
+              Toạ độ chỉ dùng để tính khoảng cách tới bất động sản và không hiển thị công khai.
+              Bỏ trống cả hai ô nếu chưa muốn khai báo.
+            </p>
+          </details>
         </section>
 
         <section className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs space-y-4">
