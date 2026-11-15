@@ -7,7 +7,9 @@ import {
   CalendarDays,
   CheckCheck,
   CheckCircle2,
+  ClipboardCheck,
   FileText,
+  LifeBuoy,
   MessageSquare,
   Receipt,
   Scale,
@@ -33,12 +35,16 @@ interface NotificationDropdownProps {
 }
 
 const VISUALS: Record<string, { icon: typeof Bell; className: string }> = {
+  POST_PENDING: { icon: ClipboardCheck, className: "bg-[#fbf1dc] text-[#9a6a12]" },
   POST_APPROVED: { icon: CheckCircle2, className: "bg-[#eaf2ed] text-[#15594f]" },
   POST_REJECTED: { icon: XCircle, className: "bg-[#fbeae6] text-[#a4422c]" },
+  SUPPORT_TICKET: { icon: LifeBuoy, className: "bg-[#e0f2fe] text-[#075985]" },
   MESSAGE: { icon: MessageSquare, className: "bg-[#e0f2fe] text-[#075985]" },
   APPOINTMENT: { icon: CalendarDays, className: "bg-[#fbf1dc] text-[#9a6a12]" },
   INVOICE: { icon: Receipt, className: "bg-[#fef3c7] text-[#92400e]" },
   CONTRACT: { icon: FileText, className: "bg-[#eaf2ed] text-[#15594f]" },
+  CONTRACT_TERMINATION: { icon: FileText, className: "bg-[#fbeae6] text-[#a4422c]" },
+  CONTRACT_RENEWAL: { icon: FileText, className: "bg-[#eaf2ed] text-[#15594f]" },
   OCCUPANCY: { icon: Users, className: "bg-[#f2ede3] text-[#6b5a3e]" },
   TASK: { icon: Wrench, className: "bg-[#eaf2ed] text-[#15594f]" },
   OFFER: { icon: Receipt, className: "bg-[#fbf1dc] text-[#9a6a12]" },

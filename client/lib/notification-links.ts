@@ -49,6 +49,22 @@ export function resolveNotificationTarget(
       if (portal === 'admin') return '/admin/moderation/listings';
       return null;
 
+    case 'POST_PENDING':
+      if (portal === 'admin') {
+        return id
+          ? `/admin/moderation/listings#post-${encodeURIComponent(id)}`
+          : '/admin/moderation/listings';
+      }
+      return null;
+
+    case 'SUPPORT_TICKET':
+      if (portal === 'admin') {
+        return id
+          ? `/admin/support#ticket-${encodeURIComponent(id)}`
+          : '/admin/support';
+      }
+      return null;
+
     case 'INVOICE':
       if (portal === 'landlord') return '/landlord/invoices';
       // Khách thuê xem hoá đơn trong trang hợp đồng của mình.
@@ -80,6 +96,9 @@ export function resolveNotificationTarget(
       if (portal === 'tenant') {
         return id ? `/tenant/messages?conversation=${encodeURIComponent(id)}` : '/tenant/messages';
       }
+      if (portal === 'admin') {
+        return id ? `/admin/messages?conversation=${encodeURIComponent(id)}` : '/admin/messages';
+      }
       return null;
 
     case 'COMMISSION':
@@ -98,6 +117,10 @@ export function notificationActionLabel(type: NotificationType): string {
       return 'Xem bài viết bị từ chối';
     case 'POST_APPROVED':
       return 'Xem bài viết đã duyệt';
+    case 'POST_PENDING':
+      return 'Duyệt tin đăng';
+    case 'SUPPORT_TICKET':
+      return 'Xử lý yêu cầu hỗ trợ';
     case 'TASK':
     case 'OFFER':
     case 'REVIEW':
@@ -116,6 +139,12 @@ export function notificationActionLabel(type: NotificationType): string {
       return 'Xem số người ở';
     case 'MESSAGE':
       return 'Mở hội thoại';
+    case 'DISPUTE':
+      return 'Xử lý tranh chấp';
+    case 'COMMISSION':
+      return 'Xem báo cáo hoa hồng';
+    case 'SYSTEM':
+      return 'Xem chi tiết';
     default:
       return 'Xem chi tiết';
   }

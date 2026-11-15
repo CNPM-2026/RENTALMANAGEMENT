@@ -21,6 +21,8 @@ export type KycState = KycStatus | 'NONE';
 
 /** Mã lỗi máy đọc được để client phân biệt "thiếu KYC" với các lỗi 403 khác. */
 export const STAFF_KYC_REQUIRED = 'STAFF_KYC_REQUIRED';
+/** Mã lỗi khi khách thuê chưa xác thực KYC nhưng thao tác yêu cầu thuê phòng. */
+export const TENANT_KYC_REQUIRED = 'TENANT_KYC_REQUIRED';
 
 /** Trạng thái KYC lấy từ quan hệ đã include sẵn (không tốn thêm query). */
 export const kycStateOf = (relation?: { status: KycStatus } | null): KycState =>
@@ -32,14 +34,19 @@ export const isKycApproved = (state: KycState | null | undefined): boolean =>
 
 /**
  * Chặn thao tác khi chưa được duyệt KYC.
- * @param action cụm động từ tiếng Việt, vd. `'nhận việc'`, `'ứng tuyển công việc'`.
+ * @param action cụm động từ tiếng Việt, vd. `'nhận việc'`, `'gửi yêu cầu thuê phòng'`.
+ * @param code mã lỗi máy đọc được; mặc định giữ tương thích với luồng thợ.
  */
-export const assertKycApproved = (state: KycState | null | undefined, action: string): void => {
+export const assertKycApproved = (
+  state: KycState | null | undefined,
+  action: string,
+  code: string = STAFF_KYC_REQUIRED,
+): void => {
   if (isKycApproved(state)) return;
   throw new AppError(
     `Bạn cần được duyệt xác minh CCCD (KYC) trước khi ${action}.`,
     403,
-    STAFF_KYC_REQUIRED,
+    code,
   );
 };
 

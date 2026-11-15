@@ -44,7 +44,13 @@ router.post(
 );
 
 // --- Dùng chung: danh sách sự cố trong phạm vi của mình ---
-router.get('/my', authorizeStaffOr('MAINTENANCE', 'TENANT', 'LANDLORD'), maintenanceController.getMine);
+// Route đọc mở cho mọi role để trang `/tenant/maintenance` không 403 khi
+// ADMIN/STAFF mở từ menu dùng chung. Service chỉ trả dữ liệu thuộc actor.
+router.get(
+  '/my',
+  authorizeStaffOr('MAINTENANCE', 'TENANT', 'LANDLORD', 'STAFF', 'ADMIN'),
+  maintenanceController.getMine,
+);
 
 // --- Chủ trọ: tiếp nhận sự cố & chuyển thành công việc cần thợ ---
 router.patch(

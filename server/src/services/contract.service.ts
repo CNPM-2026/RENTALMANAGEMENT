@@ -89,6 +89,10 @@ export const contractService = {
       whereClause.tenantId = userId;
     } else if (role === 'ADMIN') {
       // Admin is intentionally allowed to review all contracts.
+    } else if (role === 'STAFF') {
+      // STAFF không có membership mở được trang tenant nhưng không sở hữu hợp
+      // đồng nào. STAFF có membership đã được controller đổi thành LANDLORD.
+      whereClause.tenantId = userId;
     } else {
       throw new AppError('Role không được phép xem hợp đồng', 403);
     }

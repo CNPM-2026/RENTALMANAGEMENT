@@ -549,18 +549,21 @@ export const apiClient = {
   appointments: {
     create: (payload: CreateAppointmentPayload) =>
       apiClient.post<Appointment>('/appointments', payload),
-    getMyAppointments: () =>
-      apiClient.get<Appointment[]>('/appointments/my'),
-    updateStatus: (id: string, payload: UpdateAppointmentStatusPayload) =>
-      apiClient.patch<Appointment>(`/appointments/${id}/status`, payload),
+    getMyAppointments: (scope?: 'tenant') =>
+      apiClient.get<Appointment[]>('/appointments/my', scope ? { scope } : undefined),
+    updateStatus: (id: string, payload: UpdateAppointmentStatusPayload, scope?: 'tenant') =>
+      apiClient.patch<Appointment>(
+        `/appointments/${id}/status${scope ? `?scope=${scope}` : ''}`,
+        payload,
+      ),
   },
 
   // 7. Contracts
   contracts: {
     create: (payload: CreateContractPayload) =>
       apiClient.post<Contract>('/contracts', payload),
-    getMyContracts: () =>
-      apiClient.get<Contract[]>('/contracts/my'),
+    getMyContracts: (scope?: 'tenant') =>
+      apiClient.get<Contract[]>('/contracts/my', scope ? { scope } : undefined),
     updateStatus: (id: string, payload: UpdateContractStatusPayload) =>
       apiClient.patch<Contract>(`/contracts/${id}/status`, payload),
 
@@ -616,8 +619,8 @@ export const apiClient = {
       apiClient.get<InvoicePreview>('/invoices/preview', query),
     generate: (payload: GenerateInvoicePayload) =>
       apiClient.post<Invoice>('/invoices/generate', payload),
-    getMyInvoices: () =>
-      apiClient.get<Invoice[]>('/invoices/my'),
+    getMyInvoices: (scope?: 'tenant') =>
+      apiClient.get<Invoice[]>('/invoices/my', scope ? { scope } : undefined),
     pay: (id: string) =>
       apiClient.patch<Invoice>(`/invoices/${id}/pay`),
   },
@@ -817,8 +820,10 @@ export const apiClient = {
     /** Khách thuê báo sự cố; dùng FormData khi gửi kèm ảnh hiện trạng. */
     create: (payload: FormData | CreateMaintenancePayload) =>
       apiClient.post<MaintenanceRequest>('/maintenance', payload),
-    getMine: () => apiClient.get<MaintenanceRequest[]>('/maintenance/my'),
-    getById: (id: string) => apiClient.get<MaintenanceRequest>(`/maintenance/${id}`),
+    getMine: (scope?: 'tenant') =>
+      apiClient.get<MaintenanceRequest[]>('/maintenance/my', scope ? { scope } : undefined),
+    getById: (id: string, scope?: 'tenant') =>
+      apiClient.get<MaintenanceRequest>(`/maintenance/${id}`, scope ? { scope } : undefined),
     updateStatus: (id: string, status: MaintenanceStatus) =>
       apiClient.patch<MaintenanceRequest>(`/maintenance/${id}/status`, { status }),
     /** 🆕 Chủ trọ tiếp nhận: đã xem xét / cần bổ sung thông tin / từ chối. */
@@ -913,9 +918,13 @@ export const apiClient = {
   rentalRequests: {
     create: (payload: CreateRentalRequestPayload) =>
       apiClient.post<RentalRequest>('/rental-requests', payload),
-    getMine: () => apiClient.get<RentalRequest[]>('/rental-requests/my'),
-    updateStatus: (id: string, status: string) =>
-      apiClient.patch<RentalRequest>(`/rental-requests/${id}/status`, { status }),
+    getMine: (scope?: 'tenant') =>
+      apiClient.get<RentalRequest[]>('/rental-requests/my', scope ? { scope } : undefined),
+    updateStatus: (id: string, status: string, scope?: 'tenant') =>
+      apiClient.patch<RentalRequest>(
+        `/rental-requests/${id}/status${scope ? `?scope=${scope}` : ''}`,
+        { status },
+      ),
   },
 
   roommateInvitations: {
@@ -932,7 +941,7 @@ export const apiClient = {
       apiClient.get<User[]>('/admin/users', query),
     updateUserStatus: (id: string, isActive: boolean) =>
       apiClient.patch<User>(`/admin/users/${id}/status`, { isActive }),
-    /** `role` lọc hàng đợi theo người nộp (`LANDLORD` | `STAFF`); bỏ trống = cả hai. */
+    /** `role` lọc hàng đợi theo người nộp (`TENANT` | `LANDLORD` | `STAFF`); bỏ trống = tất cả. */
     getKyc: (status?: string, role?: KycRole) =>
       apiClient.get<KycSubmission[]>('/admin/kyc', { status, role }),
     updateKyc: (id: string, payload: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>

@@ -2,9 +2,15 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { notificationService } from './notification.service';
 import { roomDemandService } from './roomDemand.service';
+import { assertKycApproved, loadKycState, TENANT_KYC_REQUIRED } from './kycGate.service';
 
 export const rentalRequestService = {
   create: async (tenantId: string, data: { roomId: string; moveInDate: string; leaseTermMonths: number; occupantsCount?: number; note?: string }) => {
+    // KYC là điều kiện BẮT BUỘC với khách thuê trước khi gửi yêu cầu thuê. Server
+    // kiểm tra lại (không tin client) và fail closed: chỉ APPROVED mới đi tiếp.
+    const kycState = await loadKycState(tenantId);
+    assertKycApproved(kycState, 'gửi yêu cầu thuê phòng', TENANT_KYC_REQUIRED);
+
     const room = await prisma.room.findFirst({
       where: { id: data.roomId },
       include: {

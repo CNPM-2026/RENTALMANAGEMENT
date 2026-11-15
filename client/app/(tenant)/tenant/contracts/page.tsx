@@ -19,7 +19,7 @@ export default function TenantContractsPage() {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    apiClient.contracts.getMyContracts().then(setContracts).catch(() => setError("Không tải được danh sách hợp đồng."));
+    apiClient.contracts.getMyContracts("tenant").then(setContracts).catch(() => setError("Không tải được danh sách hợp đồng."));
   }, []);
 
   return <div className="space-y-6">

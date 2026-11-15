@@ -45,7 +45,7 @@ function TenantContractDetailContent() {
     : "Chưa cập nhật";
 
   React.useEffect(() => {
-    apiClient.contracts.getMyContracts()
+    apiClient.contracts.getMyContracts("tenant")
       .then((items) => {
         const found = items.find((item) => item.id === contractId);
         if (!found) throw new Error("Không tìm thấy hợp đồng.");
@@ -59,7 +59,7 @@ function TenantContractDetailContent() {
   // đồng phản ánh dữ liệu server (ví dụ hợp đồng đã TERMINATED hoặc đã ký tiếp).
   const reloadContract = React.useCallback(() => {
     void apiClient.contracts
-      .getMyContracts()
+      .getMyContracts("tenant")
       .then((items) => {
         const found = items.find((item) => item.id === contractId);
         if (!found) return;

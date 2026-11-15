@@ -56,7 +56,31 @@ export const userService = {
     frontIdUrl: string;
     backIdUrl: string;
   }) => (async () => {
-    const previous = await prisma.kycSubmission.findUnique({ where: { userId }, select: { frontIdUrl: true, backIdUrl: true } });
+    const previous = await prisma.kycSubmission.findUnique({
+      where: { userId },
+      select: { status: true, frontIdUrl: true, backIdUrl: true },
+    });
+
+    // KYC là quyết định MỘT LẦN cho mỗi tài khoản:
+    //  - APPROVED: không bao giờ cho nộp lại/thay đổi danh tính đã xác thực;
+    //  - PENDING: đang chờ admin đối soát, nộp lại chỉ tạo hồ sơ trùng và có thể
+    //    ghi đè ảnh mà admin đang xem.
+    // REJECTED được phép nộp lại — đó là lý do trạng thái này tồn tại.
+    if (previous?.status === 'APPROVED') {
+      throw new AppError(
+        'Tài khoản đã xác thực KYC. Mỗi tài khoản chỉ được xác thực một lần.',
+        409,
+        'KYC_ALREADY_APPROVED',
+      );
+    }
+    if (previous?.status === 'PENDING') {
+      throw new AppError(
+        'Hồ sơ KYC đang chờ duyệt. Vui lòng chờ kết quả trước khi nộp lại.',
+        409,
+        'KYC_ALREADY_PENDING',
+      );
+    }
+
     const result = await prisma.kycSubmission.upsert({
       where: { userId },
       create: { userId, ...data, status: 'PENDING' },
@@ -192,8 +216,13 @@ export const userService = {
     const result = await prisma.kycSubmission.findUnique({ where: { userId } });
     return result && {
       ...result,
-      frontIdUrl: storageService.getPrivateImageUrl(result.frontIdUrl),
-      backIdUrl: storageService.getPrivateImageUrl(result.backIdUrl),
+      // Hồ sơ APPROVED đã xoá ảnh: hai cột là NULL và không được cố tạo signed URL.
+      frontIdUrl: result.frontIdUrl
+        ? storageService.getPrivateImageUrl(result.frontIdUrl)
+        : null,
+      backIdUrl: result.backIdUrl
+        ? storageService.getPrivateImageUrl(result.backIdUrl)
+        : null,
     };
   },
 };

@@ -10,9 +10,17 @@ router.use(authenticate);
 /**
  * Tenant: khai báo / xem lịch sử của chính mình.
  * LANDLORD không được khai thay (server còn kiểm tra hợp đồng ACTIVE).
+ *
+ * `GET /my` chỉ đọc dữ liệu của chính người gọi, nên mọi role đều mở được
+ * trang `/tenant/occupancy` (ADMIN/STAFF sẽ thấy danh sách rỗng). Quyền GHI
+ * vẫn chỉ dành cho TENANT.
  */
 router.post('/', authorize('TENANT'), validate(occupancyDeclarationSchema), occupancyController.declare);
-router.get('/my', authorize('TENANT'), occupancyController.listMine);
+router.get(
+  '/my',
+  authorize('TENANT', 'LANDLORD', 'STAFF', 'ADMIN'),
+  occupancyController.listMine,
+);
 
 /**
  * Lịch sử + trạng thái hiện tại của một phòng: chủ trọ sở hữu, HOẶC tenant có

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient, resolveMediaUrl } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
 import { Post } from "@/types/models";
 
 const TIME_SLOTS = [
@@ -50,6 +51,15 @@ function BookViewingContent() {
   const [post, setPost] = React.useState<Post | null>(null);
 
   React.useEffect(() => {
+    // Điền sẵn thông tin người xem đã khai trong hồ sơ; vẫn cho sửa.
+    const user = getCurrentUser();
+    if (user) {
+      queueMicrotask(() => {
+        setFullName(user.fullName ?? "");
+        setPhone(user.phone ?? "");
+      });
+    }
+
     void apiClient.posts.getById(roomId)
       .then((loadedPost) => {
         setPost(loadedPost);

@@ -29,6 +29,14 @@ export default function AdminListingModerationPage() {
     loadPending();
   }, [loadPending]);
 
+  React.useEffect(() => {
+    const targetId = window.location.hash.replace(/^#/, "");
+    if (!targetId) return;
+    document
+      .getElementById(targetId)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [pendingPosts]);
+
   const handleModerate = async (id: string, status: "APPROVED" | "REJECTED", reason?: string) => {
     try {
       setErrorMessage(null);
@@ -69,7 +77,8 @@ export default function AdminListingModerationPage() {
           {pendingPosts.map((post) => (
             <div
               key={post.id}
-              className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4"
+              id={`post-${post.id}`}
+              className="scroll-mt-24 rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 transition-shadow target:border-[#15594f] target:ring-2 target:ring-[#15594f]/25"
             >
               <div className="space-y-1.5">
                 <h3 className="text-[16px] font-semibold text-[#203c37]">{post.title}</h3>

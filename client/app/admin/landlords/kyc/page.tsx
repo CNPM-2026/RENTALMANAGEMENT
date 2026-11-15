@@ -7,15 +7,17 @@ import { translateRole } from "@/lib/labels";
 import type { KycSubmission, KycRole } from "@/types/models";
 
 /**
- * Hàng đợi KYC của ADMIN — DÙNG CHUNG cho chủ trọ và thợ.
+ * Hàng đợi KYC của ADMIN — DÙNG CHUNG cho khách thuê, chủ trọ và thợ.
  *
  * Chỉ có một bảng `kyc_submissions` và một endpoint duyệt, nên không tồn tại màn
  * duyệt thứ hai cho thợ. Bộ lọc role chỉ chia hàng đợi cho dễ xử lý, không đổi
  * quyền hay kết quả duyệt. Duyệt hồ sơ của thợ chính là điều kiện mở khoá cho
- * `kycGate.service` (thợ chỉ được bật "đang nhận việc" khi hồ sơ APPROVED).
+ * `kycGate.service` (thợ chỉ được bật "đang nhận việc" khi hồ sơ APPROVED);
+ * khách thuê phải APPROVED mới được gửi yêu cầu thuê phòng.
  */
 const ROLE_FILTERS: Array<{ key: KycRole | "ALL"; label: string }> = [
   { key: "ALL", label: "Tất cả" },
+  { key: "TENANT", label: "Khách thuê" },
   { key: "LANDLORD", label: "Chủ trọ" },
   { key: "STAFF", label: "Thợ dịch vụ" },
 ];

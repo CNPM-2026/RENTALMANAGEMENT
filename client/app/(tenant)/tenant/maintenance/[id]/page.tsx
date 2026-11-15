@@ -45,7 +45,7 @@ function TenantMaintenanceDetailContent() {
     if (!issueId) return;
     let active = true;
     apiClient.maintenance
-      .getById(issueId)
+      .getById(issueId, "tenant")
       .then((item) => {
         if (active) setIssue(item);
       })

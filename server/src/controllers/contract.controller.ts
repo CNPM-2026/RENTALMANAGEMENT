@@ -10,10 +10,21 @@ const isStaffScope = (req: AuthRequest) => Boolean(req.user!.landlordId);
 const uploadedFiles = (req: AuthRequest): Express.Multer.File[] =>
   Array.isArray(req.files) ? (req.files as Express.Multer.File[]) : [];
 
-const lifecycleActor = (req: AuthRequest) => ({
-  id: req.user!.id,
-  role: req.user!.role,
-});
+const lifecycleActor = (req: AuthRequest) => {
+  // Một tài khoản TENANT có thể là nhân viên được cấp quyền. Mặc định họ thao
+  // tác với tư cách KHÁCH THUÊ; chỉ chuyển sang phạm vi chủ trọ khi họ thực sự
+  // có quyền APPOINTMENTS và yêu cầu rõ `?scope=landlord`. Nhờ vậy việc có
+  // membership không âm thầm biến thao tác hợp đồng cá nhân thành thao tác của
+  // chủ trọ.
+  const canActAsLandlord = req.user!.role === 'LANDLORD'
+    || Boolean(req.user!.staffPermissions?.includes('APPOINTMENTS'));
+  const landlordScope = req.query.scope === 'landlord' && canActAsLandlord;
+  const tenantScope = req.user!.role === 'TENANT' && !landlordScope;
+  return {
+    id: tenantScope ? req.user!.id : resourceOwnerId(req),
+    role: tenantScope ? 'TENANT' : isStaffScope(req) || landlordScope ? 'LANDLORD' : req.user!.role,
+  };
+};
 
 export const contractController = {
   create: async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -31,9 +42,13 @@ export const contractController = {
 
   getMyContracts: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // Portal khách thuê có thể gửi `?scope=tenant` để luôn nhận hợp đồng của
+      // CHÍNH MÌNH, kể cả khi tài khoản đồng thời được chủ trọ cấp quyền nhân
+      // viên. Không có tham số này thì giữ nguyên hành vi cũ (staff scope).
+      const tenantScope = req.query.scope === 'tenant' && req.user!.role === 'TENANT';
       const result = await contractService.getMyContracts(
-        resourceOwnerId(req),
-        isStaffScope(req) ? 'LANDLORD' : req.user!.role,
+        tenantScope ? req.user!.id : resourceOwnerId(req),
+        tenantScope ? 'TENANT' : isStaffScope(req) ? 'LANDLORD' : req.user!.role,
       );
       return res.status(200).json({
         success: true,

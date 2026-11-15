@@ -58,7 +58,7 @@ export default function TenantAppointmentsPage() {
   }, []);
 
   React.useEffect(() => {
-    apiClient.appointments.getMyAppointments()
+    apiClient.appointments.getMyAppointments("tenant")
       .then((items) => setAppointments(items.map((item) => ({
         id: item.id,
         roomTitle: item.room?.property?.name ?? "Phòng thuê",
@@ -132,13 +132,13 @@ export default function TenantAppointmentsPage() {
     }
 
     try {
-      await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" });
+      await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" }, "tenant");
       await apiClient.appointments.create({
         roomId: selectedAppointment.roomId,
         appointmentTime: proposedTime.toISOString(),
         note: `Đề xuất đổi lịch: ${rescheduleReason || "Lịch hẹn mới"}`,
       });
-      const items = await apiClient.appointments.getMyAppointments();
+      const items = await apiClient.appointments.getMyAppointments("tenant");
       setAppointments(items.map((item) => ({
         id: item.id, roomTitle: item.room?.property?.name ?? "Phòng thuê", roomAddress: item.room?.property?.address ?? "Chưa cập nhật địa chỉ",
         roomImage: item.room?.property?.images?.[0]?.imageUrl ?? "/images/default-room.svg", roomId: item.roomId ?? "",
@@ -154,7 +154,7 @@ export default function TenantAppointmentsPage() {
 
   async function handleCancelSubmit() {
     if (!selectedAppointment) return;
-    await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" });
+    await apiClient.appointments.updateStatus(selectedAppointment.id, { status: "CANCELLED" }, "tenant");
     setAppointments((prev) => prev.map((a) => a.id === selectedAppointment.id ? { ...a, status: "CANCELLED", note: `Lý do hủy: ${cancelReason}` } : a));
     setCancelModalOpen(false);
   }

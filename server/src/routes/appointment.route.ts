@@ -9,7 +9,7 @@ const router = Router();
 router.use(authenticate); 
 
 router.post('/', authorize('TENANT'), validate(createAppointmentSchema), appointmentController.create);
-router.get('/my', appointmentController.getMyAppointments);
+router.get('/my', authorizeStaffOr('APPOINTMENTS', 'TENANT', 'LANDLORD', 'STAFF', 'ADMIN'), appointmentController.getMyAppointments);
 router.patch('/:id/status', authorizeStaffOr('APPOINTMENTS', 'TENANT', 'LANDLORD'), validate(updateAppointmentStatusSchema), appointmentController.updateStatus);
 
 export default router;

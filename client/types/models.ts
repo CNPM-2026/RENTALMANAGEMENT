@@ -58,7 +58,10 @@ export type NotificationType =
   | 'OCCUPANCY'
   /** 🆕 Chấm dứt / ký tiếp hợp đồng. */
   | 'CONTRACT_TERMINATION'
-  | 'CONTRACT_RENEWAL';
+  | 'CONTRACT_RENEWAL'
+  /** 🆕 Hàng đợi Admin — tin đăng chờ duyệt và phiếu hỗ trợ mới. */
+  | 'POST_PENDING'
+  | 'SUPPORT_TICKET';
 
 /**
  * 🆕 Occupancy — trạng thái khai báo số người ở.
@@ -107,7 +110,7 @@ export type KycStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type KycState = 'NONE' | KycStatus;
 
 /** Các role có hồ sơ trong hàng đợi KYC của admin (cùng bảng `kyc_submissions`). */
-export type KycRole = 'LANDLORD' | 'STAFF';
+export type KycRole = 'TENANT' | 'LANDLORD' | 'STAFF';
 
 /**
  * 🆕 Nhóm kỹ năng / loại dịch vụ của THỢ ĐỘC LẬP (mirror enum `ServiceCategory`
@@ -797,8 +800,12 @@ export interface KycSubmission {
   userId: string;
   idNumber: string;
   permanentAddress: string;
-  frontIdUrl: string;
-  backIdUrl: string;
+  /**
+   * Ảnh CCCD đã ký URL. `null` khi hồ sơ đã APPROVED: server xoá asset khỏi
+   * Cloudinary và NULL hai cột để không lưu giấy tờ sau khi xác thực.
+   */
+  frontIdUrl: string | null;
+  backIdUrl: string | null;
   status: KycStatus;
   rejectionReason?: string | null;
   createdAt: string;

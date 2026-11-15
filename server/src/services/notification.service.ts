@@ -87,6 +87,28 @@ export const notificationService = {
     return results.filter(Boolean);
   },
 
+  /**
+   * Gửi một sự kiện cho TOÀN BỘ tài khoản ADMIN đang hoạt động.
+   *
+   * Dùng cho các hàng đợi mà chỉ admin xử lý (duyệt tin đăng, KYC, hỗ trợ,
+   * tranh chấp...). Lỗi thông báo không bao giờ được làm hỏng nghiệp vụ đã
+   * commit — caller vẫn nên `.catch(() => undefined)`.
+   */
+  notifyAdmins: async (
+    payload: { title: string; content: string; type: NotificationType; referenceId?: string },
+    dedupeKeyFor?: (adminId: string) => string,
+  ) => {
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN', isActive: true },
+      select: { id: true },
+    });
+    return notificationService.notifyUsers(
+      admins.map((admin) => admin.id),
+      payload,
+      dedupeKeyFor,
+    );
+  },
+
   getMyNotifications: async (
     userId: string,
     options: { since?: Date; unreadOnly?: boolean; limit?: number } = {},

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
 import { ReportTargetType, DisputeCategory } from "@/types/models";
 
 function SafetyReportViolationContent() {
@@ -36,6 +37,14 @@ function SafetyReportViolationContent() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submittedSuccess, setSubmittedSuccess] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    // Điền sẵn kênh liên hệ đã khai (ưu tiên SĐT, sau đó email). Đây chỉ là gợi
+    // ý ban đầu — người dùng vẫn sửa được.
+    const user = getCurrentUser();
+    const contact = [user?.phone, user?.email].filter(Boolean).join(" · ");
+    if (contact) queueMicrotask(() => setContactInfo(contact));
+  }, []);
 
   const categories = [
     {

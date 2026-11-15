@@ -47,13 +47,13 @@ export default function TenantMaintenancePage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const loadItems = React.useCallback(() => {
-    apiClient.maintenance.getMine().then(setItems).catch(() => setItems([]));
+    apiClient.maintenance.getMine("tenant").then(setItems).catch(() => setItems([]));
   }, []);
 
   React.useEffect(() => {
     loadItems();
     apiClient.contracts
-      .getMyContracts()
+      .getMyContracts("tenant")
       .then((rows) => setContracts((rows ?? []).filter((contract) => contract.status === "ACTIVE")))
       .catch(() => setContracts([]));
   }, [loadItems]);

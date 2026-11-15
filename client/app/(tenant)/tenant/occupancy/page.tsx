@@ -47,7 +47,7 @@ export default function TenantOccupancyPage() {
   React.useEffect(() => {
     let isCancelled = false;
     Promise.all([
-      apiClient.contracts.getMyContracts(),
+      apiClient.contracts.getMyContracts("tenant"),
       apiClient.occupancyDeclarations.getMine(),
     ])
       .then(([myContracts, myDeclarations]) => {

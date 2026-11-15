@@ -66,6 +66,8 @@ export function PortalSidebar({ onLogout }: PortalSidebarProps) {
   // 5 Account Navigation Items (from Figma spec_miner_survey_3 handoff)
   const accountItems = [
     { label: "Thông báo", href: "/tenant/notifications", icon: Bell },
+    // KYC là điều kiện bắt buộc trước khi gửi yêu cầu thuê phòng.
+    { label: "Xác thực KYC", href: "/tenant/kyc", icon: ShieldCheck },
     { label: "Chỉnh sửa hồ sơ", href: "/tenant/profile", icon: User },
     {
       label: "Cài đặt & Quyền riêng tư",

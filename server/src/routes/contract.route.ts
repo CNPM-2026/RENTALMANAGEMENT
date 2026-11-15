@@ -22,12 +22,18 @@ router.use(authenticate); // Tất cả đều phải đăng nhập
 router.post('/', authorizeStaffOr('APPOINTMENTS', 'LANDLORD'), validate(contractSchema), contractController.create);
 
 // Admin xem toàn bộ; các role còn lại chỉ xem hợp đồng thuộc phạm vi của mình.
-router.get('/my', authorize('ADMIN', 'LANDLORD', 'TENANT'), contractController.getMyContracts);
+// STAFF có membership được scope theo chủ trọ (quyền APPOINTMENTS); STAFF không
+// có membership mở được trang nhưng danh sách rỗng.
+router.get(
+  '/my',
+  authorizeStaffOr('APPOINTMENTS', 'ADMIN', 'LANDLORD', 'TENANT', 'STAFF'),
+  contractController.getMyContracts,
+);
 
 // --- Chấm dứt hợp đồng: gửi yêu cầu (kèm ảnh) → Admin duyệt → theo dõi hoàn cọc ---
 router.get(
   '/termination-requests',
-  authorize('ADMIN', 'LANDLORD', 'TENANT'),
+  authorizeStaffOr('APPOINTMENTS', 'ADMIN', 'LANDLORD', 'TENANT', 'STAFF'),
   validate(contractTerminationQuerySchema, 'query'),
   contractController.getTerminationRequests,
 );
@@ -54,7 +60,7 @@ router.patch(
 // --- Ký tiếp / gia hạn: một bên đề xuất, bên còn lại phản hồi ---
 router.get(
   '/renewal-requests',
-  authorize('ADMIN', 'LANDLORD', 'TENANT'),
+  authorizeStaffOr('APPOINTMENTS', 'ADMIN', 'LANDLORD', 'TENANT', 'STAFF'),
   validate(contractRenewalQuerySchema, 'query'),
   contractController.getRenewalRequests,
 );

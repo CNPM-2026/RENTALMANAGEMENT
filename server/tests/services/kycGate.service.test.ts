@@ -52,6 +52,21 @@ describe('kycGate.assertKycApproved', () => {
   it('không ném gì khi đã duyệt', () => {
     expect(() => assertKycApproved('APPROVED', 'nhận việc')).not.toThrow();
   });
+
+  it('dùng được mã lỗi riêng cho khách thuê', () => {
+    let caught: unknown;
+    try {
+      assertKycApproved('NONE', 'gửi yêu cầu thuê phòng', 'TENANT_KYC_REQUIRED');
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toMatchObject({
+      statusCode: 403,
+      code: 'TENANT_KYC_REQUIRED',
+      message: expect.stringContaining('gửi yêu cầu thuê phòng'),
+    });
+  });
 });
 
 describe('kycGate.kycStateOf', () => {

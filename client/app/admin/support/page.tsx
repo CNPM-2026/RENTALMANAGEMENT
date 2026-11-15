@@ -15,6 +15,14 @@ export default function AdminSupportPage() {
     loadTickets();
   }, [loadTickets]);
 
+  React.useEffect(() => {
+    const targetId = window.location.hash.replace(/^#/, "");
+    if (!targetId) return;
+    document
+      .getElementById(targetId)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [tickets]);
+
   const resolveTicket = async (id: string) => {
     await apiClient.support.update(id, { status: "RESOLVED" });
     loadTickets();
@@ -41,7 +49,11 @@ export default function AdminSupportPage() {
           </thead>
           <tbody className="divide-y divide-[#eef3ef] text-[#203c37]">
             {tickets.map((t) => (
-              <tr key={t.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
+              <tr
+                key={t.id}
+                id={`ticket-${t.id}`}
+                className="scroll-mt-24 transition-colors hover:bg-[#f7f6f2]/60 target:bg-[#eaf2ed] target:ring-2 target:ring-inset target:ring-[#15594f]"
+              >
                 <td className="py-3.5 px-4 font-semibold">{t.user?.fullName ?? "Người dùng"}</td>
                 <td className="py-3.5 px-4">{t.subject}</td>
                 <td className="py-3.5 px-4 text-[#74817b]">{new Date(t.createdAt).toLocaleString("vi-VN")}</td>
