@@ -49,7 +49,7 @@ export default function TenantRentalRequestsPage() {
   const router = useRouter();
 
   React.useEffect(() => {
-    Promise.all([apiClient.rentalRequests.getMine(), apiClient.contracts.getMyContracts()]).then(([items, contracts]) => {
+    Promise.all([apiClient.rentalRequests.getMine("tenant"), apiClient.contracts.getMyContracts("tenant")]).then(([items, contracts]) => {
       setRequests((items as ApiRentalRequest[]).map((item) => {
         const contract = contracts.find((candidate) => candidate.roomId === item.roomId && candidate.tenantId === item.tenantId);
         return {
@@ -77,7 +77,7 @@ export default function TenantRentalRequestsPage() {
 
   const handleHandoverConfirmation = async (requestId: string) => {
     try {
-      await apiClient.rentalRequests.updateStatus(requestId, "SIGNED");
+      await apiClient.rentalRequests.updateStatus(requestId, "SIGNED", "tenant");
       setRequests((current) => current.map((request) => request.id === requestId
         ? { ...request, status: "SIGNED", currentStep: 4 }
         : request));

@@ -65,6 +65,8 @@ function ApplyRentalContent() {
   const [checkingAppointment, setCheckingAppointment] = React.useState(true);
   const [hasCompletedVisit, setHasCompletedVisit] = React.useState(false);
   const [relevantAppointment, setRelevantAppointment] = React.useState<Appointment | null>(null);
+  // null = đang tải trạng thái KYC; false = chưa xác thực (chặn gửi yêu cầu).
+  const [kycApproved, setKycApproved] = React.useState<boolean | null>(null);
 
   React.useEffect(() => {
     const initializationTimer = window.setTimeout(() => {
@@ -79,6 +81,27 @@ function ApplyRentalContent() {
       setMinMoveInDate(dateOffset(1));
       setMaxMoveInDate(dateOffset(365));
     }, 0);
+
+    // Lấy hồ sơ mới nhất để điền sẵn cả occupation (getCurrentUser chỉ có dữ liệu
+    // đăng nhập cơ bản). Người dùng vẫn sửa được mọi trường.
+    void apiClient.auth
+      .getMe()
+      .then((me) => {
+        setFullName(me.fullName ?? "");
+        setPhone(me.phone ?? "");
+        setEmail(me.email ?? "");
+        setOccupation(me.profile?.occupation ?? "");
+      })
+      .catch(() => undefined);
+
+    // KYC: vừa quyết định quyền gửi yêu cầu, vừa là nguồn điền sẵn số CCCD đã khai.
+    void apiClient.users
+      .getMyKyc()
+      .then((record) => {
+        setKycApproved(record?.status === "APPROVED");
+        if (record?.idNumber) setCitizenId(record.idNumber);
+      })
+      .catch(() => setKycApproved(false));
 
     // Load post info
     void apiClient.posts
@@ -96,7 +119,7 @@ function ApplyRentalContent() {
 
     // Check if tenant has CONFIRMED or COMPLETED appointment for this room/post
     void apiClient.appointments
-      .getMyAppointments()
+      .getMyAppointments("tenant")
       .then((appointments) => {
         // Look for appointment for this post or the room associated with the post
         const qualifyingAppt = appointments.find((appt) => {
@@ -130,6 +153,10 @@ function ApplyRentalContent() {
 
   async function handleSubmitApplication(e: React.FormEvent) {
     e.preventDefault();
+    if (kycApproved !== true) {
+      setErrorMsg("Bạn cần xác thực KYC trước khi gửi yêu cầu thuê phòng.");
+      return;
+    }
     if (!hasCompletedVisit) {
       setErrorMsg("Bạn cần đặt lịch và xem phòng trực tiếp trước khi gửi yêu cầu thuê.");
       return;
@@ -216,6 +243,27 @@ function ApplyRentalContent() {
               <strong className="font-semibold block">Gửi yêu cầu thuê phòng thành công!</strong>
               Hồ sơ của bạn đã được chuyển đến chủ trọ. Đang chuyển hướng đến trang Theo dõi yêu cầu thuê...
             </div>
+          </div>
+        )}
+
+        {/* KYC Banner — bắt buộc trước khi gửi yêu cầu thuê */}
+        {kycApproved === false && !success && (
+          <div className="p-5 rounded-[14px] bg-[#fdf8ec] border border-[#f4deb4] flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <ShieldCheck className="size-5 text-[#9a6a12] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[14px] font-semibold text-[#9a6a12]">Bạn chưa xác thực KYC</p>
+                <p className="text-[13px] text-[#9a6a12] mt-0.5 leading-relaxed">
+                  Xác thực CCCD là điều kiện bắt buộc trước khi gửi yêu cầu thuê phòng. Hồ sơ chỉ
+                  cần xác thực một lần cho mỗi tài khoản.
+                </p>
+              </div>
+            </div>
+            <Link href="/tenant/kyc" className="shrink-0">
+              <Button variant="primary" size="md" leftIcon={<ShieldCheck className="size-4" />}>
+                Xác thực KYC
+              </Button>
+            </Link>
           </div>
         )}
 
@@ -463,15 +511,19 @@ function ApplyRentalContent() {
                   variant="primary"
                   size="md"
                   loading={loading}
-                  disabled={!hasCompletedVisit || checkingAppointment}
+                  disabled={!hasCompletedVisit || checkingAppointment || kycApproved !== true}
                   className="font-bold shadow-md"
                   rightIcon={<Send className="size-4" />}
                 >
-                  {checkingAppointment
-                    ? "Đang kiểm tra..."
-                    : !hasCompletedVisit
-                      ? "Cần xem phòng trước"
-                      : "Gửi yêu cầu thuê phòng"}
+                  {kycApproved === null
+                    ? "Đang kiểm tra KYC..."
+                    : kycApproved === false
+                      ? "Cần xác thực KYC"
+                      : checkingAppointment
+                        ? "Đang kiểm tra..."
+                        : !hasCompletedVisit
+                          ? "Cần xem phòng trước"
+                          : "Gửi yêu cầu thuê phòng"}
                 </Button>
               </div>
             </div>

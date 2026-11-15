@@ -10,7 +10,9 @@ import {
   CheckCheck,
   CheckCircle2,
   ChevronRight,
+  ClipboardCheck,
   FileText,
+  LifeBuoy,
   MessageSquare,
   Receipt,
   Users,
@@ -33,23 +35,41 @@ import {
   type NotificationPortal,
 } from "@/lib/notification-links";
 
-type FilterKey = "ALL" | "TASK" | "APPOINTMENT" | "INVOICE" | "CONTRACT" | "SYSTEM";
+type FilterKey =
+  | "ALL"
+  | "MODERATION"
+  | "SUPPORT"
+  | "TASK"
+  | "APPOINTMENT"
+  | "INVOICE"
+  | "CONTRACT"
+  | "MESSAGE"
+  | "DISPUTE"
+  | "SYSTEM";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "ALL", label: "Tất cả" },
+  { key: "MODERATION", label: "Kiểm duyệt" },
+  { key: "SUPPORT", label: "Hỗ trợ" },
   { key: "TASK", label: "Công việc" },
   { key: "APPOINTMENT", label: "Lịch hẹn" },
   { key: "INVOICE", label: "Hoá đơn" },
   { key: "CONTRACT", label: "Hợp đồng" },
+  { key: "MESSAGE", label: "Tin nhắn" },
+  { key: "DISPUTE", label: "Tranh chấp" },
   { key: "SYSTEM", label: "Hệ thống" },
 ];
 
 function visualOf(type: NotificationType) {
   switch (type) {
+    case "POST_PENDING":
+      return { icon: ClipboardCheck, bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]", badge: "Chờ duyệt" };
     case "POST_REJECTED":
       return { icon: XCircle, bg: "bg-[#fbeae6]", text: "text-[#a4422c]", badge: "Bị từ chối" };
     case "POST_APPROVED":
       return { icon: CheckCircle2, bg: "bg-[#eaf2ed]", text: "text-[#15594f]", badge: "Đã duyệt" };
+    case "SUPPORT_TICKET":
+      return { icon: LifeBuoy, bg: "bg-[#e0f2fe]", text: "text-[#075985]", badge: "Hỗ trợ" };
     case "MESSAGE":
       return { icon: MessageSquare, bg: "bg-[#e0f2fe]", text: "text-[#075985]", badge: "Tin nhắn" };
     case "APPOINTMENT":
@@ -57,7 +77,10 @@ function visualOf(type: NotificationType) {
     case "INVOICE":
       return { icon: Receipt, bg: "bg-[#fef3c7]", text: "text-[#92400e]", badge: "Hoá đơn" };
     case "CONTRACT":
+    case "CONTRACT_TERMINATION":
       return { icon: FileText, bg: "bg-[#eaf2ed]", text: "text-[#15594f]", badge: "Hợp đồng" };
+    case "CONTRACT_RENEWAL":
+      return { icon: FileText, bg: "bg-[#eaf2ed]", text: "text-[#15594f]", badge: "Ký tiếp" };
     case "OCCUPANCY":
       return { icon: Users, bg: "bg-[#f2ede3]", text: "text-[#6b5a3e]", badge: "Số người ở" };
     case "TASK":
@@ -77,9 +100,18 @@ function visualOf(type: NotificationType) {
 
 function matchesFilter(item: Notification, filter: FilterKey) {
   if (filter === "ALL") return true;
-  if (filter === "TASK") return ["TASK", "OFFER", "REVIEW", "DISPUTE"].includes(item.type);
+  if (filter === "MODERATION") {
+    return ["POST_PENDING", "POST_APPROVED", "POST_REJECTED"].includes(item.type);
+  }
+  if (filter === "SUPPORT") return item.type === "SUPPORT_TICKET";
+  if (filter === "TASK") return ["TASK", "OFFER", "REVIEW"].includes(item.type);
+  if (filter === "CONTRACT") {
+    return ["CONTRACT", "CONTRACT_TERMINATION", "CONTRACT_RENEWAL"].includes(item.type);
+  }
+  if (filter === "DISPUTE") return item.type === "DISPUTE";
+  if (filter === "MESSAGE") return item.type === "MESSAGE";
   if (filter === "SYSTEM") {
-    return ["SYSTEM", "POST_APPROVED", "POST_REJECTED", "COMMISSION", "OCCUPANCY"].includes(item.type);
+    return ["SYSTEM", "COMMISSION", "OCCUPANCY"].includes(item.type);
   }
   return item.type === filter;
 }

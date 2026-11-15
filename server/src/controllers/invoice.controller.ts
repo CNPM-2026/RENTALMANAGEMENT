@@ -38,7 +38,13 @@ export const invoiceController = {
 
   getMyInvoices: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const result = await invoiceService.getMyInvoices(resourceOwnerId(req), req.user!.landlordId ? 'LANDLORD' : req.user!.role);
+      // `?scope=tenant` dành cho portal khách thuê: đọc hoá đơn của CHÍNH MÌNH
+      // dù tài khoản đồng thời là nhân viên của chủ trọ.
+      const tenantScope = req.query.scope === 'tenant' && req.user!.role === 'TENANT';
+      const result = await invoiceService.getMyInvoices(
+        tenantScope ? req.user!.id : resourceOwnerId(req),
+        tenantScope ? 'TENANT' : req.user!.landlordId ? 'LANDLORD' : req.user!.role,
+      );
       return res.status(200).json({
         success: true,
         message: 'Lấy danh sách hóa đơn thành công',

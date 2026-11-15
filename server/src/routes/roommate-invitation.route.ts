@@ -5,8 +5,11 @@ import { roommateInvitationController } from '../controllers/roommate-invitation
 import { roommateInvitationCreateSchema, roommateInvitationStatusSchema } from '../validations/resource.validation';
 
 const router = Router();
-router.use(authenticate, authorize('TENANT'));
-router.post('/', validate(roommateInvitationCreateSchema), roommateInvitationController.create);
+router.use(authenticate);
+// Trang `/tenant/roommate-invitations` là route dùng chung trong portal khách
+// thuê: mọi role được ĐỌC lời mời của chính mình (thường rỗng với role khác).
+// Tạo / phản hồi lời mời vẫn chỉ TENANT.
 router.get('/my', roommateInvitationController.getMine);
-router.patch('/:id/status', validate(roommateInvitationStatusSchema), roommateInvitationController.updateStatus);
+router.post('/', authorize('TENANT'), validate(roommateInvitationCreateSchema), roommateInvitationController.create);
+router.patch('/:id/status', authorize('TENANT'), validate(roommateInvitationStatusSchema), roommateInvitationController.updateStatus);
 export default router;

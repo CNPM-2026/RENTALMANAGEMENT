@@ -348,7 +348,7 @@ export default function RoommateDiscoveryPage() {
         if (!cancelled) setMyRoommatePost(null);
       });
 
-    void apiClient.contracts.getMyContracts()
+    void apiClient.contracts.getMyContracts("tenant")
       .then((contracts: Contract[]) => {
         if (cancelled) return;
         const seen = new Set<string>();

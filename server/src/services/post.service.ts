@@ -2,6 +2,7 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { PostType, Prisma } from '@prisma/client';
 import { storageService } from './storage.service';
+import { notificationService } from './notification.service';
 
 export const postService = {
   getById: async (postId: string, user?: { id: string; role: string }) => {
@@ -141,7 +142,22 @@ export const postService = {
       }
     }
 
-    // 3. Trả về post kèm ảnh
+    // 3. Báo cho admin có tin mới trong hàng đợi duyệt. Type riêng giúp UI
+    //    deep-link thẳng tới trang kiểm duyệt; lỗi thông báo không được làm
+    //    hỏng tin đăng vừa tạo.
+    await notificationService
+      .notifyAdmins(
+        {
+          title: 'Tin đăng mới chờ duyệt',
+          content: `Có tin "${post.title}" đang chờ Admin kiểm duyệt.`,
+          type: 'POST_PENDING',
+          referenceId: post.id,
+        },
+        (adminId) => `post:${post.id}:pending:${adminId}`,
+      )
+      .catch(() => undefined);
+
+    // 4. Trả về post kèm ảnh
     return await prisma.post.findUnique({
       where: { id: post.id },
       include: { images: true, room: true, property: true },

@@ -9,8 +9,8 @@ import { invalidateUserSockets } from '../socket/sessionInvalidation';
 
 /** Giá trị hợp lệ cho bộ lọc hàng đợi KYC; giá trị lạ bị BỎ QUA (không 500). */
 const KYC_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
-/** Chỉ các role này mới có hồ sơ KYC (TENANT/ADMIN nộp qua API cũ vẫn xem được khi không lọc). */
-const KYC_ROLES = ['LANDLORD', 'STAFF'] as const;
+/** Chỉ các role này mới có hồ sơ KYC (role khác nộp qua API cũ vẫn xem được khi không lọc). */
+const KYC_ROLES = ['TENANT', 'LANDLORD', 'STAFF'] as const;
 
 export const adminService = {
   // Lấy danh sách bài chờ duyệt
@@ -139,12 +139,13 @@ export const adminService = {
   },
 
   /**
-   * Hàng đợi KYC dùng CHUNG cho chủ trọ và thợ (một bảng `kyc_submissions`).
+   * Hàng đợi KYC dùng CHUNG cho khách thuê, chủ trọ và thợ (một bảng
+   * `kyc_submissions`).
    *
    * - `status`: lọc theo trạng thái (`PENDING` mặc định ở UI).
-   * - `role`: lọc theo role của người nộp. Không truyền = tất cả (giữ nguyên hành
-   *   vi cũ cho các màn hình admin hiện có).
-   * - Trả kèm `user.role` để admin phân biệt hồ sơ chủ trọ với hồ sơ thợ.
+   * - `role`: lọc theo role của người nộp. Không truyền = tất cả (giữ nguyên
+   *   hành vi cũ cho các màn hình admin hiện có).
+   * - Trả kèm `user.role` để admin phân biệt hồ sơ khách thuê/chủ trọ/thợ.
    */
   getKycSubmissions: async (status?: string, role?: string) => {
     const where: Prisma.KycSubmissionWhereInput = {};
@@ -162,18 +163,77 @@ export const adminService = {
     });
     return submissions.map((submission) => ({
       ...submission,
-      frontIdUrl: storageService.getPrivateImageUrl(submission.frontIdUrl),
-      backIdUrl: storageService.getPrivateImageUrl(submission.backIdUrl),
+      frontIdUrl: submission.frontIdUrl
+        ? storageService.getPrivateImageUrl(submission.frontIdUrl)
+        : null,
+      backIdUrl: submission.backIdUrl
+        ? storageService.getPrivateImageUrl(submission.backIdUrl)
+        : null,
     }));
   },
 
   updateKyc: async (adminId: string, id: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
-    const submission = await prisma.kycSubmission.findUnique({ where: { id }, select: { id: true, userId: true } });
-    if (!submission) throw new AppError('Không tìm thấy hồ sơ KYC', 404);
-    const updated = await prisma.kycSubmission.update({
+    const submission = await prisma.kycSubmission.findUnique({
       where: { id },
-      data: { status, rejectionReason: status === 'REJECTED' ? rejectionReason : null, reviewedById: adminId, reviewedAt: new Date() },
+      select: { id: true, userId: true, status: true, frontIdUrl: true, backIdUrl: true },
     });
+    if (!submission) throw new AppError('Không tìm thấy hồ sơ KYC', 404);
+
+    // Quyết định KYC là cuối cùng và chỉ áp dụng cho hồ sơ đang chờ. Điều kiện
+    // này chặn việc admin thứ hai duyệt lại/đổi kết quả một hồ sơ đã xử lý.
+    if (submission.status !== 'PENDING') {
+      throw new AppError(
+        'Hồ sơ KYC đã được xử lý, không thể đổi kết quả.',
+        409,
+        'KYC_ALREADY_REVIEWED',
+      );
+    }
+
+    const claimed = await prisma.kycSubmission.updateMany({
+      where: { id, status: 'PENDING' },
+      data: {
+        status,
+        rejectionReason: status === 'REJECTED' ? rejectionReason : null,
+        reviewedById: adminId,
+        reviewedAt: new Date(),
+      },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError(
+        'Hồ sơ KYC vừa được xử lý bởi quản trị viên khác.',
+        409,
+        'KYC_ALREADY_REVIEWED',
+      );
+    }
+    let updated = await prisma.kycSubmission.findUniqueOrThrow({ where: { id } });
+
+    if (status === 'APPROVED') {
+      // Giữ ref cho tới khi Cloudinary xác nhận đã xoá. Nhờ vậy nếu xoá lỗi
+      // (hoặc process dừng giữa chừng), hồ sơ vẫn còn `frontIdUrl`/`backIdUrl`
+      // để script `db:kyc:purge-approved` thử lại — không tạo orphan âm thầm.
+      const assets = [submission.frontIdUrl, submission.backIdUrl]
+        .filter((asset): asset is string => Boolean(asset));
+      const deleted = await Promise.all(
+        assets.map(async (asset) => {
+          try {
+            await storageService.deleteImage(asset, 'authenticated');
+            return true;
+          } catch (error) {
+            console.error(`[kyc] Không xoá được ảnh ${asset}:`, error);
+            return false;
+          }
+        }),
+      );
+
+      if (deleted.every(Boolean)) {
+        await prisma.kycSubmission.updateMany({
+          where: { id, status: 'APPROVED' },
+          data: { frontIdUrl: null, backIdUrl: null },
+        });
+        updated = await prisma.kycSubmission.findUniqueOrThrow({ where: { id } });
+      }
+    }
+
     await auditService.record({ userId: adminId, action: `KYC_${status}`, entityType: 'KycSubmission', entityId: id });
     return updated;
   },

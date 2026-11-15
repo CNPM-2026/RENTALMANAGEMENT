@@ -7,10 +7,17 @@ import { rentalRequestService } from '../services/rental-request.service';
  * quản lý phải chạy trên dữ liệu của CHỦ TRỌ đó và dưới danh nghĩa LANDLORD —
  * `resourceOwnerId` là nguồn duy nhất suy ra id này (không đọc từ client).
  */
-const scope = (req: AuthRequest) => ({
-  userId: resourceOwnerId(req),
-  role: req.user!.landlordId ? 'LANDLORD' : req.user!.role,
-});
+const scope = (req: AuthRequest) => {
+  // `?scope=tenant` do portal khách thuê gửi: luôn đọc yêu cầu của CHÍNH MÌNH,
+  // kể cả khi tài khoản cũng là nhân viên của một chủ trọ.
+  if (req.query.scope === 'tenant' && req.user!.role === 'TENANT') {
+    return { userId: req.user!.id, role: 'TENANT' };
+  }
+  return {
+    userId: resourceOwnerId(req),
+    role: req.user!.landlordId ? 'LANDLORD' : req.user!.role,
+  };
+};
 
 export const rentalRequestController = {
   create: async (req: AuthRequest, res: Response, next: NextFunction) => {

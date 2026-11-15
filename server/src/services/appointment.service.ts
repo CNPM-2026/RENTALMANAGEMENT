@@ -110,7 +110,11 @@ export const appointmentService = {
     } else if (role === 'LANDLORD') {
       whereClause = { landlordId: userId };
     } else {
-      throw new AppError('Role không được phép xem lịch hẹn cá nhân', 403);
+      // `/tenant/appointments` là route dùng chung: ADMIN (hoặc STAFF không có
+      // membership) mở được trang nhưng không có "lịch hẹn cá nhân" ⇒ trả rỗng
+      // thay vì 403. Nhân viên có membership đã được controller đổi role thành
+      // LANDLORD và scope theo chủ trọ.
+      whereClause = { tenantId: userId };
     }
 
     return await prisma.appointment.findMany({

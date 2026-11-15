@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
 import { Contract } from "@/types/models";
 
 export default function CreateSupportTicketPage() {
@@ -35,7 +36,11 @@ export default function CreateSupportTicketPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   React.useEffect(() => {
-    apiClient.contracts.getMyContracts().then(setContracts).catch(() => setContracts([]));
+    // Điền sẵn số điện thoại đã khai trong hồ sơ; người dùng vẫn sửa được nếu
+    // muốn kỹ thuật viên liên hệ qua số khác.
+    const user = getCurrentUser();
+    if (user?.phone) queueMicrotask(() => setContactPhone(user.phone ?? ""));
+    apiClient.contracts.getMyContracts("tenant").then(setContracts).catch(() => setContracts([]));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

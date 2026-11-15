@@ -97,8 +97,8 @@ export default function TenantProfilePage() {
 
         const [favorites, appointments, contracts] = await Promise.all([
           apiClient.favorites.getMyFavorites(),
-          apiClient.appointments.getMyAppointments(),
-          apiClient.contracts.getMyContracts(),
+          apiClient.appointments.getMyAppointments("tenant"),
+          apiClient.contracts.getMyContracts("tenant"),
         ]);
         setActivityCounts({
           favorites: favorites.length,

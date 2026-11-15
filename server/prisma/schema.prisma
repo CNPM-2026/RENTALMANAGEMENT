@@ -267,6 +267,10 @@ enum NotificationType {
   // 🆕 Chấm dứt / gia hạn hợp đồng — gửi cho các bên và Admin duyệt.
   CONTRACT_TERMINATION
   CONTRACT_RENEWAL
+  // 🆕 Hàng đợi Admin: tin đăng mới chờ duyệt và phiếu hỗ trợ mới.
+  // Tách khỏi SYSTEM để UI deep-link đúng màn hình xử lý.
+  POST_PENDING
+  SUPPORT_TICKET
 }
 
 // 🆕 Enum cho đối tượng được đánh giá
@@ -501,8 +505,11 @@ model KycSubmission {
   userId           String    @unique @map("user_id")
   idNumber         String    @map("id_number")
   permanentAddress String    @map("permanent_address")
-  frontIdUrl       String    @map("front_id_url")
-  backIdUrl        String    @map("back_id_url")
+  // Ảnh CCCD chỉ cần trong lúc chờ duyệt. Khi hồ sơ được APPROVED, ảnh được xoá
+  // khỏi Cloudinary và hai cột này được đặt NULL (giữ lại idNumber/địa chỉ để
+  // đối soát lịch sử, nhưng không giữ ảnh giấy tờ sau khi đã xác thực).
+  frontIdUrl       String?   @map("front_id_url")
+  backIdUrl        String?   @map("back_id_url")
   status           KycStatus @default(PENDING)
   rejectionReason  String?   @map("rejection_reason")
   reviewedById     String?   @map("reviewed_by_id")

@@ -198,8 +198,17 @@ export const authorizeStaffOr = (permission: string, ...roles: string[]): Reques
   return (req, res, next) => {
     const authReq = req as AuthRequest;
     const user = authReq.user;
+    // Tài khoản TENANT có thể đồng thời là nhân viên của một chủ trọ. Khi portal
+    // khách thuê gửi `?scope=tenant`, họ được đọc dữ liệu CỦA CHÍNH MÌNH bằng
+    // role gốc, kể cả khi không có quyền tương ứng của nhân viên. Không có scope
+    // này thì giữ nguyên luật cũ: thiếu quyền nhân viên ⇒ 403.
+    const isTenantSelfScope =
+      !!user && user.role === 'TENANT' && req.query.scope === 'tenant' && roles.includes('TENANT');
     const isRegularRole = !!user && !user.landlordId && roles.includes(user.role);
-    if (!user || (!isRegularRole && user.role !== 'LANDLORD' && !user.staffPermissions?.includes(permission))) {
+    if (
+      !user
+      || (!isRegularRole && !isTenantSelfScope && user.role !== 'LANDLORD' && !user.staffPermissions?.includes(permission))
+    ) {
       return next(new AppError('Bạn không có quyền thực hiện hành động này', 403));
     }
     next();

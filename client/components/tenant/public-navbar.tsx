@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { translateRole } from "@/lib/labels";
+import { apiClient } from "@/lib/api";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
 
@@ -45,6 +46,24 @@ export function PublicNavbar({
   const currentPath = pathname ?? "";
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = React.useState(false);
+  const [hasLandlordWorkspace, setHasLandlordWorkspace] = React.useState(false);
+
+  // Tài khoản TENANT có thể đồng thời là nhân viên được chủ trọ cấp quyền. Khi
+  // đó phải có lối vào `/landlord/*`, nếu không các chức năng đã cấp sẽ "vô hình"
+  // dù server cho phép truy cập.
+  React.useEffect(() => {
+    if (!currentUser || currentUser.role !== "TENANT") return;
+    let active = true;
+    apiClient.staff
+      .getMyMembership()
+      .then((membership) => {
+        if (active) setHasLandlordWorkspace(Boolean(membership));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
 
   const navLinks = [
     { label: "Trang chủ", href: "/", icon: Home },
@@ -172,14 +191,25 @@ export function PublicNavbar({
                       <span>Không gian cá nhân</span>
                     </Link>
 
-                    {currentUser.role === "LANDLORD" && (
+                    {(currentUser.role === "LANDLORD" || hasLandlordWorkspace) && (
                       <Link
                         href="/landlord/dashboard"
                         onClick={() => setProfileDropdownOpen(false)}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
                       >
                         <Home className="size-4" />
-                        <span>Không gian chủ trọ</span>
+                        <span>{currentUser.role === "LANDLORD" ? "Không gian chủ trọ" : "Không gian được phân quyền"}</span>
+                      </Link>
+                    )}
+
+                    {currentUser.role === "TENANT" && (
+                      <Link
+                        href="/tenant/kyc"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[#203c37] hover:bg-[#f7f6f2]"
+                      >
+                        <ShieldCheck className="size-4 text-[#74817b]" />
+                        <span>Xác thực KYC</span>
                       </Link>
                     )}
 

@@ -24,7 +24,13 @@ export const maintenanceController = {
   },
   getMine: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const data = await maintenanceService.getMine(resourceOwnerId(req), scopeRole(req));
+      // Portal khách thuê gửi `?scope=tenant` để luôn đọc sự cố do CHÍNH MÌNH
+      // báo, kể cả khi tài khoản đồng thời là nhân viên của một chủ trọ.
+      const tenantScope = req.query.scope === 'tenant' && req.user!.role === 'TENANT';
+      const data = await maintenanceService.getMine(
+        tenantScope ? req.user!.id : resourceOwnerId(req),
+        tenantScope ? 'TENANT' : scopeRole(req),
+      );
       return res.json({ success: true, data });
     } catch (error) {
       return next(error);
@@ -32,9 +38,12 @@ export const maintenanceController = {
   },
   getById: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // Cùng quy ước `?scope=tenant` như danh sách: tenant có membership vẫn xem
+      // được chi tiết sự cố do chính mình báo.
+      const tenantScope = req.query.scope === 'tenant' && req.user!.role === 'TENANT';
       const data = await maintenanceService.getById(
-        resourceOwnerId(req),
-        scopeRole(req),
+        tenantScope ? req.user!.id : resourceOwnerId(req),
+        tenantScope ? 'TENANT' : scopeRole(req),
         String(req.params.id),
       );
       return res.json({ success: true, data });

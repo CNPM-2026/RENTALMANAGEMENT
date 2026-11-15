@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { notificationService } from './notification.service';
 
 export const supportService = {
   create: async (userId: string, data: {
@@ -16,7 +17,23 @@ export const supportService = {
       });
       if (!room) throw new AppError('Bạn không có hợp đồng thuê đang hoạt động ở phòng này', 403);
     }
-    return prisma.supportTicket.create({ data: { ...data, userId } });
+    const ticket = await prisma.supportTicket.create({ data: { ...data, userId } });
+
+    // Admin theo dõi hàng đợi hỗ trợ; type riêng giúp deep-link đúng ticket.
+    // Lỗi thông báo không được làm hỏng ticket.
+    await notificationService
+      .notifyAdmins(
+        {
+          title: 'Yêu cầu hỗ trợ mới',
+          content: `Có phiếu hỗ trợ mới: "${ticket.subject}".`,
+          type: 'SUPPORT_TICKET',
+          referenceId: ticket.id,
+        },
+        (adminId) => `support:${ticket.id}:created:${adminId}`,
+      )
+      .catch(() => undefined);
+
+    return ticket;
   },
 
   getMine: (userId: string) => prisma.supportTicket.findMany({
