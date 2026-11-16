@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, Building2, MapPin, DoorOpen, Edit, Search, Sparkles, Check, X } from "lucide-react";
+import { Plus, Building2, MapPin, DoorOpen, Edit, Search, Sparkles, Check } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Property, Amenity } from "@/types/models";
 import { Modal } from "@/components/ui/modal";

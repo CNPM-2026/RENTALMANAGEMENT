@@ -59,32 +59,27 @@ function RoomDetailContent() {
       try {
         const roomData = await apiClient.rooms.getById(roomId);
         if (roomData) {
+          const prop = roomData.property;
           const fallbackPost: Post = {
             id: roomData.id,
-            authorId: (roomData.property as any)?.landlordId ?? "",
+            authorId: prop?.landlordId ?? "",
             propertyId: roomData.propertyId,
             roomId: roomData.id,
-            title: `Phòng ${roomData.roomNumber} - ${(roomData.property as any)?.name ?? "Phòng cho thuê"}`,
-            description: (roomData.property as any)?.description ?? "Phòng trọ đầy đủ tiện nghi, an ninh đảm bảo.",
+            title: `Phòng ${roomData.roomNumber} - ${prop?.name ?? "Phòng cho thuê"}`,
+            description: prop?.description ?? "Phòng trọ đầy đủ tiện nghi, an ninh đảm bảo.",
             price: roomData.priceMonthly,
             postType: "RENT_OUT",
             status: "APPROVED",
             viewCount: 0,
             createdAt: roomData.createdAt,
             updatedAt: roomData.createdAt,
-            author: (roomData.property as any)?.landlord,
-            property: roomData.property,
+            author: prop?.landlord,
+            property: prop,
             room: roomData,
-            images: ((roomData as any).posts?.[0]?.images ?? []).map((img: any) => ({
-              id: img.id,
-              postId: roomData.id,
-              imageUrl: img.imageUrl,
-              isPrimary: img.isPrimary ?? false,
-            })),
+            images: [],
           };
           setPost(fallbackPost);
-          const imgs = fallbackPost.images?.map((img) => img.imageUrl) ?? [];
-          setRoomImages(imgs.length > 0 ? imgs : ["/images/default-room.svg"]);
+          setRoomImages(["/images/default-room.svg"]);
         }
       } catch {
         setPost(null);
