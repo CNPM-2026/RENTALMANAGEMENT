@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { propertyController } from '../controllers/property.controller';
 import { authenticate, authorizeStaff } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { propertySchema } from '../validations/resource.validation';
+import { propertySchema, propertyUpdateSchema } from '../validations/resource.validation';
 
 const router = Router();
 
@@ -13,5 +13,7 @@ router.use(authenticate, authorizeStaff('PROPERTIES_ROOMS'));
 
 router.post('/', validate(propertySchema), propertyController.create);
 router.get('/my', propertyController.getMyProperties);
+router.get('/:id', propertyController.getById);
+router.put('/:id', validate(propertyUpdateSchema), propertyController.update);
 
 export default router;

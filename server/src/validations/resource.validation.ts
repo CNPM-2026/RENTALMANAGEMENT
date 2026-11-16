@@ -29,7 +29,10 @@ export const propertySchema = z.object({
   rules: z.string().max(5000).optional(),
   latitude: strictNumber('Vĩ độ không hợp lệ').pipe(z.number().min(-90).max(90)).optional(),
   longitude: strictNumber('Kinh độ không hợp lệ').pipe(z.number().min(-180).max(180)).optional(),
+  amenityIds: z.array(uuid).max(50).optional(),
 });
+
+export const propertyUpdateSchema = propertySchema.partial();
 
 export const roomSchema = z.object({
   propertyId: uuid,

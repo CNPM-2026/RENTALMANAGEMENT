@@ -504,6 +504,10 @@ export const apiClient = {
   properties: {
     create: (payload: CreatePropertyPayload) =>
       apiClient.post<Property>('/properties', payload),
+    update: (id: string, payload: Partial<CreatePropertyPayload>) =>
+      apiClient.put<Property>(`/properties/${id}`, payload),
+    getById: (id: string) =>
+      apiClient.get<Property>(`/properties/${id}`),
     getMyProperties: () =>
       apiClient.get<Property[]>('/properties/my'),
   },
@@ -515,6 +519,8 @@ export const apiClient = {
     /** 🆕 Sửa phòng: giá điện/nước/sức chứa... (server kiểm tra quyền sở hữu). */
     update: (id: string, payload: UpdateRoomPayload) =>
       apiClient.patch<Room>(`/rooms/${id}`, payload),
+    getById: (id: string) =>
+      apiClient.get<Room>(`/rooms/${id}`, undefined, { skipAuth: true }),
     getByProperty: (propertyId: string) =>
       apiClient.get<Room[]>(`/rooms/property/${propertyId}`),
     delete: (id: string) =>

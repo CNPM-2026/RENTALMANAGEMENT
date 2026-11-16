@@ -207,9 +207,16 @@ export interface Property {
   landlord?: Partial<User>;
   rooms?: Room[];
   images?: PropertyImage[];
+  propertyAmenities?: PropertyAmenity[];
   _count?: {
     rooms: number;
   };
+}
+
+export interface PropertyAmenity {
+  propertyId: string;
+  amenityId: string;
+  amenity?: Amenity;
 }
 
 export interface Amenity {
@@ -1290,7 +1297,10 @@ export interface CreatePropertyPayload {
   rules?: string;
   latitude?: number;
   longitude?: number;
+  amenityIds?: string[];
 }
+
+export type UpdatePropertyPayload = Partial<CreatePropertyPayload>;
 
 // --- Room Endpoints ---
 export interface CreateRoomPayload {

@@ -3,9 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Sparkles, Check } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { CreatePropertyPayload } from "@/types/models";
+import { CreatePropertyPayload, Amenity } from "@/types/models";
 import { AddressFields } from "@/components/address/address-fields";
 
 const initialForm: CreatePropertyPayload = {
@@ -23,6 +23,21 @@ export default function NewLandlordPropertyPage() {
   const [form, setForm] = React.useState(initialForm);
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [amenities, setAmenities] = React.useState<Amenity[]>([]);
+  const [selectedAmenityIds, setSelectedAmenityIds] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    apiClient.rooms
+      .getAllAmenities()
+      .then((data) => setAmenities(data ?? []))
+      .catch(() => setAmenities([]));
+  }, []);
+
+  const toggleAmenity = (id: string) => {
+    setSelectedAmenityIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   const updateField = (field: keyof CreatePropertyPayload, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -43,6 +58,7 @@ export default function NewLandlordPropertyPage() {
         ward: form.ward.trim(),
         description: form.description?.trim() || undefined,
         rules: form.rules?.trim() || undefined,
+        amenityIds: selectedAmenityIds,
       });
       router.push("/landlord/properties");
     } catch (requestError) {
@@ -116,6 +132,43 @@ export default function NewLandlordPropertyPage() {
               className={`${inputClassName} resize-y`}
             />
           </label>
+
+          {/* Tiện ích chung của tòa nhà */}
+          <div className="space-y-2 sm:col-span-2 pt-2 border-t border-[#e2e7e1]">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-[#15594f]" />
+              <span className="text-[14px] font-semibold text-[#203c37]">Tiện ích chung của tòa nhà / khu trọ</span>
+            </div>
+            <p className="text-[12px] text-[#74817b]">
+              Chọn các tiện ích dùng chung trong tòa nhà mà khách thuê phòng sẽ được hưởng.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 pt-2">
+              {amenities.map((amenity) => {
+                const isSelected = selectedAmenityIds.includes(amenity.id);
+                return (
+                  <button
+                    key={amenity.id}
+                    type="button"
+                    onClick={() => toggleAmenity(amenity.id)}
+                    className={`flex items-center gap-2 p-2.5 rounded-[8px] border text-left text-[13px] transition-all cursor-pointer ${
+                      isSelected
+                        ? "border-[#15594f] bg-[#eaf2ed] text-[#15594f] font-semibold shadow-xs"
+                        : "border-[#e2e7e1] bg-white text-[#203c37] hover:border-[#15594f]/50 hover:bg-[#f7f6f2]"
+                    }`}
+                  >
+                    <div
+                      className={`size-4 rounded flex items-center justify-center border transition-colors ${
+                        isSelected ? "bg-[#15594f] border-[#15594f] text-white" : "border-[#74817b]/40 bg-white"
+                      }`}
+                    >
+                      {isSelected && <Check className="size-3" />}
+                    </div>
+                    <span className="truncate">{amenity.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 border-t border-[#e2e7e1] pt-5">

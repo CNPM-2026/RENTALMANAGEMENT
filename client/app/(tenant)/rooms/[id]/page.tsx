@@ -54,7 +54,37 @@ function RoomDetailContent() {
       setPost(value);
       setRoomImages(value.images?.map((image) => image.imageUrl) ?? []);
       void apiClient.reviews.getByTarget("POST", value.id).then(setReviewSummary).catch(() => setReviewSummary(null));
-    }).catch(() => setPost(null));
+    }).catch(async () => {
+      // Fallback: Nếu roomId là ID của Room (khi chủ trọ xem phòng trực tiếp)
+      try {
+        const roomData = await apiClient.rooms.getById(roomId);
+        if (roomData) {
+          const prop = roomData.property;
+          const fallbackPost: Post = {
+            id: roomData.id,
+            authorId: prop?.landlordId ?? "",
+            propertyId: roomData.propertyId,
+            roomId: roomData.id,
+            title: `Phòng ${roomData.roomNumber} - ${prop?.name ?? "Phòng cho thuê"}`,
+            description: prop?.description ?? "Phòng trọ đầy đủ tiện nghi, an ninh đảm bảo.",
+            price: roomData.priceMonthly,
+            postType: "RENT_OUT",
+            status: "APPROVED",
+            viewCount: 0,
+            createdAt: roomData.createdAt,
+            updatedAt: roomData.createdAt,
+            author: prop?.landlord,
+            property: prop,
+            room: roomData,
+            images: [],
+          };
+          setPost(fallbackPost);
+          setRoomImages(["/images/default-room.svg"]);
+        }
+      } catch {
+        setPost(null);
+      }
+    });
   }, [roomId]);
 
   React.useEffect(() => {
@@ -185,7 +215,7 @@ function RoomDetailContent() {
               ĐÃ XÁC MINH PHÁP LÝ & VỊ TRÍ THỰC TẾ
             </Badge>
             <span className="text-[12px] text-[#74817b]">
-              Cập nhật lần cuối: 2 ngày trước • Mã phòng: <strong className="text-[#203c37]">BM-302</strong>
+              Cập nhật lần cuối: {post?.updatedAt ? new Date(post.updatedAt).toLocaleDateString("vi-VN") : "Hôm nay"} • Mã phòng: <strong className="text-[#203c37]">{post?.room?.roomNumber ? `P.${post.room.roomNumber}` : post?.id ? post.id.slice(0, 8).toUpperCase() : "BM-302"}</strong>
             </span>
           </div>
         </div>
@@ -269,7 +299,9 @@ function RoomDetailContent() {
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
                   Diện tích
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">28 m²</p>
+                <p className="text-lg font-bold text-[#203c37]">
+                  {post?.room?.area ? `${post.room.area} m²` : "Chưa cập nhật"}
+                </p>
               </div>
 
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
@@ -277,7 +309,9 @@ function RoomDetailContent() {
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
                   Sức chứa tối đa
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">2 người</p>
+                <p className="text-lg font-bold text-[#203c37]">
+                  {post?.room?.maxOccupants ? `${post.room.maxOccupants} người` : "Chưa cập nhật"}
+                </p>
               </div>
 
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
@@ -285,7 +319,13 @@ function RoomDetailContent() {
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
                   Loại giường
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">Giường đôi 1m6</p>
+                <p className="text-lg font-bold text-[#203c37]">
+                  {post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("giường đôi"))
+                    ? "Giường đôi"
+                    : post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("giường"))
+                    ? "Giường đơn"
+                    : "Tiêu chuẩn"}
+                </p>
               </div>
 
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
@@ -293,7 +333,11 @@ function RoomDetailContent() {
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
                   Hướng ban công
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">Đông đón nắng</p>
+                <p className="text-lg font-bold text-[#203c37]">
+                  {post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("ban công"))
+                    ? "Có ban công thoáng"
+                    : "Đón gió thoáng mát"}
+                </p>
               </div>
             </div>
 
@@ -319,12 +363,16 @@ function RoomDetailContent() {
                     Trong phòng riêng
                   </h3>
                   <div className="space-y-2 text-[#203c37]">
-                    {(post?.room?.roomAmenities ?? []).map((item) => (
-                      <div key={`${item.roomId}-${item.amenityId}`} className="flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
-                        <span>{item.amenity?.name}</span>
-                      </div>
-                    ))}
+                    {(post?.room?.roomAmenities ?? []).length > 0 ? (
+                      (post?.room?.roomAmenities ?? []).map((item) => (
+                        <div key={`${item.roomId}-${item.amenityId}`} className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
+                          <span>{item.amenity?.name}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[#74817b]">Chưa cập nhật tiện ích trong phòng.</p>
+                    )}
                   </div>
                 </div>
 
@@ -334,7 +382,16 @@ function RoomDetailContent() {
                     Tiện ích chung tòa nhà
                   </h3>
                   <div className="space-y-2 text-[#203c37]">
-                    <p className="text-[#74817b]">Chưa cập nhật tiện ích chung.</p>
+                    {post?.property?.propertyAmenities && post.property.propertyAmenities.length > 0 ? (
+                      post.property.propertyAmenities.map((item) => (
+                        <div key={`${item.propertyId}-${item.amenityId}`} className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
+                          <span>{item.amenity?.name}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[#74817b]">Chưa cập nhật tiện ích chung tòa nhà.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -576,60 +633,72 @@ function RoomDetailContent() {
           4. PHOTO GALLERY MODAL LIGHTBOX
       ======================================================================== */}
       {galleryOpen && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4">
-          <button
-            onClick={() => setGalleryOpen(false)}
-            className="absolute top-6 right-6 text-white hover:text-gray-300 p-2 cursor-pointer z-50"
-            aria-label="Đóng thư viện ảnh"
-          >
-            <X className="size-7" />
-          </button>
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
+          {/* Top Bar with counter & close button */}
+          <div className="absolute top-4 inset-x-4 flex items-center justify-between z-50 text-white max-w-7xl mx-auto px-4">
+            <div className="px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold">
+              Ảnh {activeImageIndex + 1} / {ROOM_IMAGES.length}
+            </div>
+            <button
+              onClick={() => setGalleryOpen(false)}
+              className="size-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer"
+              aria-label="Đóng thư viện ảnh"
+            >
+              <X className="size-6" />
+            </button>
+          </div>
 
-          <div className="relative max-w-4xl max-h-[80vh] flex items-center justify-center">
-            <Image
+          {/* Main Large Image Container */}
+          <div className="relative w-full max-w-7xl h-[76vh] sm:h-[82vh] flex items-center justify-center px-4 sm:px-14">
+            <img
               src={ROOM_IMAGES[activeImageIndex] ?? ROOM_IMAGES[0]}
               alt={`Ảnh chi tiết ${activeImageIndex + 1}`}
-              width={1600}
-              height={1200}
-              sizes="(max-width: 1024px) 100vw, 80vw"
-              className="w-auto h-auto max-w-full max-h-[75vh] object-contain rounded-[8px]"
+              className="max-w-full max-h-full w-auto h-auto object-contain rounded-[12px] shadow-2xl transition-all duration-200 select-none"
             />
 
             {/* Prev Button */}
-            <button
-              onClick={() =>
-                setActiveImageIndex((i) => (i === 0 ? ROOM_IMAGES.length - 1 : i - 1))
-              }
-              className="absolute left-2 top-1/2 -translate-y-1/2 size-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center cursor-pointer"
-              aria-label="Ảnh trước"
-            >
-              <ChevronLeft className="size-6" />
-            </button>
+            {ROOM_IMAGES.length > 1 && (
+              <button
+                onClick={() =>
+                  setActiveImageIndex((i) => (i === 0 ? ROOM_IMAGES.length - 1 : i - 1))
+                }
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 size-12 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer transition-all shadow-lg"
+                aria-label="Ảnh trước"
+              >
+                <ChevronLeft className="size-7" />
+              </button>
+            )}
 
             {/* Next Button */}
-            <button
-              onClick={() =>
-                setActiveImageIndex((i) => (i === ROOM_IMAGES.length - 1 ? 0 : i + 1))
-              }
-              className="absolute right-2 top-1/2 -translate-y-1/2 size-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center cursor-pointer"
-              aria-label="Ảnh kế tiếp"
-            >
-              <ChevronRight className="size-6" />
-            </button>
+            {ROOM_IMAGES.length > 1 && (
+              <button
+                onClick={() =>
+                  setActiveImageIndex((i) => (i === ROOM_IMAGES.length - 1 ? 0 : i + 1))
+                }
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 size-12 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer transition-all shadow-lg"
+                aria-label="Ảnh kế tiếp"
+              >
+                <ChevronRight className="size-7" />
+              </button>
+            )}
           </div>
 
-          {/* Dots Indicator */}
-          <div className="flex items-center gap-2 mt-4">
-            {ROOM_IMAGES.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveImageIndex(idx)}
-                className={`size-2.5 rounded-full transition-all cursor-pointer ${
-                  activeImageIndex === idx ? "bg-white w-6" : "bg-white/40"
-                }`}
-              />
-            ))}
-          </div>
+          {/* Thumbnail Preview Strip */}
+          {ROOM_IMAGES.length > 1 && (
+            <div className="flex items-center gap-2 mt-3 max-w-3xl overflow-x-auto py-1 px-4">
+              {ROOM_IMAGES.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`relative size-14 shrink-0 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                    activeImageIndex === idx ? "border-[#15594f] scale-105" : "border-transparent opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

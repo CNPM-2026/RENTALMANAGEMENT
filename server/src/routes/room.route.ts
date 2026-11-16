@@ -8,6 +8,7 @@ const router = Router();
 
 // API lấy tiện ích có thể public, nhưng để trong này cũng được
 router.get('/amenities', roomController.getAmenities);
+router.get('/:id', roomController.getById);
 
 // Các API dưới đây yêu cầu quyền LANDLORD
 router.use(authenticate, authorizeStaff('PROPERTIES_ROOMS'));

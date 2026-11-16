@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { translateRole } from "@/lib/labels";
 import { AdminStatsResponse } from "@/types/models";
@@ -38,10 +39,10 @@ export default function AdminDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Người dùng" value={value(overview?.totalUsers)} />
-        <KpiCard label="Tin đăng" value={value(overview?.totalPosts)} />
+        <KpiCard label="Người dùng" value={value(overview?.totalUsers)} href="/admin/users" />
+        <KpiCard label="Tin đăng" value={value(overview?.totalPosts)} href="/admin/moderation/listings" />
         <KpiCard label="Lịch xem phòng" value={value(overview?.totalAppointments)} />
-        <KpiCard label="Tin chờ kiểm duyệt" value={value(overview?.pendingPosts)} accent />
+        <KpiCard label="Tin chờ kiểm duyệt" value={value(overview?.pendingPosts)} href="/admin/moderation/listings" accent />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -63,8 +64,8 @@ export default function AdminDashboardPage() {
         <section className="rounded-[12px] border border-[#e2e7e1] bg-white p-6 shadow-sm">
           <h2 className="text-[17px] font-semibold text-[#203c37]">Ưu tiên xử lý hôm nay</h2>
           <div className="mt-5 space-y-3">
-            <PriorityRow label="Tin chờ kiểm duyệt" value={overview?.pendingPosts} loading={isLoading} />
-            <PriorityRow label="Báo cáo vi phạm" value={overview?.pendingReports} loading={isLoading} />
+            <PriorityRow label="Tin chờ kiểm duyệt" value={overview?.pendingPosts} loading={isLoading} href="/admin/moderation/listings" />
+            <PriorityRow label="Báo cáo vi phạm" value={overview?.pendingReports} loading={isLoading} href="/admin/reports" />
           </div>
         </section>
       </div>
@@ -72,22 +73,26 @@ export default function AdminDashboardPage() {
   );
 }
 
-function KpiCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-sm">
+function KpiCard({ label, value, accent, href }: { label: string; value: string; accent?: boolean; href?: string }) {
+  const content = (
+    <div className={`rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-sm transition-all ${href ? "hover:border-[#15594f] hover:shadow-md cursor-pointer" : ""}`}>
       <p className="text-[13px] text-[#74817b]">{label}</p>
       <p className={`mt-2 text-[24px] font-semibold ${accent ? "text-[#9a6a12]" : "text-[#203c37]"}`}>{value}</p>
     </div>
   );
+
+  return href ? <Link href={href} className="block">{content}</Link> : content;
 }
 
-function PriorityRow({ label, value, loading }: { label: string; value: number | undefined; loading: boolean }) {
-  return (
-    <div className="flex items-center justify-between rounded-[8px] bg-[#f7f6f2] px-4 py-3">
-      <span className="text-[14px] text-[#203c37]">{label}</span>
+function PriorityRow({ label, value, loading, href }: { label: string; value: number | undefined; loading: boolean; href?: string }) {
+  const content = (
+    <div className={`flex items-center justify-between rounded-[8px] bg-[#f7f6f2] px-4 py-3 transition-colors ${href ? "hover:bg-[#eaf2ed] cursor-pointer" : ""}`}>
+      <span className="text-[14px] text-[#203c37] font-medium">{label}</span>
       <span className="rounded-full bg-[#fbf1dc] px-2.5 py-0.5 text-[13px] font-semibold text-[#9a6a12]">
         {loading ? "..." : formatNumber(value ?? 0)}
       </span>
     </div>
   );
+
+  return href ? <Link href={href} className="block">{content}</Link> : content;
 }
