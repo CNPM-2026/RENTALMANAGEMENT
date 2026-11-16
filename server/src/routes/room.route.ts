@@ -6,8 +6,9 @@ import { roomSchema } from '../validations/resource.validation';
 
 const router = Router();
 
-// API lấy tiện ích có thể public, nhưng để trong này cũng được
+// Public endpoints
 router.get('/amenities', roomController.getAmenities);
+router.get('/:id', roomController.getById);
 
 // Các API dưới đây yêu cầu quyền LANDLORD
 router.use(authenticate, authorize('LANDLORD'));

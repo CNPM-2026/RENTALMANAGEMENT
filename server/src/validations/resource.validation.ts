@@ -13,6 +13,7 @@ export const propertySchema = z.object({
   rules: z.string().max(5000).optional(),
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
+  amenityIds: z.array(uuid).max(50).optional(),
 });
 
 export const roomSchema = z.object({

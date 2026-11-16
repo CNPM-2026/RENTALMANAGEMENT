@@ -11,19 +11,24 @@ const router = Router();
 router.get('/', postController.getApprovedPosts);
 router.get('/search', validate(searchPostSchema, 'query'), postController.search);
 router.get('/my-posts', authenticate, postController.getMyPosts);
+router.get('/:id', postController.getById);
+
 router.post(
   '/', 
   authenticate, 
   upload.array('images', 10), 
-  validate(postWriteSchema),
+  validate(postWriteSchema), 
   postController.create
 );
+
 router.put(
   '/:id', 
   authenticate, 
   upload.array('images', 10), 
-  validate(postWriteSchema.partial()),
+  validate(postWriteSchema.partial()), 
   postController.update
 );
+
 router.delete('/:id', authenticate, postController.delete);
+
 export default router;

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { AdminStatsResponse, Role } from "@/types/models";
 
@@ -47,7 +48,9 @@ export default function AdminDashboardPage() {
         <KpiCard label="Người dùng" value={value(overview?.totalUsers)} />
         <KpiCard label="Tin đăng" value={value(overview?.totalPosts)} />
         <KpiCard label="Lịch xem phòng" value={value(overview?.totalAppointments)} />
-        <KpiCard label="Tin chờ kiểm duyệt" value={value(overview?.pendingPosts)} accent />
+        <Link href="/admin/moderation/listings" className="block hover:opacity-95 transition-opacity">
+          <KpiCard label="Tin chờ kiểm duyệt (Bấm để duyệt)" value={value(overview?.pendingPosts)} accent />
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -69,8 +72,12 @@ export default function AdminDashboardPage() {
         <section className="rounded-[12px] border border-[#e2e7e1] bg-white p-6 shadow-sm">
           <h2 className="text-[17px] font-semibold text-[#203c37]">Ưu tiên xử lý hôm nay</h2>
           <div className="mt-5 space-y-3">
-            <PriorityRow label="Tin chờ kiểm duyệt" value={overview?.pendingPosts} loading={isLoading} />
-            <PriorityRow label="Báo cáo vi phạm" value={overview?.pendingReports} loading={isLoading} />
+            <Link href="/admin/moderation/listings" className="block">
+              <PriorityRow label="Tin chờ kiểm duyệt" value={overview?.pendingPosts} loading={isLoading} />
+            </Link>
+            <Link href="/admin/reports" className="block">
+              <PriorityRow label="Báo cáo vi phạm" value={overview?.pendingReports} loading={isLoading} />
+            </Link>
           </div>
         </section>
       </div>

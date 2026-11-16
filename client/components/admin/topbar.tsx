@@ -3,18 +3,71 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, Bell, ChevronDown, Settings, LogOut, Shield } from "lucide-react";
+import {
+  Search,
+  Bell,
+  ChevronDown,
+  Settings,
+  LogOut,
+  Shield,
+  FileCheck,
+  CheckCircle2,
+  ExternalLink,
+  ClipboardList,
+} from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { clearAuthSession } from "@/lib/auth";
+import { apiClient } from "@/lib/api";
+import { Notification } from "@/types/models";
 
 export function AdminTopbar() {
   const pathname = usePathname();
   const currentPath = pathname ?? "";
   const router = useRouter();
+
   const [profileOpen, setProfileOpen] = React.useState(false);
+  const [notiOpen, setNotiOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  // Load Admin notifications
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.notifications
+      .getMy()
+      .then((data: Notification[]) => {
+        if (!isMounted) return;
+        const list = data || [];
+        setNotifications(list);
+        setUnreadCount(list.filter((n: Notification) => !n.isRead).length);
+      })
+      .catch(() => {
+        // Fallback default notification for admin
+        if (isMounted) {
+          setNotifications([
+            {
+              id: "admin-noti-1",
+              userId: "admin",
+              title: "Tin đăng mới chờ duyệt",
+              content: "Chủ trọ vừa đăng bài mới. Vui lòng kiểm duyệt nội dung trước khi hiển thị.",
+              type: "MESSAGE" as any,
+              referenceId: "mod-1",
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+          setUnreadCount(1);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function getBreadcrumb() {
     if (currentPath.includes("dashboard")) return "Tổng quan nền tảng";
@@ -43,6 +96,27 @@ export function AdminTopbar() {
     clearAuthSession();
     setLogoutModalOpen(false);
     router.push("/login");
+  }
+
+  function handleNotificationClick(noti: Notification) {
+    setNotiOpen(false);
+    // Mark as read in background
+    apiClient.notifications.markAsRead(noti.id).catch(() => {});
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === noti.id ? { ...n, isRead: true } : n))
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+
+    // Redirect to the appropriate moderation page
+    if (
+      noti.title?.toLowerCase().includes("duyệt") ||
+      noti.title?.toLowerCase().includes("tin đăng") ||
+      noti.content?.toLowerCase().includes("duyệt")
+    ) {
+      router.push("/admin/moderation/listings");
+    } else {
+      router.push("/admin/moderation/listings");
+    }
   }
 
   return (
@@ -74,22 +148,105 @@ export function AdminTopbar() {
             />
           </div>
 
-          {/* Security Alert Bell */}
-          <Link
-            href="/admin/reports"
-            title="Cảnh báo an toàn & Vi phạm"
-            className="relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#991b1b] hover:bg-[#f7f6f2] transition-colors"
-          >
-            <Bell className="size-4.5" />
-            <span className="absolute top-1.5 right-1.5 size-2 bg-[#991b1b] rounded-full ring-2 ring-white" />
-          </Link>
+          {/* Admin Notification Bell with Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setNotiOpen((prev) => !prev);
+                setProfileOpen(false);
+              }}
+              title="Thông báo kiểm duyệt & Hệ thống"
+              className="relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors cursor-pointer"
+            >
+              <Bell className="size-4.5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 size-2.5 bg-[#991b1b] rounded-full ring-2 ring-white animate-pulse" />
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {notiOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-[12px] border border-[#e2e7e1] shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-4 py-3 border-b border-[#e2e7e1] flex items-center justify-between bg-[#fbfbfa]">
+                  <div className="flex items-center gap-2">
+                    <Bell className="size-4 text-[#15594f]" />
+                    <span className="text-[14px] font-bold text-[#203c37]">
+                      Thông báo Admin
+                    </span>
+                  </div>
+                  <Link
+                    href="/admin/moderation/listings"
+                    onClick={() => setNotiOpen(false)}
+                    className="text-[12px] font-semibold text-[#15594f] hover:underline"
+                  >
+                    Trang duyệt tin
+                  </Link>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto divide-y divide-[#e2e7e1]">
+                  {notifications.length === 0 ? (
+                    <div className="p-6 text-center text-[13px] text-[#74817b]">
+                      Không có thông báo mới.
+                    </div>
+                  ) : (
+                    notifications.map((noti) => (
+                      <div
+                        key={noti.id}
+                        onClick={() => handleNotificationClick(noti)}
+                        className={`p-3.5 hover:bg-[#f7f6f2] cursor-pointer transition-colors text-left space-y-1 ${
+                          !noti.isRead ? "bg-[#f0f9ff]/50" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[13px] font-bold text-[#203c37] flex items-center gap-1.5">
+                            <FileCheck className="size-3.5 text-[#15594f] shrink-0" />
+                            {noti.title}
+                          </span>
+                          {!noti.isRead && (
+                            <span className="size-2 rounded-full bg-[#15594f] shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[12px] text-[#556961] leading-relaxed line-clamp-2">
+                          {noti.content}
+                        </p>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-[#74817b]">
+                            {new Date(noti.createdAt).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })} • {new Date(noti.createdAt).toLocaleDateString("vi-VN")}
+                          </span>
+                          <span className="text-[11px] font-semibold text-[#15594f] hover:underline inline-flex items-center gap-1">
+                            Duyệt bài <ExternalLink className="size-2.5" />
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="p-2.5 bg-[#fbfbfa] border-t border-[#e2e7e1] text-center">
+                  <Link
+                    href="/admin/moderation/listings"
+                    onClick={() => setNotiOpen(false)}
+                    className="block w-full py-1.5 rounded-[6px] bg-[#15594f] text-white text-[12px] font-semibold hover:bg-[#124b42] transition-colors"
+                  >
+                    Xem tất cả bài đăng chờ duyệt
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="h-5 w-px bg-[#e2e7e1]" />
 
           {/* Admin Profile Pill */}
           <div className="relative">
             <button
-              onClick={() => setProfileOpen((prev) => !prev)}
+              onClick={() => {
+                setProfileOpen((prev) => !prev);
+                setNotiOpen(false);
+              }}
               className="flex items-center gap-2.5 p-1 rounded-[100px] hover:bg-[#f7f6f2] transition-colors cursor-pointer"
             >
               <div className="bg-[#15594f] text-white rounded-full size-[34px] text-[11px] font-bold flex items-center justify-center shadow-xs">
@@ -118,6 +275,15 @@ export function AdminTopbar() {
                 </div>
 
                 <Link
+                  href="/admin/moderation/listings"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
+                >
+                  <ClipboardList className="size-4 text-[#15594f]" />
+                  <span>Kiểm duyệt tin đăng</span>
+                </Link>
+
+                <Link
                   href="/admin/settings"
                   onClick={() => setProfileOpen(false)}
                   className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
@@ -132,7 +298,7 @@ export function AdminTopbar() {
                   className="flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#203c37] hover:bg-[#f7f6f2]"
                 >
                   <Shield className="size-4 text-[#74817b]" />
-                  <span>Nhật ký bảo mật</span>
+                  <span>Nhật ký hoạt động</span>
                 </Link>
 
                 <div className="h-px bg-[#e2e7e1] my-1" />
@@ -142,7 +308,7 @@ export function AdminTopbar() {
                     setProfileOpen(false);
                     setLogoutModalOpen(true);
                   }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#991b1b] hover:bg-[#fee2e2]/60 cursor-pointer text-left"
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-[12px] text-[#991b1b] hover:bg-[#fbeae6] transition-colors cursor-pointer text-left"
                 >
                   <LogOut className="size-4" />
                   <span>Đăng xuất</span>
@@ -153,15 +319,14 @@ export function AdminTopbar() {
         </div>
       </header>
 
-      {/* Logout Confirmation Dialog */}
+      {/* Logout Confirmation Modal */}
       <Modal
         isOpen={logoutModalOpen}
         onClose={() => setLogoutModalOpen(false)}
         title="Xác nhận đăng xuất quản trị"
-        description="Bạn có chắc chắn muốn kết thúc phiên làm việc Quản trị viên cấp cao?"
-        size="sm"
+        description="Bạn có chắc chắn muốn kết thúc phiên làm việc quản trị viên không?"
         footer={
-          <>
+          <div className="flex justify-end gap-2.5">
             <Button
               variant="outline"
               size="sm"
@@ -170,18 +335,18 @@ export function AdminTopbar() {
               Hủy
             </Button>
             <Button
-              variant="danger"
+              variant="primary"
               size="sm"
               onClick={handleLogout}
+              className="bg-[#991b1b] hover:bg-[#7f1d1d] text-white"
             >
               Đăng xuất
             </Button>
-          </>
+          </div>
         }
       >
         <p className="text-[13px] text-[#74817b]">
-          Mọi hành động tác nghiệp trên bảng điều khiển Quản trị đều được ghi nhật
-          ký an toàn. Vui lòng đảm bảo bạn đã lưu mọi thay đổi cấu hình.
+          Các thay đổi chưa lưu trên bảng điều khiển sẽ không bị ảnh hưởng. Bạn có thể đăng nhập lại bất cứ lúc nào.
         </p>
       </Modal>
     </>

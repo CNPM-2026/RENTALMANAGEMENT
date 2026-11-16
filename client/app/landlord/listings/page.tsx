@@ -91,12 +91,12 @@ export default function LandlordListingsPage() {
                   return (
                     <tr key={post.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
                       <td className="py-3.5 px-4 font-medium">
-                        <Link href={`/rooms/${post.roomId}`} className="hover:text-[#15594f] hover:underline">
+                        <Link href={`/rooms/${post.roomId || post.id}`} className="hover:text-[#15594f] hover:underline">
                           {post.title}
                         </Link>
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-[#15594f]">
-                        {formatCurrency(post.room?.priceMonthly || 0)}
+                        {formatCurrency(post.price || post.room?.priceMonthly || 0)}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${st.bg} ${st.text}`}>
@@ -108,7 +108,7 @@ export default function LandlordListingsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <Link
-                          href={`/rooms/${post.roomId}`}
+                          href={`/rooms/${post.roomId || post.id}`}
                           className="inline-flex items-center gap-1 text-[12px] font-medium text-[#15594f] hover:underline"
                         >
                           <Eye className="size-3.5" />

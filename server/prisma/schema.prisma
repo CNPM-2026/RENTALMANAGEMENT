@@ -212,10 +212,11 @@ model Property {
   longitude   Float? // 🆕 Toạ độ cho Map View
   createdAt   DateTime @default(now()) @map("created_at")
 
-  landlord User            @relation(fields: [landlordId], references: [id], onDelete: Cascade)
-  rooms    Room[]
-  posts    Post[]
-  images   PropertyImage[] // 🆕 Ảnh cụm trọ
+  landlord          User              @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  rooms             Room[]
+  posts             Post[]
+  images            PropertyImage[] // 🆕 Ảnh cụm trọ
+  propertyAmenities PropertyAmenity[]
 
   @@map("properties")
 }
@@ -257,10 +258,11 @@ model Room {
 }
 
 model Amenity {
-  id      String        @id @default(uuid())
-  name    String        @unique // Điều hòa, Nóng lạnh, Máy giặt, Giường...
-  iconUrl String?       @map("icon_url")
-  rooms   RoomAmenity[]
+  id                String            @id @default(uuid())
+  name              String            @unique // Điều hòa, Nóng lạnh, Máy giặt, Giường...
+  iconUrl           String?           @map("icon_url")
+  rooms             RoomAmenity[]
+  propertyAmenities PropertyAmenity[]
 
   @@map("amenities")
 }
@@ -274,6 +276,17 @@ model RoomAmenity {
 
   @@id([roomId, amenityId])
   @@map("room_amenities")
+}
+
+model PropertyAmenity {
+  propertyId String @map("property_id")
+  amenityId  String @map("amenity_id")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenity  Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, amenityId])
+  @@map("property_amenities")
 }
 
 // ==========================================

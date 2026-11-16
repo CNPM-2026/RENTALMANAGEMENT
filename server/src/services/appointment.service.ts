@@ -44,7 +44,7 @@ export const appointmentService = {
 
     // Không cho tự đặt lịch với chính mình
     if (landlordId === tenantId) {
-      throw new AppError('Bạn không thể tự đặt lịch xem phòng của chính mình', 400);
+      throw new AppError('Bạn đang đăng nhập bằng tài khoản chủ trọ của phòng này. Vui lòng đăng nhập tài khoản người thuê để đặt lịch xem phòng.', 400);
     }
 
     // 2. Tạo lịch hẹn

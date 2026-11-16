@@ -25,12 +25,15 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Building2,
+  PhoneCall,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Modal } from "@/components/ui/modal";
+import { apiClient } from "@/lib/api";
 
-const ROOM_IMAGES = [
+const DEFAULT_IMAGES = [
   "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
   "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
   "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
@@ -41,12 +44,209 @@ const ROOM_IMAGES = [
 function RoomDetailContent() {
   const params = useParams();
   const router = useRouter();
-  const roomId = (params?.id as string) || "room-ban-mai-1";
+  const rawId = (params?.id as string) || "";
+
+  const [loading, setLoading] = React.useState(true);
+  const [data, setData] = React.useState<{
+    title: string;
+    description: string;
+    price: number;
+    deposit: number;
+    area: number;
+    maxOccupants: number;
+    roomNumber: string;
+    propertyName: string;
+    fullAddress: string;
+    province: string;
+    district: string;
+    images: string[];
+    roomAmenities: string[];
+    propertyAmenities: string[];
+    landlord: {
+      name: string;
+      phone: string;
+      email?: string;
+      avatar?: string;
+    };
+    rules?: string;
+    status?: string;
+    roomId?: string;
+    postId?: string;
+  } | null>(null);
 
   const [isSaved, setIsSaved] = React.useState(false);
   const [galleryOpen, setGalleryOpen] = React.useState(false);
   const [activeImageIndex, setActiveImageIndex] = React.useState(0);
   const [copiedShare, setCopiedShare] = React.useState(false);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    async function fetchData() {
+      if (!rawId) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+
+      // 1. Try to fetch as a Room first
+      try {
+        const roomRes = await apiClient.rooms.getById(rawId) as any;
+        const room = roomRes?.data || roomRes;
+        if (room && room.id && isMounted) {
+          const prop = room.property;
+          const host = prop?.landlord;
+          const imagesList: string[] = [];
+
+          if (room.posts && room.posts.length > 0) {
+            room.posts.forEach((p: any) => {
+              if (p.images && p.images.length > 0) {
+                p.images.forEach((img: any) => imagesList.push(img.imageUrl));
+              }
+            });
+          }
+          if (prop?.images && prop.images.length > 0) {
+            prop.images.forEach((img: any) => imagesList.push(img.imageUrl));
+          }
+
+          const rAmenities = (room.roomAmenities || [])
+            .map((ra: any) => ra.amenity?.name || ra.name)
+            .filter(Boolean);
+
+          const pAmenities = (prop?.propertyAmenities || [])
+            .map((pa: any) => pa.amenity?.name || pa.name)
+            .filter(Boolean);
+
+          setData({
+            title: `Phòng ${room.roomNumber} — ${prop?.name || "Nhà trọ cao cấp"}`,
+            description: prop?.description || "Phòng trọ được trang bị đầy đủ tiện nghi, môi trường sống an ninh, văn minh và yên tĩnh.",
+            price: Number(room.priceMonthly) || 0,
+            deposit: Number(room.depositAmount) || Number(room.priceMonthly) || 0,
+            area: Number(room.area) || 25,
+            maxOccupants: Number(room.maxOccupants) || 2,
+            roomNumber: room.roomNumber,
+            propertyName: prop?.name || "Nhà trọ",
+            fullAddress: prop ? `${prop.address}, ${prop.ward}, ${prop.district}, ${prop.province}` : "Đang cập nhật địa chỉ",
+            province: prop?.province || "",
+            district: prop?.district || "",
+            images: imagesList.length > 0 ? imagesList : DEFAULT_IMAGES,
+            roomAmenities: rAmenities.length > 0 ? rAmenities : ["Điều hòa nhiệt độ", "Bình nóng lạnh", "Giường nệm", "Tủ quần áo"],
+            propertyAmenities: pAmenities.length > 0 ? pAmenities : ["Bảo vệ 24/7", "Camera an ninh", "Bãi giữ xe", "Giờ giấc tự do"],
+            landlord: {
+              name: host?.fullName || "Chủ nhà trọ",
+              phone: host?.phone || "0912 345 678",
+              email: host?.email,
+              avatar: host?.avatarUrl,
+            },
+            rules: prop?.rules || "Giữ gìn vệ sinh chung, không làm ồn sau 23h.",
+            status: room.status,
+            roomId: room.id,
+          });
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Not a room or failed, continue to check if it's a post
+      }
+
+      // 2. Try to fetch as a Post
+      try {
+        const postRes = await apiClient.posts.getById(rawId) as any;
+        const post = postRes?.data || postRes;
+        if (post && post.id && isMounted) {
+          const prop = post.property;
+          const room = post.room;
+          const host = post.author || prop?.landlord;
+          const imagesList: string[] = (post.images || []).map((img: any) => img.imageUrl).filter(Boolean);
+
+          const rAmenities = (room?.roomAmenities || [])
+            .map((ra: any) => ra.amenity?.name || ra.name)
+            .filter(Boolean);
+
+          const pAmenities = (prop?.propertyAmenities || [])
+            .map((pa: any) => pa.amenity?.name || pa.name)
+            .filter(Boolean);
+
+          setData({
+            title: post.title,
+            description: post.description,
+            price: Number(post.price) || Number(room?.priceMonthly) || 0,
+            deposit: Number(room?.depositAmount) || Number(post.price) || 0,
+            area: Number(room?.area) || 28,
+            maxOccupants: Number(room?.maxOccupants) || 2,
+            roomNumber: room?.roomNumber || "Phòng cho thuê",
+            propertyName: prop?.name || "Tòa nhà căn hộ",
+            fullAddress: prop ? `${prop.address}, ${prop.ward}, ${prop.district}, ${prop.province}` : "Khu vực trung tâm thuận tiện",
+            province: prop?.province || "",
+            district: prop?.district || "",
+            images: imagesList.length > 0 ? imagesList : DEFAULT_IMAGES,
+            roomAmenities: rAmenities.length > 0 ? rAmenities : ["Điều hòa nhiệt độ", "Bình nóng lạnh", "Giường nệm", "Tủ quần áo"],
+            propertyAmenities: pAmenities.length > 0 ? pAmenities : ["Thang máy", "Bảo vệ 24/7", "Camera an ninh", "Bãi để xe máy"],
+            landlord: {
+              name: host?.fullName || "Chủ bài đăng",
+              phone: host?.phone || "0912 345 678",
+              email: host?.email,
+              avatar: host?.avatarUrl,
+            },
+            rules: prop?.rules || "Giữ gìn vệ sinh chung, tôn trọng không gian sống của mọi người.",
+            status: post.status,
+            roomId: room?.id || post.roomId,
+            postId: post.id,
+          });
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Failed post fetch as well
+      }
+
+      // 3. Fallback demo data if not found or offline
+      if (isMounted) {
+        setData({
+          title: "Studio Ban Mai — Ban Công Hướng Đông Thoáng Mát",
+          description: "Studio Ban Mai tọa lạc tại tầng 3 của tòa nhà văn minh trên đường Điện Biên Phủ, Phường 25, Quận Bình Thạnh. Căn phòng được thiết kế theo phong cách tối giản hiện đại với cửa sổ kính lớn sát đất và ban công riêng biệt hướng Đông, giúp căn phòng luôn ngập tràn ánh sáng tự nhiên và gió mát.",
+          price: 4500000,
+          deposit: 4500000,
+          area: 28,
+          maxOccupants: 2,
+          roomNumber: "BM-302",
+          propertyName: "Tòa nhà Ban Mai",
+          fullAddress: "142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP. Hồ Chí Minh",
+          province: "TP. Hồ Chí Minh",
+          district: "Bình Thạnh",
+          images: DEFAULT_IMAGES,
+          roomAmenities: [
+            "Điều hòa không khí Inverter",
+            "Tủ lạnh 2 cánh 150L",
+            "Khu bếp nấu riêng biệt có hút mùi",
+            "Ban công riêng phơi đồ thoáng",
+            "Máy nước nóng tắm đứng khép kín",
+            "Giường đệm 1m6 & tủ quần áo",
+          ],
+          propertyAmenities: [
+            "Thang máy di chuyển tiện lợi",
+            "Khóa vân tay ra vào cổng chính",
+            "Camera giám sát an ninh 24/7",
+            "Khu giặt sấy đồ chung trên sân thượng",
+            "Nhà để xe máy tầng trệt miễn phí",
+            "Giờ giấc tự do 24/24 không chung chủ",
+          ],
+          landlord: {
+            name: "Nguyễn Minh An",
+            phone: "0912 345 678",
+          },
+          rules: "Giờ giấc tự do, không hút thuốc trong phòng, giữ gìn vệ sinh chung.",
+        });
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [rawId]);
 
   function handleShare() {
     if (typeof window !== "undefined") {
@@ -56,11 +256,23 @@ function RoomDetailContent() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-8 gap-3 text-[#74817b]">
+        <Loader2 className="size-8 animate-spin text-[#15594f]" />
+        <p className="text-[14px] font-medium">Đang tải chi tiết bài đăng...</p>
+      </div>
+    );
+  }
+
+  const roomInfo = data!;
+  const targetId = roomInfo.roomId || roomInfo.postId || rawId;
+
   return (
     <div className="w-full min-h-screen bg-[#f7f6f2] text-[#203c37] py-8 px-4 sm:px-6 lg:px-12">
       <div className="max-w-[1312px] mx-auto space-y-6">
         {/* =======================================================================
-            1. BREADCRUMBS & TOP TITLE BAR (Figma Node 44:63105)
+            1. BREADCRUMBS & TOP TITLE BAR
         ======================================================================== */}
         <div className="space-y-1">
           <nav className="flex items-center gap-1.5 text-[12px] text-[#74817b]">
@@ -72,17 +284,19 @@ function RoomDetailContent() {
               Tìm phòng
             </Link>
             <span>/</span>
-            <span className="text-[#203c37] font-medium">Studio Ban Mai</span>
+            <span className="text-[#203c37] font-medium truncate max-w-[300px]">
+              {roomInfo.propertyName || roomInfo.title}
+            </span>
           </nav>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
             <div className="space-y-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-[#203c37] tracking-tight">
-                Studio Ban Mai — Ban Công Hướng Đông Thoáng Mát
+                {roomInfo.title}
               </h1>
               <div className="flex items-center gap-2 text-[13px] text-[#74817b]">
                 <MapPin className="size-4 text-[#15594f] shrink-0" />
-                <span>142 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP. Hồ Chí Minh</span>
+                <span>{roomInfo.fullAddress}</span>
               </div>
             </div>
 
@@ -113,20 +327,27 @@ function RoomDetailContent() {
             </div>
           </div>
 
-          {/* Verification Badge Bar (Figma Node 44:63115) */}
-          <div className="flex items-center gap-3 pt-2">
+          {/* Verification Badge Bar */}
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <Badge variant="success" size="md">
               <BadgeCheck className="size-4 inline mr-1" />
-              ĐÃ XÁC MINH PHÁP LÝ & VỊ TRÍ THỰC TẾ
+              ĐÃ XÁC MINH THÔNG TIN & VỊ TRÍ
             </Badge>
-            <span className="text-[12px] text-[#74817b]">
-              Cập nhật lần cuối: 2 ngày trước • Mã phòng: <strong className="text-[#203c37]">BM-302</strong>
-            </span>
+            {roomInfo.roomNumber && (
+              <span className="text-[12px] text-[#74817b]">
+                Số phòng / Mã: <strong className="text-[#203c37]">{roomInfo.roomNumber}</strong>
+              </span>
+            )}
+            {roomInfo.status && (
+              <Badge variant={roomInfo.status === "APPROVED" || roomInfo.status === "AVAILABLE" ? "success" : "warning"} size="sm">
+                Trạng thái: {roomInfo.status}
+              </Badge>
+            )}
           </div>
         </div>
 
         {/* =======================================================================
-            2. PHOTO GALLERY (Figma Node 44:63119, h 420px)
+            2. PHOTO GALLERY (h 420px)
         ======================================================================== */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 h-[360px] sm:h-[420px] rounded-[16px] overflow-hidden border border-[#e2e7e1] shadow-xs bg-white">
           {/* Main Large Image */}
@@ -138,8 +359,8 @@ function RoomDetailContent() {
             }}
           >
             <img
-              src={ROOM_IMAGES[0]}
-              alt="Studio Ban Mai phòng chính"
+              src={roomInfo.images[0] || DEFAULT_IMAGES[0]}
+              alt={roomInfo.title}
               className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
             />
             <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
@@ -155,27 +376,27 @@ function RoomDetailContent() {
               }}
             >
               <img
-                src={ROOM_IMAGES[1]}
-                alt="Nội thất phòng"
+                src={roomInfo.images[1] || DEFAULT_IMAGES[1]}
+                alt="Ảnh không gian phòng"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
             </div>
             <div
               className="relative h-full overflow-hidden cursor-pointer group"
               onClick={() => {
-                setActiveImageIndex(2);
+                setActiveImageIndex(2 % roomInfo.images.length);
                 setGalleryOpen(true);
               }}
             >
               <img
-                src={ROOM_IMAGES[2]}
-                alt="Góc làm việc"
+                src={roomInfo.images[2] || DEFAULT_IMAGES[2]}
+                alt="Ảnh góc phòng"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white backdrop-blur-[1px] group-hover:bg-black/50 transition-colors">
                 <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-[8px] bg-white/20 backdrop-blur-md text-[13px] font-semibold">
                   <Images className="size-4" />
-                  <span>Xem toàn bộ 5 ảnh</span>
+                  <span>Xem {roomInfo.images.length} ảnh</span>
                 </div>
               </div>
             </div>
@@ -183,21 +404,21 @@ function RoomDetailContent() {
         </div>
 
         {/* =======================================================================
-            3. TWO-COLUMN DETAILS & STICKY CTA (Figma Node 44:63129)
+            3. TWO-COLUMN DETAILS & STICKY CTA
         ======================================================================== */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* -------------------------------------------------------------------
-              LEFT COLUMN: SPECS, DESCRIPTION, AMENITIES, LOCATION (910px)
+              LEFT COLUMN: SPECS, DESCRIPTION, AMENITIES, LOCATION
           -------------------------------------------------------------------- */}
           <div className="lg:col-span-8 space-y-6">
-            {/* 4 Specs KPI Cards (Figma Node 44:63131) */}
+            {/* 4 Specs KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
                 <Maximize2 className="size-5 text-[#15594f]" />
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
                   Diện tích
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">28 m²</p>
+                <p className="text-lg font-bold text-[#203c37]">{roomInfo.area} m²</p>
               </div>
 
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
@@ -205,142 +426,129 @@ function RoomDetailContent() {
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
                   Sức chứa tối đa
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">2 người</p>
+                <p className="text-lg font-bold text-[#203c37]">{roomInfo.maxOccupants} người</p>
               </div>
 
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
                 <BedDouble className="size-5 text-[#15594f]" />
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
-                  Loại giường
+                  Phòng số
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">Giường đôi 1m6</p>
+                <p className="text-lg font-bold text-[#203c37] truncate">{roomInfo.roomNumber}</p>
               </div>
 
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
-                <Sun className="size-5 text-[#15594f]" />
+                <Building2 className="size-5 text-[#15594f]" />
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
-                  Hướng ban công
+                  Cơ sở / Tòa nhà
                 </p>
-                <p className="text-lg font-bold text-[#203c37]">Đông đón nắng</p>
+                <p className="text-lg font-bold text-[#203c37] truncate">{roomInfo.propertyName}</p>
               </div>
             </div>
 
-            {/* Room Description (Figma Node 44:63144) */}
+            {/* Room Description */}
             <div className="p-6 rounded-[14px] bg-white border border-[#e2e7e1] space-y-3">
               <h2 className="text-[17px] font-bold text-[#203c37]">
-                Mô tả chi tiết căn phòng
+                Mô tả chi tiết
               </h2>
-              <div className="text-[14px] text-[#203c37] leading-relaxed space-y-3">
-                <p>
-                  Studio Ban Mai tọa lạc tại tầng 3 của tòa nhà văn minh trên đường Điện Biên Phủ, Phường 25, Quận Bình Thạnh. Căn phòng được thiết kế theo phong cách tối giản hiện đại với cửa sổ kính lớn sát đất và ban công riêng biệt hướng Đông, giúp căn phòng luôn ngập tràn ánh sáng tự nhiên và gió mát.
-                </p>
-                <p>
-                  Phòng được trang bị đầy đủ nội thất cao cấp: Điều hòa Inverter tiết kiệm điện, Tủ lạnh 150L, Bếp từ đôi riêng biệt, Giường nệm lò xo túi cao cấp, Tủ quần áo âm tường và Bàn làm việc tiêu chuẩn. Phòng vệ sinh khép kín có vách kính tắm đứng và bình nước nóng năng lượng mặt trời.
-                </p>
-                <p>
-                  Tòa nhà có thang máy tốc độ cao, hệ thống khóa cửa vân tay bảo mật 2 lớp, camera an ninh 24/7 và khu vực để xe máy rộng rãi ở tầng trệt. Môi trường sống văn minh, yên tĩnh, ưu tiên sinh viên và nhân viên văn phòng lịch sự.
-                </p>
+              <div className="text-[14px] text-[#203c37] leading-relaxed whitespace-pre-line">
+                {roomInfo.description}
               </div>
             </div>
 
-            {/* Amenities Grid (Figma Node 44:63148) */}
+            {/* Amenities Grid: In-room vs Building Common Amenities */}
             <div className="p-6 rounded-[14px] bg-white border border-[#e2e7e1] space-y-4">
               <h2 className="text-[17px] font-bold text-[#203c37]">
                 Trang thiết bị & Tiện ích
               </h2>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-[14px]">
                 {/* In-room Amenities */}
-                <div className="space-y-2.5">
-                  <h3 className="text-[13px] font-bold text-[#15594f] uppercase tracking-wider">
-                    Trong phòng riêng
-                  </h3>
+                <div className="space-y-3 p-4 rounded-[10px] bg-[#f7f6f2] border border-[#e2e7e1]">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-[#15594f]" />
+                    <h3 className="text-[13px] font-bold text-[#15594f] uppercase tracking-wider">
+                      Trong phòng riêng ({roomInfo.roomAmenities.length})
+                    </h3>
+                  </div>
                   <div className="space-y-2 text-[#203c37]">
-                    {[
-                      "Điều hòa không khí Inverter",
-                      "Tủ lạnh 2 cánh 150L",
-                      "Khu bếp nấu riêng biệt có hút mùi",
-                      "Ban công riêng phơi đồ thoáng",
-                      "Máy nước nóng tắm đứng khép kín",
-                      "Giường đệm 1m6 & tủ quần áo",
-                    ].map((item) => (
-                      <div key={item} className="flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
+                    {roomInfo.roomAmenities.length > 0 ? (
+                      roomInfo.roomAmenities.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
+                          <span>{item}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[13px] text-[#74817b] italic">Chưa cập nhật tiện ích riêng.</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Building Shared Amenities */}
-                <div className="space-y-2.5">
-                  <h3 className="text-[13px] font-bold text-[#15594f] uppercase tracking-wider">
-                    Tiện ích chung tòa nhà
-                  </h3>
+                {/* Building Shared / Common Amenities */}
+                <div className="space-y-3 p-4 rounded-[10px] bg-[#f7f6f2] border border-[#e2e7e1]">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-[#0284c7]" />
+                    <h3 className="text-[13px] font-bold text-[#0284c7] uppercase tracking-wider">
+                      Tiện ích chung tòa nhà ({roomInfo.propertyAmenities.length})
+                    </h3>
+                  </div>
                   <div className="space-y-2 text-[#203c37]">
-                    {[
-                      "Thang máy di chuyển tiện lợi",
-                      "Khóa vân tay ra vào cổng chính",
-                      "Camera giám sát an ninh 24/7",
-                      "Khu giặt sấy đồ chung trên sân thượng",
-                      "Nhà để xe máy tầng trệt miễn phí",
-                      "Giờ giấc tự do 24/24 không chung chủ",
-                    ].map((item) => (
-                      <div key={item} className="flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-[#15594f] shrink-0" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
+                    {roomInfo.propertyAmenities.length > 0 ? (
+                      roomInfo.propertyAmenities.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-[#0284c7] shrink-0" />
+                          <span>{item}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[13px] text-[#74817b] italic">Tòa nhà chưa cấu hình tiện ích chung.</p>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Monthly Costs Breakdown Table (Figma Node 44:63159) */}
+            {/* Rules & Costs Breakdown */}
             <div className="p-6 rounded-[14px] bg-white border border-[#e2e7e1] space-y-4">
               <h2 className="text-[17px] font-bold text-[#203c37]">
-                Biểu phí & Chi phí dịch vụ hàng tháng
+                Nội quy & Biểu phí hàng tháng
               </h2>
               <div className="divide-y divide-[#e2e7e1] text-[14px]">
                 <div className="py-2.5 flex items-center justify-between">
-                  <span className="text-[#203c37]">Tiền thuê phòng cố định</span>
-                  <span className="font-bold text-[#15594f]">4.500.000 đ/tháng</span>
+                  <span className="text-[#203c37]">Tiền thuê phòng niêm yết</span>
+                  <span className="font-bold text-[#15594f]">
+                    {roomInfo.price > 0 ? `${roomInfo.price.toLocaleString("vi-VN")} đ/tháng` : "Thỏa thuận"}
+                  </span>
                 </div>
                 <div className="py-2.5 flex items-center justify-between">
-                  <span className="text-[#203c37]">Tiền điện sinh hoạt</span>
-                  <span className="font-semibold text-[#203c37]">3.500 đ / kWh (Công tơ riêng)</span>
+                  <span className="text-[#203c37]">Tiền đặt cọc</span>
+                  <span className="font-bold text-[#15594f]">
+                    {roomInfo.deposit > 0 ? `${roomInfo.deposit.toLocaleString("vi-VN")} đ` : "1 tháng tiền phòng"}
+                  </span>
                 </div>
                 <div className="py-2.5 flex items-center justify-between">
-                  <span className="text-[#203c37]">Tiền nước sinh hoạt</span>
-                  <span className="font-semibold text-[#203c37]">15.000 đ / m³ (Đồng hồ riêng)</span>
-                </div>
-                <div className="py-2.5 flex items-center justify-between">
-                  <span className="text-[#203c37]">Phí quản lý tòa nhà, rác & thang máy</span>
-                  <span className="font-semibold text-[#203c37]">120.000 đ / phòng / tháng</span>
-                </div>
-                <div className="py-2.5 flex items-center justify-between">
-                  <span className="text-[#203c37]">Internet cáp quang Wifi tốc độ cao</span>
-                  <span className="font-semibold text-[#203c37]">100.000 đ / phòng / tháng</span>
-                </div>
-                <div className="py-2.5 flex items-center justify-between">
-                  <span className="text-[#203c37]">Tiền đặt cọc giữ phòng (Cam kết)</span>
-                  <span className="font-bold text-[#15594f]">4.500.000 đ (1 tháng tiền phòng)</span>
+                  <span className="text-[#203c37]">Nội quy lưu trú</span>
+                  <span className="font-medium text-[#203c37] max-w-[60%] text-right">
+                    {roomInfo.rules}
+                  </span>
                 </div>
               </div>
 
               <div className="p-3 rounded-[8px] bg-[#eaf2ed] border border-[#d2e4d7] flex items-center gap-2.5 text-[12px] text-[#15594f]">
                 <Info className="size-4 shrink-0" />
-                <span>Tiền cọc được giữ an toàn và hoàn trả 100% khi thanh lý hợp đồng đúng hạn.</span>
+                <span>Tiền cọc được giữ an toàn và hoàn trả 100% khi thanh lý hợp đồng đúng cam kết.</span>
               </div>
             </div>
 
-            {/* Location & Map Preview (Figma Node 44:63183) */}
+            {/* Location & Map Preview */}
             <div className="p-6 rounded-[14px] bg-white border border-[#e2e7e1] space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-[17px] font-bold text-[#203c37]">
-                  Vị trí & Tiện ích lân cận
+                  Vị trí địa lý
                 </h2>
                 <a
-                  href="https://maps.google.com"
+                  href={`https://maps.google.com/?q=${encodeURIComponent(roomInfo.fullAddress)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#15594f] hover:underline"
@@ -349,79 +557,24 @@ function RoomDetailContent() {
                 </a>
               </div>
 
-              {/* Map Illustration Container */}
-              <div className="relative w-full h-[220px] rounded-[10px] overflow-hidden border border-[#e2e7e1] bg-[#eef1ed] flex items-center justify-center">
+              <div className="relative w-full h-[180px] rounded-[10px] overflow-hidden border border-[#e2e7e1] bg-[#eef1ed] flex items-center justify-center">
                 <div className="text-center space-y-2 p-4">
                   <div className="size-10 rounded-full bg-[#15594f] text-white flex items-center justify-center mx-auto shadow-md">
                     <MapPin className="size-5" />
                   </div>
-                  <p className="text-[13px] font-bold text-[#203c37]">
-                    142 Điện Biên Phủ, P. 25, Q. Bình Thạnh
-                  </p>
-                  <p className="text-[12px] text-[#74817b]">
-                    500m đến ĐH Ngoại Thương • 700m đến ĐH HUTECH • 5 phút đến Landmark 81
+                  <p className="text-[14px] font-bold text-[#203c37]">
+                    {roomInfo.fullAddress}
                   </p>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-[12px] text-[#74817b]">
-                  Nếu phát hiện tin giả mạo hoặc sai lệch địa chỉ, vui lòng báo cáo.
-                </span>
-                <Link href="/tenant/safety/report">
-                  <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#991b1b] hover:underline">
-                    <Flag className="size-3" />
-                    Báo cáo tin đăng
-                  </span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Tenant Reviews Section */}
-            <div className="p-6 rounded-[14px] bg-white border border-[#e2e7e1] space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-[17px] font-bold text-[#203c37]">
-                    Đánh giá từ khách thuê trước
-                  </h2>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <div className="flex text-amber-500">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="size-4 fill-amber-500 text-amber-500" />
-                      ))}
-                    </div>
-                    <span className="text-[14px] font-bold text-[#203c37]">4.9 / 5.0</span>
-                    <span className="text-[12px] text-[#74817b]">(12 đánh giá thực tế)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sample Review */}
-              <div className="pt-3 border-t border-[#e2e7e1] space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="size-8 rounded-full bg-[#15594f] text-white font-bold text-[12px] flex items-center justify-center">
-                      TL
-                    </div>
-                    <div>
-                      <h4 className="text-[13px] font-bold text-[#203c37]">Trần Linh</h4>
-                      <p className="text-[11px] text-[#74817b]">Thuê 1 năm (2025 - 2026)</p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] text-[#74817b]">1 tháng trước</span>
-                </div>
-                <p className="text-[13px] text-[#203c37] leading-relaxed">
-                  Phòng đúng y như ảnh chụp, ban công rất thoáng và mát vào buổi chiều. Anh Minh An chủ nhà hỗ trợ cực kỳ nhiệt tình, có lần máy lạnh bị chảy nước báo là trong vòng 2 tiếng thợ đến xử lý xong ngay.
-                </p>
               </div>
             </div>
           </div>
 
           {/* -------------------------------------------------------------------
-              RIGHT STICKY COLUMN: BOOKING & RENTAL APPLICATION CTA (370px)
+              RIGHT STICKY COLUMN: BOOKING & RENTAL APPLICATION CTA
           -------------------------------------------------------------------- */}
           <aside className="lg:col-span-4 sticky top-24 space-y-5">
-            {/* Main Sticky Action Box (Figma Node 44:63195) */}
+            {/* Main Sticky Action Box */}
             <div className="bg-white p-6 rounded-[16px] border border-[#e2e7e1] shadow-lg space-y-5">
               <div className="space-y-1">
                 <span className="text-[11px] font-bold text-[#15594f] uppercase tracking-wider">
@@ -429,12 +582,12 @@ function RoomDetailContent() {
                 </span>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-3xl font-extrabold text-[#15594f]">
-                    4.500.000 đ
+                    {roomInfo.price > 0 ? `${roomInfo.price.toLocaleString("vi-VN")} đ` : "Thỏa thuận"}
                   </span>
                   <span className="text-[14px] text-[#74817b]">/ tháng</span>
                 </div>
                 <p className="text-[12px] text-[#74817b]">
-                  Tiền cọc: 1 tháng tiền phòng (4.500.000 đ)
+                  Tiền cọc: {roomInfo.deposit > 0 ? `${roomInfo.deposit.toLocaleString("vi-VN")} đ` : "1 tháng tiền phòng"}
                 </p>
               </div>
 
@@ -442,7 +595,7 @@ function RoomDetailContent() {
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                <Link href={`/rooms/${roomId}/book-viewing`} className="block">
+                <Link href={`/rooms/${targetId}/book-viewing`} className="block">
                   <Button
                     variant="primary"
                     size="lg"
@@ -453,7 +606,7 @@ function RoomDetailContent() {
                   </Button>
                 </Link>
 
-                <Link href={`/rooms/${roomId}/apply`} className="block">
+                <Link href={`/rooms/${targetId}/apply`} className="block">
                   <Button
                     variant="secondary"
                     size="lg"
@@ -470,26 +623,29 @@ function RoomDetailContent() {
               </p>
             </div>
 
-            {/* Landlord Profile Card (Figma Node 44:63208) */}
+            {/* Landlord Profile Card */}
             <div className="bg-white p-5 rounded-[14px] border border-[#e2e7e1] shadow-xs space-y-4">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-full bg-[#15594f] text-white font-bold flex items-center justify-center text-[15px] shadow-xs">
-                  MA
+                <div className="size-12 rounded-full bg-[#15594f] text-white font-bold flex items-center justify-center text-[15px] shadow-xs uppercase">
+                  {roomInfo.landlord.name.substring(0, 2)}
                 </div>
                 <div className="space-y-0.5">
                   <h3 className="text-[14px] font-bold text-[#203c37]">
-                    Nguyễn Minh An
+                    {roomInfo.landlord.name}
                   </h3>
                   <Badge variant="success" size="sm">
-                    CHỦ TRỌ ĐÃ XÁC MINH KYC
+                    CHỦ NHÀ ĐÃ XÁC MINH
                   </Badge>
                 </div>
               </div>
 
               <div className="divide-y divide-[#e2e7e1] text-[12px] pt-1">
-                <div className="py-1.5 flex justify-between">
-                  <span className="text-[#74817b]">Tỷ lệ phản hồi</span>
-                  <span className="font-semibold text-[#203c37]">98%</span>
+                <div className="py-1.5 flex justify-between items-center">
+                  <span className="text-[#74817b]">Số điện thoại</span>
+                  <span className="font-semibold text-[#15594f] flex items-center gap-1">
+                    <PhoneCall className="size-3" />
+                    {roomInfo.landlord.phone}
+                  </span>
                 </div>
                 <div className="py-1.5 flex justify-between">
                   <span className="text-[#74817b]">Thời gian phản hồi</span>
@@ -502,7 +658,7 @@ function RoomDetailContent() {
                 size="sm"
                 className="w-full font-medium"
                 leftIcon={<MessageCircle className="size-4 text-[#15594f]" />}
-                onClick={() => router.push(`/tenant/messages?contact=landlord&name=Minh+An`)}
+                onClick={() => router.push(`/tenant/messages?contact=landlord&name=${encodeURIComponent(roomInfo.landlord.name)}`)}
               >
                 Nhắn tin với chủ trọ
               </Button>
@@ -535,7 +691,7 @@ function RoomDetailContent() {
 
           <div className="relative max-w-4xl max-h-[80vh] flex items-center justify-center">
             <img
-              src={ROOM_IMAGES[activeImageIndex]}
+              src={roomInfo.images[activeImageIndex] || DEFAULT_IMAGES[0]}
               alt={`Ảnh chi tiết ${activeImageIndex + 1}`}
               className="max-w-full max-h-[75vh] object-contain rounded-[8px]"
             />
@@ -543,7 +699,7 @@ function RoomDetailContent() {
             {/* Prev Button */}
             <button
               onClick={() =>
-                setActiveImageIndex((i) => (i === 0 ? ROOM_IMAGES.length - 1 : i - 1))
+                setActiveImageIndex((i) => (i === 0 ? roomInfo.images.length - 1 : i - 1))
               }
               className="absolute left-2 top-1/2 -translate-y-1/2 size-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center cursor-pointer"
               aria-label="Ảnh trước"
@@ -554,7 +710,7 @@ function RoomDetailContent() {
             {/* Next Button */}
             <button
               onClick={() =>
-                setActiveImageIndex((i) => (i === ROOM_IMAGES.length - 1 ? 0 : i + 1))
+                setActiveImageIndex((i) => (i === roomInfo.images.length - 1 ? 0 : i + 1))
               }
               className="absolute right-2 top-1/2 -translate-y-1/2 size-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center cursor-pointer"
               aria-label="Ảnh kế tiếp"
@@ -565,7 +721,7 @@ function RoomDetailContent() {
 
           {/* Dots Indicator */}
           <div className="flex items-center gap-2 mt-4">
-            {ROOM_IMAGES.map((_, idx) => (
+            {roomInfo.images.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => setActiveImageIndex(idx)}

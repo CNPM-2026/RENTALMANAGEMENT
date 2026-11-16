@@ -49,6 +49,39 @@ export const roomService = {
     });
   },
 
+  // Lấy chi tiết phòng (Dành cho Tenant / Preview xem phòng)
+  getRoomById: async (id: string) => {
+    const room = await prisma.room.findUnique({
+      where: { id },
+      include: {
+        property: {
+          include: {
+            landlord: {
+              select: { id: true, fullName: true, phone: true, avatarUrl: true, email: true }
+            },
+            propertyAmenities: {
+              include: { amenity: true }
+            },
+            images: true
+          }
+        },
+        roomAmenities: {
+          include: { amenity: true }
+        },
+        posts: {
+          include: { images: true },
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (!room) {
+      throw new AppError('Phòng không tồn tại', 404);
+    }
+
+    return room;
+  },
+
   // Lấy danh sách phòng theo nhà trọ
   getRoomsByProperty: async (landlordId: string, propertyId: string) => {
     // Check quyền sở hữu
@@ -66,8 +99,10 @@ export const roomService = {
     });
   },
 
-  // Lấy danh sách tất cả tiện ích (để chủ trọ chọn khi tạo phòng)
+  // Lấy danh sách tất cả tiện ích (để chủ trọ chọn khi tạo phòng hoặc tòa nhà)
   getAllAmenities: async () => {
-    return await prisma.amenity.findMany();
+    return await prisma.amenity.findMany({
+      orderBy: { name: 'asc' }
+    });
   }
 };

@@ -333,6 +333,10 @@ export const apiClient = {
   properties: {
     create: (payload: CreatePropertyPayload) =>
       apiClient.post<Property>('/properties', payload),
+    update: (id: string, payload: Partial<CreatePropertyPayload>) =>
+      apiClient.put<Property>(`/properties/${id}`, payload),
+    getById: (id: string) =>
+      apiClient.get<Property>(`/properties/${id}`),
     getMyProperties: () =>
       apiClient.get<Property[]>('/properties/my'),
   },
@@ -341,6 +345,8 @@ export const apiClient = {
   rooms: {
     create: (payload: CreateRoomPayload) =>
       apiClient.post<Room>('/rooms', payload),
+    getById: (id: string) =>
+      apiClient.get<Room>(`/rooms/${id}`, undefined, { skipAuth: true }),
     getByProperty: (propertyId: string) =>
       apiClient.get<Room[]>(`/rooms/property/${propertyId}`),
     getAllAmenities: () =>
@@ -351,6 +357,8 @@ export const apiClient = {
   posts: {
     getApproved: (query?: { postType?: string; province?: string }) =>
       apiClient.get<Post[]>('/posts', query, { skipAuth: true }),
+    getById: (id: string) =>
+      apiClient.get<Post>(`/posts/${id}`, undefined, { skipAuth: true }),
     search: (query: SearchPostsQuery) =>
       apiClient.get<{ meta: PaginationMeta; data: Post[] }>('/posts/search', query as unknown as RequestOptions['params'], { skipAuth: true }),
     getMyPosts: () =>

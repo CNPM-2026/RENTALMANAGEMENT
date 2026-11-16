@@ -2,6 +2,7 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { PostType, Prisma } from '@prisma/client';
 import { storageService } from './storage.service';
+import { notificationService } from './notification.service';
 
 export const postService = {
   createPost: async (authorId: string, data: any, files: Express.Multer.File[]) => {
@@ -47,11 +48,67 @@ export const postService = {
       });
     }
 
-    // 3. Trả về post kèm ảnh
+    // 3. Gửi thông báo cho Admin để duyệt bài đăng
+    try {
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true }
+      });
+      for (const admin of admins) {
+        await notificationService.createNotification(
+          admin.id,
+          'Tin đăng mới chờ duyệt',
+          `Bài đăng "${post.title}" đang chờ bạn kiểm duyệt.`,
+          'SYSTEM',
+          post.id
+        );
+      }
+    } catch (notiErr) {
+      console.error('Lỗi khi gửi thông báo Admin:', notiErr);
+    }
+
+    // 4. Trả về post kèm ảnh
     return await prisma.post.findUnique({
       where: { id: post.id },
       include: { images: true },
     });
+  },
+
+  // Lấy chi tiết bài đăng (Xem trước hoặc xem chi tiết)
+  getPostById: async (postId: string) => {
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      include: {
+        images: true,
+        author: {
+          select: { id: true, fullName: true, phone: true, avatarUrl: true, email: true }
+        },
+        property: {
+          include: {
+            landlord: {
+              select: { id: true, fullName: true, phone: true, avatarUrl: true, email: true }
+            },
+            propertyAmenities: {
+              include: { amenity: true }
+            },
+            images: true
+          }
+        },
+        room: {
+          include: {
+            roomAmenities: {
+              include: { amenity: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!post) {
+      throw new AppError('Bài đăng không tồn tại', 404);
+    }
+
+    return post;
   },
 
   // Lấy danh sách bài đăng đã được duyệt (Dành cho mọi người xem)

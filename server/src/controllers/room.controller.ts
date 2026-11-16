@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { roomService } from '../services/room.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
@@ -12,7 +12,19 @@ export const roomController = {
         data: result,
       });
     } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Lỗi server' });
+    }
+  },
+
+  getById: async (req: Request, res: Response) => {
+    try {
+      const result = await roomService.getRoomById(String(req.params.id));
+      return res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Lỗi server' });
     }
   },
 
@@ -25,11 +37,11 @@ export const roomController = {
         data: result,
       });
     } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Lỗi server' });
     }
   },
 
-  getAmenities: async (req: AuthRequest, res: Response) => {
+  getAmenities: async (req: Request, res: Response) => {
     try {
       const result = await roomService.getAllAmenities();
       return res.status(200).json({
@@ -38,7 +50,7 @@ export const roomController = {
         data: result,
       });
     } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Lỗi server' });
     }
   }
 };
