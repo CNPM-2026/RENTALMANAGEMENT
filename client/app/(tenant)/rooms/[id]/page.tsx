@@ -648,12 +648,15 @@ function RoomDetailContent() {
             </button>
           </div>
 
-          {/* Main Large Image Container */}
-          <div className="relative w-full max-w-7xl h-[76vh] sm:h-[82vh] flex items-center justify-center px-4 sm:px-14">
-            <img
+          {/* Main Large Image Container - chỉ phóng to bên trong Lightbox */}
+          <div className="relative w-full max-w-none h-[78vh] sm:h-[82vh] flex items-center justify-center px-2 sm:px-12">
+            <Image
               src={ROOM_IMAGES[activeImageIndex] ?? ROOM_IMAGES[0]}
               alt={`Ảnh chi tiết ${activeImageIndex + 1}`}
-              className="max-w-full max-h-full w-auto h-auto object-contain rounded-[12px] shadow-2xl transition-all duration-200 select-none"
+              fill
+              sizes="90vw"
+              priority
+              className="object-contain rounded-[12px] shadow-2xl transition-all duration-200 select-none"
             />
 
             {/* Prev Button */}
@@ -694,7 +697,13 @@ function RoomDetailContent() {
                     activeImageIndex === idx ? "border-[#15594f] scale-105" : "border-transparent opacity-60 hover:opacity-100"
                   }`}
                 >
-                  <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                  <Image
+                    src={img}
+                    alt={`Thumbnail ${idx + 1}`}
+                    fill
+                    sizes="56px"
+                    className="object-cover"
+                  />
                 </button>
               ))}
             </div>
