@@ -86,7 +86,22 @@ export const contractService = {
     if (role === 'LANDLORD') {
       whereClause.room = { property: { landlordId: userId } };
     } else if (role === 'TENANT') {
-      whereClause.tenantId = userId;
+      const userDeclarations = await prisma.roomOccupancyDeclaration.findMany({
+        where: { tenantId: userId, status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
+        select: { roomId: true, contractId: true },
+      });
+      const roomIds = userDeclarations.map((d) => d.roomId);
+      const contractIds = userDeclarations.map((d) => d.contractId).filter(Boolean) as string[];
+
+      if (roomIds.length > 0 || contractIds.length > 0) {
+        whereClause.OR = [
+          { tenantId: userId },
+          ...(contractIds.length > 0 ? [{ id: { in: contractIds } }] : []),
+          ...(roomIds.length > 0 ? [{ roomId: { in: roomIds }, status: 'ACTIVE' }] : []),
+        ];
+      } else {
+        whereClause.tenantId = userId;
+      }
     } else if (role === 'ADMIN') {
       // Admin is intentionally allowed to review all contracts.
     } else if (role === 'STAFF') {

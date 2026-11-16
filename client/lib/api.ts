@@ -950,6 +950,8 @@ export const apiClient = {
     /** `role` lọc hàng đợi theo người nộp (`TENANT` | `LANDLORD` | `STAFF`); bỏ trống = tất cả. */
     getKyc: (status?: string, role?: KycRole) =>
       apiClient.get<KycSubmission[]>('/admin/kyc', { status, role }),
+    getKycById: (id: string) =>
+      apiClient.get<KycSubmission>(`/admin/kyc/${id}`),
     updateKyc: (id: string, payload: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
       apiClient.patch<KycSubmission>(`/admin/kyc/${id}/status`, payload),
     getAuditLogs: (query?: { search?: string; limit?: number }) =>

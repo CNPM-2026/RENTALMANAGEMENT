@@ -16,6 +16,7 @@ router.delete('/posts/:id', adminController.deletePost);
 router.get('/users', adminController.getUsers);
 router.patch('/users/:id/status', adminController.updateUserStatus);
 router.get('/kyc', adminController.getKyc);
+router.get('/kyc/:id', adminController.getKycById);
 router.patch('/kyc/:id/status', adminController.updateKyc);
 router.get('/audit-logs', adminController.getAuditLogs);
 router.get('/content-filter', adminController.getContentFilterKeywords);

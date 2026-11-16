@@ -16,21 +16,53 @@ export const appointmentService = {
     
     // 1. Tự động tìm Chủ trọ dựa vào Phòng hoặc Bài đăng
     if (roomId) {
-      const room = await prisma.room.findUnique({
+      let room = await prisma.room.findUnique({
         where: { id: roomId },
         include: {
           property: true,
-          // Hợp đồng ACTIVE là nguồn sự thật mạnh hơn `rooms.status`: một phòng
-          // có thể còn ghi AVAILABLE do dữ liệu cũ trong khi đã có người thuê.
           contracts: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
         }
       });
 
-      if (!room) throw new AppError('Phòng không tồn tại', 404);
-      if (room.status !== 'AVAILABLE' || room.contracts.length > 0) {
-        throw new AppError('Phòng hiện không sẵn sàng để xem', 400);
+      // Nếu không tìm thấy phòng theo id, có thể client truyền nhầm postId vào roomId
+      if (!room) {
+        const post = await prisma.post.findUnique({
+          where: { id: roomId },
+          include: {
+            property: true,
+            room: {
+              include: {
+                property: true,
+                contracts: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
+              },
+            },
+          }
+        });
+
+        if (post) {
+          if (post.status !== 'APPROVED' || (post.expiredAt && post.expiredAt <= new Date())) {
+            throw new AppError('Bài đăng chưa được duyệt hoặc đã hết hạn', 400);
+          }
+          if (post.postType !== PostType.RENT_OUT) {
+            throw new AppError('Chỉ bài đăng cho thuê phòng mới cho phép đặt lịch xem', 400);
+          }
+          if (post.room) {
+            room = post.room;
+            targetRoomId = post.room.id;
+          } else {
+            targetRoomId = null;
+          }
+          landlordId = post.property ? post.property.landlordId : post.authorId;
+        }
       }
-      landlordId = room.property.landlordId;
+
+      if (!room && !landlordId) throw new AppError('Phòng không tồn tại', 404);
+      if (room) {
+        if (room.status !== 'AVAILABLE' || room.contracts.length > 0) {
+          throw new AppError('Phòng hiện không sẵn sàng để xem', 400);
+        }
+        landlordId = room.property.landlordId;
+      }
     } else if (postId) {
       const post = await prisma.post.findUnique({
         where: { id: postId },

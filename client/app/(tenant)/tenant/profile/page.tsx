@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Camera, Save, ShieldCheck, Heart, Calendar, FileText, Info } from "lucide-react";
+import { Camera, Save, ShieldCheck, ShieldAlert, ShieldX, Clock, Heart, Calendar, FileText, Info } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api";
 import { getCurrentUser, updateStoredUser } from "@/lib/auth";
 import { UserWithProfile } from "@/types/models";
@@ -445,10 +445,51 @@ export default function TenantProfilePage() {
                 </Link>
               )}
 
-              <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-[100px] bg-[#eaf2ed] text-[#15594f] text-[11px] font-bold">
-                <ShieldCheck className="size-3.5" />
-                <span>Người thuê đã xác thực</span>
-              </div>
+              {/* KYC Verification Status */}
+              {user?.kycSubmission?.status === "APPROVED" ? (
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-[100px] bg-[#eaf2ed] text-[#15594f] text-[11px] font-bold">
+                  <ShieldCheck className="size-3.5 text-[#15594f]" />
+                  <span>Đã xác minh danh tính (KYC)</span>
+                </div>
+              ) : user?.kycSubmission?.status === "PENDING" ? (
+                <div className="mt-2.5 flex flex-col items-center gap-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[100px] bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold">
+                    <Clock className="size-3.5 text-amber-600" />
+                    <span>Hồ sơ KYC đang chờ duyệt</span>
+                  </div>
+                  <Link href="/tenant/kyc" className="text-[11px] text-[#15594f] hover:underline font-medium">
+                    Xem tiến độ xét duyệt
+                  </Link>
+                </div>
+              ) : user?.kycSubmission?.status === "REJECTED" ? (
+                <div className="mt-2.5 flex flex-col items-center gap-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[100px] bg-red-50 text-red-700 border border-red-200 text-[11px] font-bold">
+                    <ShieldX className="size-3.5 text-red-600" />
+                    <span>Hồ sơ KYC bị từ chối</span>
+                  </div>
+                  {user.kycSubmission.rejectionReason && (
+                    <p className="text-[11px] text-red-600 text-center max-w-[200px] line-clamp-2">
+                      {user.kycSubmission.rejectionReason}
+                    </p>
+                  )}
+                  <Link href="/tenant/kyc" className="text-[11px] text-[#15594f] font-semibold hover:underline">
+                    Gửi lại hồ sơ xác minh
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-2.5 flex flex-col items-center gap-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[100px] bg-gray-100 text-gray-700 border border-gray-200 text-[11px] font-bold">
+                    <ShieldAlert className="size-3.5 text-gray-500" />
+                    <span>Chưa xác minh danh tính</span>
+                  </div>
+                  <Link
+                    href="/tenant/kyc"
+                    className="inline-flex items-center gap-1 text-[11px] text-[#15594f] font-bold hover:underline"
+                  >
+                    Xác minh ngay &rarr;
+                  </Link>
+                </div>
+              )}
             </div>
 
             <div className="h-px bg-[#e2e7e1]" />

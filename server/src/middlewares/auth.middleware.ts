@@ -25,6 +25,14 @@ export interface AuthRequest extends Request {
       emergencyContact: string | null;
       createdAt: Date;
     } | null;
+    kycSubmission?: {
+      id: string;
+      status: string;
+      idNumber: string;
+      rejectionReason: string | null;
+      createdAt: Date;
+      reviewedAt: Date | null;
+    } | null;
     landlordId?: string;
     staffPermissions?: string[];
   };
@@ -60,6 +68,16 @@ export const authenticate: RequestHandler = async (req, res, next) => {
         createdAt: true,
         updatedAt: true,
         profile: true,
+        kycSubmission: {
+          select: {
+            id: true,
+            status: true,
+            idNumber: true,
+            rejectionReason: true,
+            createdAt: true,
+            reviewedAt: true,
+          }
+        },
       }
     });
 
@@ -134,6 +152,16 @@ export const authenticateOptional: RequestHandler = async (req, res, next) => {
         createdAt: true,
         updatedAt: true,
         profile: true,
+        kycSubmission: {
+          select: {
+            id: true,
+            status: true,
+            idNumber: true,
+            rejectionReason: true,
+            createdAt: true,
+            reviewedAt: true,
+          }
+        },
       },
     });
 
