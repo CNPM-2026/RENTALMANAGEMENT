@@ -35,6 +35,7 @@ vi.mock('../../src/services/notification.service', () => ({
   notificationService: {
     notifyUsers: vi.fn(),
     notifyUser: vi.fn(),
+    createNotification: vi.fn(),
   },
 }));
 
