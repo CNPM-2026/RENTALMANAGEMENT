@@ -16,6 +16,9 @@ import {
   Building,
   Sparkles,
   ExternalLink,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api";
 import { Post, PostStatus } from "@/types/models";
@@ -71,7 +74,7 @@ function LandlordListingDetailContent() {
   const [editDescription, setEditDescription] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [editError, setEditError] = React.useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -323,7 +326,7 @@ function LandlordListingDetailContent() {
                   {images.map((img, idx) => (
                     <div
                       key={img.id || idx}
-                      onClick={() => setSelectedImage(img.imageUrl)}
+                      onClick={() => setActiveImageIndex(idx)}
                       className="group relative aspect-4/3 overflow-hidden rounded-lg border border-[#e2e7e1] bg-gray-100 cursor-pointer shadow-xs hover:border-[#15594f] transition-all"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -531,14 +534,80 @@ function LandlordListingDetailContent() {
         </form>
       </Modal>
 
-      {/* Image Preview Modal */}
-      {selectedImage && (
-        <Modal isOpen={Boolean(selectedImage)} onClose={() => setSelectedImage(null)} title="Xem hình ảnh" size="lg">
-          <div className="aspect-16/10 w-full overflow-hidden rounded-lg bg-black flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={selectedImage} alt="Ảnh phòng" className="max-h-[75vh] w-auto object-contain" />
+      {/* Photo Gallery Modal Lightbox */}
+      {activeImageIndex !== null && images[activeImageIndex] && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-2 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          {/* Top Bar with counter & close button */}
+          <div className="absolute top-4 inset-x-4 flex items-center justify-between z-50 text-white max-w-7xl mx-auto px-4">
+            <div className="px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold">
+              Ảnh {activeImageIndex + 1} / {images.length}
+              {images[activeImageIndex].isPrimary && " (Ảnh chính)"}
+            </div>
+            <button
+              onClick={() => setActiveImageIndex(null)}
+              className="size-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer"
+              aria-label="Đóng thư viện ảnh"
+            >
+              <X className="size-6" />
+            </button>
           </div>
-        </Modal>
+
+          {/* Main Large Image Container */}
+          <div className="relative w-full max-w-7xl h-[76vh] sm:h-[82vh] flex items-center justify-center px-4 sm:px-14">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={images[activeImageIndex].imageUrl}
+              alt={`Ảnh chi tiết ${activeImageIndex + 1}`}
+              className="max-w-full max-h-full w-auto h-auto object-contain rounded-xl shadow-2xl transition-all duration-200 select-none"
+            />
+
+            {/* Prev Button */}
+            {images.length > 1 && (
+              <button
+                onClick={() =>
+                  setActiveImageIndex((i) => (i === null || i === 0 ? images.length - 1 : i - 1))
+                }
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 size-12 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer transition-all shadow-lg"
+                aria-label="Ảnh trước"
+              >
+                <ChevronLeft className="size-7" />
+              </button>
+            )}
+
+            {/* Next Button */}
+            {images.length > 1 && (
+              <button
+                onClick={() =>
+                  setActiveImageIndex((i) => (i === null || i === images.length - 1 ? 0 : i + 1))
+                }
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 size-12 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer transition-all shadow-lg"
+                aria-label="Ảnh kế tiếp"
+              >
+                <ChevronRight className="size-7" />
+              </button>
+            )}
+          </div>
+
+          {/* Thumbnail Preview Strip */}
+          {images.length > 1 && (
+            <div className="flex items-center gap-2 mt-3 max-w-3xl overflow-x-auto py-1 px-4">
+              {images.map((img, idx) => (
+                <button
+                  key={img.id || idx}
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`relative size-14 shrink-0 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                    activeImageIndex === idx
+                      ? "border-[#15594f] scale-105"
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.imageUrl} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
