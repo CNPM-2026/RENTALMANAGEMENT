@@ -62,9 +62,7 @@ export function resolveNotificationTarget(
 
     case 'POST_PENDING':
       if (portal === 'admin') {
-        return id
-          ? `/admin/moderation/listings#post-${encodeURIComponent(id)}`
-          : '/admin/moderation/listings';
+        return '/admin/moderation/listings';
       }
       return null;
 

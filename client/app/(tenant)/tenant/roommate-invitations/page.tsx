@@ -21,6 +21,8 @@ import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 interface Invitation {
   id: string;
+  /** Id của người còn lại trong lời mời — KHÔNG phải id lời mời. */
+  userId: string;
   type: "RECEIVED" | "SENT";
   userName: string;
   userAge: number;
@@ -40,6 +42,7 @@ export default function TenantRoommateInvitationsPage() {
   const [invitations, setInvitations] = React.useState<Invitation[]>([]);
   const [actionMessage, setActionMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
   const [focusId, setFocusId] = React.useState<string | null>(null);
+  const [openingChatId, setOpeningChatId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     Promise.all([
@@ -48,8 +51,10 @@ export default function TenantRoommateInvitationsPage() {
     ]).then(([received, sent]) => {
       const map = (items: ApiInvitation[], type: Invitation["type"]) => items.map((item) => {
         const user = type === "RECEIVED" ? item.sender : item.recipient;
+        const counterpartId = type === "RECEIVED" ? item.senderId : item.recipientId;
         return {
           id: item.id,
+          userId: counterpartId,
           type,
           userName: user?.fullName ?? "Người dùng",
           userAge: user?.profile?.dob ? new Date().getFullYear() - new Date(user.profile.dob).getFullYear() : 0,
@@ -118,6 +123,27 @@ export default function TenantRoommateInvitationsPage() {
         type: "error",
         text: error instanceof Error ? error.message : "Không thể từ chối lời mời.",
       });
+    }
+  };
+
+  const handleOpenChat = async (invitation: Invitation) => {
+    if (openingChatId) return;
+    setActionMessage(null);
+    if (!invitation.userId) {
+      setActionMessage({ type: "error", text: "Không xác định được người cần nhắn tin." });
+      return;
+    }
+    setOpeningChatId(invitation.id);
+    try {
+      const conversation = await apiClient.chats.getOrCreateConversationWithUser(invitation.userId);
+      router.push(`/tenant/messages?conversation=${conversation.id}`);
+    } catch (error) {
+      setActionMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể bắt đầu cuộc trò chuyện.",
+      });
+    } finally {
+      setOpeningChatId(null);
     }
   };
 
@@ -264,13 +290,11 @@ export default function TenantRoommateInvitationsPage() {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={async () => {
-                        const conversation = await apiClient.chats.getOrCreateConversationWithUser(item.id);
-                        router.push(`/tenant/messages?conversation=${conversation.id}`);
-                      }}
+                      disabled={openingChatId === item.id}
+                      onClick={() => handleOpenChat(item)}
                       leftIcon={<MessageCircle className="size-3.5" />}
                     >
-                      Bắt đầu chat
+                      {openingChatId === item.id ? "Đang mở..." : "Bắt đầu chat"}
                     </Button>
                   )}
                 </div>
