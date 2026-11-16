@@ -173,7 +173,7 @@ export const maintenanceService = {
           room.property.landlordId,
           'Sự cố mới từ khách thuê',
           `${created.room?.roomNumber ? `Phòng ${created.room.roomNumber}: ` : ''}${created.title}`,
-          'SYSTEM',
+          'MAINTENANCE_REQUEST',
           created.id,
           `maintenance-issue:${created.id}:created`,
         )

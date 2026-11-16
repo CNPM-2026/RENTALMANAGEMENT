@@ -20,6 +20,7 @@ import {
   LogOut,
   ShieldCheck,
   Wrench,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -39,6 +40,9 @@ export function PortalSidebar({ onLogout }: PortalSidebarProps) {
     { label: "Lịch xem phòng", href: "/tenant/appointments", icon: Calendar },
     { label: "Yêu cầu thuê", href: "/tenant/rental-requests", icon: Send },
     { label: "Hợp đồng của tôi", href: "/tenant/contracts", icon: FileText },
+    // 🆕 Hoá đơn có trang riêng: thông báo INVOICE của tenant không còn trỏ
+    // nhầm sang trang hợp đồng (nơi không hiển thị hoá đơn).
+    { label: "Hoá đơn của tôi", href: "/tenant/invoices", icon: Receipt },
     // 🆕 Số người ở: tenant khai, chủ trọ xác minh; hoá đơn dùng số ĐÃ xác minh.
     { label: "Khai báo số người ở", href: "/tenant/occupancy", icon: UserCheck },
     // 🆕 Batch 2 — điểm bắt đầu của luồng marketplace: khách thuê báo sự cố,

@@ -70,7 +70,7 @@ export const roommateInvitationService = {
         data.recipientId,
         'Lời mời kết nối mới',
         'Bạn nhận được lời mời tìm bạn ở ghép.',
-        'SYSTEM',
+        'ROOMMATE_INVITATION',
         invitation.id,
         `roommate-invitation:${invitation.id}:received`,
       );
@@ -110,7 +110,7 @@ export const roommateInvitationService = {
         invitation.senderId,
         'Lời mời kết nối đã bị từ chối',
         `${invitation.recipient.fullName} đã từ chối lời mời ở ghép của bạn.`,
-        'SYSTEM',
+        'ROOMMATE_INVITATION',
         invitation.id,
         `roommate-invitation:${invitation.id}:declined`,
       );
@@ -119,7 +119,7 @@ export const roommateInvitationService = {
         invitation.recipientId,
         'Lời mời kết nối đã được hủy',
         `${invitation.sender.fullName} đã hủy lời mời ở ghép.`,
-        'SYSTEM',
+        'ROOMMATE_INVITATION',
         invitation.id,
         `roommate-invitation:${invitation.id}:cancelled`,
       );
@@ -203,16 +203,30 @@ export const roommateInvitationService = {
       });
 
       const reason = `Phòng ${room.roomNumber} chỉ cho phép tối đa ${room.maxOccupants} người, hiện dự kiến ${occupiedBefore} người. Không thể thêm ${invitation.sender.fullName} ở ghép.`;
-      await notificationService.notifyUsers(
-        [invitation.senderId, invitation.recipientId, room.property.landlordId],
-        {
-          title: 'Yêu cầu ở ghép bị từ chối tự động',
-          content: reason,
-          type: 'OCCUPANCY',
-          referenceId: room.id,
-        },
-        (recipientId) => `roommate-invitation:${invitation.id}:capacity-rejected:${recipientId}`,
-      );
+      // Hai bên tenant mở đúng lời mời vừa bị từ chối. Chủ trọ không có "lời mời"
+      // để focus (chưa có declaration nào được tạo), nên nhận OCCUPANCY không kèm
+      // referenceId — UI sẽ mở hàng đợi khai báo thay vì trỏ tới id phòng sai.
+      await Promise.all([
+        notificationService.notifyUsers(
+          [invitation.senderId, invitation.recipientId],
+          {
+            title: 'Yêu cầu ở ghép bị từ chối tự động',
+            content: reason,
+            type: 'ROOMMATE_INVITATION',
+            referenceId: invitation.id,
+          },
+          (recipientId) => `roommate-invitation:${invitation.id}:capacity-rejected:${recipientId}`,
+        ),
+        notificationService.notifyUsers(
+          [room.property.landlordId],
+          {
+            title: 'Yêu cầu ở ghép bị từ chối tự động',
+            content: reason,
+            type: 'OCCUPANCY',
+          },
+          (recipientId) => `roommate-invitation:${invitation.id}:capacity-rejected:${recipientId}`,
+        ),
+      ]);
 
       return {
         ...updated,

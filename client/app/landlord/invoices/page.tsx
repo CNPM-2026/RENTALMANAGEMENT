@@ -7,6 +7,7 @@ import { Invoice, InvoicePreview, InvoiceStatus, Room } from "@/types/models";
 import { Modal } from "@/components/ui/modal";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { parseDecimalInput, parseIntegerInput } from "@/lib/numeric";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 const STATUS_MAP: Record<InvoiceStatus, { label: string; bg: string; text: string }> = {
   PAID: { label: "Đã thanh toán", bg: "bg-[#eaf2ed]", text: "text-[#15594f]" },
@@ -70,6 +71,7 @@ export default function LandlordInvoicesPage() {
   const [detailInvoice, setDetailInvoice] = React.useState<Invoice | null>(null);
   const [payError, setPayError] = React.useState("");
   const [payingId, setPayingId] = React.useState("");
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   const openCreateForm = () => {
     const now = new Date();
@@ -99,6 +101,17 @@ export default function LandlordInvoicesPage() {
       })
       .catch(() => setRooms([]));
   }, []);
+
+  // Hoá đơn đến từ thông báo: cuộn tới đúng dòng và tô sáng.
+  React.useEffect(() => {
+    const id = readFocusParam("invoice");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`invoice-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [invoices]);
 
   // Xem trước có debounce: server là nguồn sự thật của phép tính, không đoán ở client.
   // Không setState đồng bộ trong thân effect; mọi cập nhật nằm trong timer/promise.
@@ -277,7 +290,7 @@ export default function LandlordInvoicesPage() {
               {filtered.map((inv) => {
                 const st = STATUS_MAP[inv.status] || STATUS_MAP.UNPAID;
                 return (
-                  <tr key={inv.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
+                  <tr key={inv.id} id={`invoice-${inv.id}`} className={`scroll-mt-24 hover:bg-[#f7f6f2]/60 transition-colors ${focusId === inv.id ? "bg-[#eaf2ed]/60 ring-2 ring-inset ring-[#15594f]" : ""}`}>
                     <td className="py-3.5 px-4 font-semibold">
                       {inv.room?.roomNumber ? `Phòng ${inv.room.roomNumber}` : inv.roomId.slice(0, 8)}
                       {inv.tenant?.fullName && (

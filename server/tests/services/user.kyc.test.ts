@@ -87,6 +87,19 @@ describe('userService.submitKyc — một lần duy nhất', () => {
     expect(mocks.deleteImage).toHaveBeenCalledWith('rental-management/kyc/front-old', 'authenticated');
     expect(mocks.deleteImage).toHaveBeenCalledWith('rental-management/kyc/back-old', 'authenticated');
   });
+
+  it('báo cho admin bằng type KYC kèm id hồ sơ để deep-link đúng hàng đợi', async () => {
+    mocks.findUnique.mockResolvedValue(null);
+    mocks.findAdmins.mockResolvedValue([{ id: 'admin-1' }]);
+
+    await userService.submitKyc('user-1', DATA);
+
+    expect(mocks.notifyUsers).toHaveBeenCalledWith(
+      ['admin-1'],
+      expect.objectContaining({ type: 'KYC', referenceId: 'kyc-1' }),
+      expect.any(Function),
+    );
+  });
 });
 
 describe('userService.getMyKyc — hồ sơ đã duyệt', () => {

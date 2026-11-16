@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { apiClient } from "@/lib/api";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 interface AppointmentItem {
   id: string;
@@ -48,6 +49,7 @@ export default function TenantAppointmentsPage() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [minRescheduleDate, setMinRescheduleDate] = React.useState("");
   const [maxRescheduleDate, setMaxRescheduleDate] = React.useState("");
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -75,6 +77,27 @@ export default function TenantAppointmentsPage() {
       }))))
       .catch(() => setErrorMessage("Không tải được lịch xem phòng."));
   }, []);
+
+  // Thông báo APPOINTMENT có thể là lịch đã huỷ/đã xong — mặc định tab
+  // "Sắp tới" sẽ ẩn bản ghi. Đổi tab theo trạng thái rồi mới cuộn tới thẻ.
+  React.useEffect(() => {
+    const id = readFocusParam("appointment");
+    if (!id) return;
+    const target = appointments.find((item) => item.id === id);
+    if (!target) return;
+    const nextTab: "UPCOMING" | "COMPLETED" | "CANCELLED" =
+      target.status === "CANCELLED"
+        ? "CANCELLED"
+        : target.status === "COMPLETED"
+          ? "COMPLETED"
+          : "UPCOMING";
+    const frame = window.requestAnimationFrame(() => {
+      setActiveTab(nextTab);
+      setFocusId(id);
+      window.requestAnimationFrame(() => scrollToFocus(`appointment-${id}`));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [appointments]);
 
   // Modal States
   const [selectedAppointment, setSelectedAppointment] = React.useState<AppointmentItem | null>(null);
@@ -264,7 +287,10 @@ export default function TenantAppointmentsPage() {
           {filteredAppointments.map((apt) => (
             <div
               key={apt.id}
-              className="p-5 rounded-[14px] bg-white border border-[#e2e7e1] shadow-xs flex flex-col md:flex-row gap-5 items-start md:items-center justify-between"
+              id={`appointment-${apt.id}`}
+              className={`p-5 rounded-[14px] bg-white border shadow-xs flex flex-col md:flex-row gap-5 items-start md:items-center justify-between scroll-mt-24 ${
+                focusId === apt.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+              }`}
             >
               <div className="flex gap-4 items-start min-w-0">
                 <img

@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
 import { RoommateInvitation as ApiInvitation } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 interface Invitation {
   id: string;
@@ -38,6 +39,7 @@ export default function TenantRoommateInvitationsPage() {
   // State for invitations
   const [invitations, setInvitations] = React.useState<Invitation[]>([]);
   const [actionMessage, setActionMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     Promise.all([
@@ -62,6 +64,21 @@ export default function TenantRoommateInvitationsPage() {
       setInvitations([...map(received, "RECEIVED"), ...map(sent, "SENT")]);
     }).catch(() => setInvitations([]));
   }, []);
+
+  // Thông báo ROOMMATE_INVITATION mở `?invitation=<id>`. Lời mời đã từ chối/huỷ
+  // có thể nằm ở tab "Đã gửi", nên chọn tab theo chính bản ghi trước khi cuộn.
+  React.useEffect(() => {
+    const id = readFocusParam("invitation");
+    if (!id) return;
+    const target = invitations.find((item) => item.id === id);
+    if (!target) return;
+    const frame = window.requestAnimationFrame(() => {
+      setActiveTab(target.type);
+      setFocusId(id);
+      window.requestAnimationFrame(() => scrollToFocus(`invitation-${id}`));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [invitations]);
 
   const handleAccept = async (id: string) => {
     setActionMessage(null);
@@ -185,7 +202,10 @@ export default function TenantRoommateInvitationsPage() {
           currentList.map((item) => (
             <Card
               key={item.id}
-              className="border border-[#e2e7e1] bg-white rounded-[12px] p-5 shadow-sm hover:border-[#15594f]/30 transition-all"
+              id={`invitation-${item.id}`}
+              className={`scroll-mt-24 border bg-white rounded-[12px] p-5 shadow-sm hover:border-[#15594f]/30 transition-all ${
+                focusId === item.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+              }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex items-start gap-4">

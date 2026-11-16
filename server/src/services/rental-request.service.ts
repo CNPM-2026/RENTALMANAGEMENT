@@ -37,7 +37,7 @@ export const rentalRequestService = {
       request.landlordId,
       'Yêu cầu thuê phòng mới',
       `Bạn nhận được yêu cầu thuê phòng ${request.room.roomNumber}.`,
-      'SYSTEM',
+      'RENTAL_REQUEST',
       request.id
     );
     return request;
@@ -77,7 +77,7 @@ export const rentalRequestService = {
         request.tenantId,
         'Cập nhật yêu cầu thuê phòng',
         `Yêu cầu thuê phòng đã được cập nhật: ${status.toLowerCase()}.`,
-        'SYSTEM',
+        'RENTAL_REQUEST',
         request.id
       );
       return updated;
@@ -113,7 +113,7 @@ export const rentalRequestService = {
       request.tenantId,
       'Yêu cầu thuê phòng được chấp thuận',
       'Yêu cầu thuê phòng của bạn đã được chủ trọ chấp thuận.',
-      'SYSTEM',
+      'RENTAL_REQUEST',
       request.id
     );
     return result.approved;

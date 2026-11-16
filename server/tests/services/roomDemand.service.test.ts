@@ -118,7 +118,7 @@ describe('roomDemandService.notifyCancelledDemand', () => {
       'tenant-2',
       'Yêu cầu thuê phòng đã bị huỷ',
       expect.stringContaining(ROOM_LABEL),
-      'SYSTEM',
+      'RENTAL_REQUEST',
       'request-2',
       'room-rented:rental-request:request-2',
     );

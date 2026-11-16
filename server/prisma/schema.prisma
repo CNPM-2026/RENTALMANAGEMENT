@@ -271,6 +271,13 @@ enum NotificationType {
   // Tách khỏi SYSTEM để UI deep-link đúng màn hình xử lý.
   POST_PENDING
   SUPPORT_TICKET
+  // 🆕 Deep-link cho các luồng trước đây dùng chung SYSTEM. Nếu để SYSTEM thì
+  // client không thể biết `reference_id` trỏ tới bảng nào, nên mọi nút "Xem chi
+  // tiết" đều rơi về trang nội dung thông báo thay vì bản ghi liên quan.
+  RENTAL_REQUEST
+  MAINTENANCE_REQUEST
+  ROOMMATE_INVITATION
+  KYC
 }
 
 // 🆕 Enum cho đối tượng được đánh giá

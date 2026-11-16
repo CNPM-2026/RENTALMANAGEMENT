@@ -5,6 +5,7 @@ import { Users, CheckCircle2, XCircle, RefreshCw, AlertTriangle } from "lucide-r
 import { apiClient } from "@/lib/api";
 import { OccupancyDeclaration } from "@/types/models";
 import { Modal } from "@/components/ui/modal";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 function formatDateTime(value?: string | null) {
   if (!value) return "—";
@@ -27,6 +28,7 @@ export default function LandlordOccupancyPage() {
   const [rejecting, setRejecting] = React.useState<OccupancyDeclaration | null>(null);
   const [rejectReason, setRejectReason] = React.useState("");
   const [isRejecting, setIsRejecting] = React.useState(false);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   // Không setState ĐỒNG BỘ trong thân effect (react-hooks/set-state-in-effect):
   // setState nằm trong callback promise; `fetchPending` chỉ dùng cho nút "Làm mới".
@@ -62,6 +64,17 @@ export default function LandlordOccupancyPage() {
       isCancelled = true;
     };
   }, []);
+
+  // Thông báo OCCUPANCY mở `?declaration=<id>` để cuộn/tô sáng khai báo.
+  React.useEffect(() => {
+    const id = readFocusParam("declaration");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`declaration-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [declarations]);
 
   const refresh = async () => {
     setIsLoading(true);
@@ -162,7 +175,7 @@ export default function LandlordOccupancyPage() {
           {declarations.map((item) => {
             const overCapacity = Boolean(item.room && item.occupants > item.room.maxOccupants);
             return (
-              <div key={item.id} className="rounded-[12px] border border-[#e2e7e1] bg-white p-4 shadow-xs">
+              <div key={item.id} id={`declaration-${item.id}`} className={`scroll-mt-24 rounded-[12px] border bg-white p-4 shadow-xs ${focusId === item.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"}`}>
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-[15px] font-semibold text-[#203c37]">
