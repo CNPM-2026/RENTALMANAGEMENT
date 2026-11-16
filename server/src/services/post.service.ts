@@ -6,17 +6,46 @@ import { notificationService } from './notification.service';
 
 export const postService = {
   getById: async (postId: string, user?: { id: string; role: string }) => {
-    const post = await prisma.post.findUnique({
+    let post = await prisma.post.findUnique({
       where: {
         id: postId,
       },
       include: {
         images: true,
         author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
-        property: true,
+        property: {
+          include: {
+            propertyAmenities: {
+              include: { amenity: true },
+            },
+          },
+        },
         room: { include: { roomAmenities: { include: { amenity: true } } } },
       },
     });
+
+    // Nếu không tìm thấy bằng postId, thử tìm post bằng roomId
+    if (!post) {
+      post = await prisma.post.findFirst({
+        where: {
+          roomId: postId,
+        },
+        include: {
+          images: true,
+          author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
+          property: {
+            include: {
+              propertyAmenities: {
+                include: { amenity: true },
+              },
+            },
+          },
+          room: { include: { roomAmenities: { include: { amenity: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
     if (!post) throw new AppError('Không tìm thấy tin đăng', 404);
 
     const isAuthor = user && user.id === post.authorId;

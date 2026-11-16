@@ -59,6 +59,18 @@ export const roomController = {
     }
   },
 
+  getById: async (req: any, res: Response, next: NextFunction) => {
+    try {
+      const result = await roomService.getRoomById(String(req.params.id));
+      return res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
   delete: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       await roomService.deleteRoom(resourceOwnerId(req), String(req.params.id));

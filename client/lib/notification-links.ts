@@ -148,7 +148,11 @@ export function resolveNotificationTarget(
       return null;
 
     case 'SYSTEM':
+      if (portal === 'admin') return '/admin/moderation/listings';
+      return null;
+
     default:
+      if (portal === 'admin') return '/admin/moderation/listings';
       return null;
   }
 }

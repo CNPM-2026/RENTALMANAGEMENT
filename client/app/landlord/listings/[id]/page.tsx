@@ -209,16 +209,14 @@ function LandlordListingDetailContent() {
             <ArrowLeft className="size-3.5" />
             <span>Danh sách tin</span>
           </Link>
-          {post.status === "APPROVED" && (
-            <Link
-              href={`/rooms/${post.id}`}
-              target="_blank"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#15594f] bg-[#eaf2ed] px-3.5 py-2 text-xs font-semibold text-[#15594f] hover:bg-[#dfebe3] transition-colors"
-            >
-              <ExternalLink className="size-3.5" />
-              <span>Xem trang công khai</span>
-            </Link>
-          )}
+          <Link
+            href={`/rooms/${post.id}`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#15594f] bg-[#eaf2ed] px-3.5 py-2 text-xs font-semibold text-[#15594f] hover:bg-[#dfebe3] transition-colors"
+          >
+            <ExternalLink className="size-3.5" />
+            <span>{post.status === "APPROVED" ? "Xem trang công khai" : "Xem trước bài đăng"}</span>
+          </Link>
           <button
             type="button"
             onClick={() => setIsEditOpen(true)}

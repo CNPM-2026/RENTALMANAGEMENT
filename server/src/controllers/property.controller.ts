@@ -32,5 +32,32 @@ export const propertyController = {
     } catch (error) {
       return next(error);
     }
+  },
+
+  getById: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const landlordId = resourceOwnerId(req);
+      const result = await propertyService.getPropertyById(landlordId, String(req.params.id));
+      return res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  update: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const landlordId = resourceOwnerId(req);
+      const result = await propertyService.updateProperty(landlordId, String(req.params.id), req.body);
+      return res.status(200).json({
+        success: true,
+        message: 'Cập nhật cơ sở thành công',
+        data: result,
+      });
+    } catch (error) {
+      return next(error);
+    }
   }
 };
