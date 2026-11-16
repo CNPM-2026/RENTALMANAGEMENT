@@ -121,7 +121,7 @@ describe('rentalRequestService.updateStatus — chủ trọ duyệt', () => {
       'tenant-2',
       'Yêu cầu thuê phòng đã bị huỷ',
       expect.stringContaining(ROOM_LABEL),
-      'SYSTEM',
+      'RENTAL_REQUEST',
       'request-2',
       'room-rented:rental-request:request-2',
     );
@@ -137,7 +137,7 @@ describe('rentalRequestService.updateStatus — chủ trọ duyệt', () => {
       'tenant-1',
       'Yêu cầu thuê phòng được chấp thuận',
       expect.any(String),
-      'SYSTEM',
+      'RENTAL_REQUEST',
       'request-1',
     );
   });

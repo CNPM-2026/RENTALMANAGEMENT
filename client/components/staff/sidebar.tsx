@@ -7,8 +7,10 @@ import {
   BadgeCheck,
   Bell,
   ClipboardList,
+  Flag,
   Home,
   LifeBuoy,
+  MessageSquare,
   UserCog,
   Wrench,
 } from "lucide-react";
@@ -31,6 +33,9 @@ export function StaffSidebar() {
       title: "CÔNG VIỆC",
       items: [
         { label: "Việc làm & ứng tuyển", href: "/staff/tasks", icon: ClipboardList },
+        // 🆕 Kết luận báo cáo/tranh chấp do thợ gửi có trang riêng để deep-link.
+        { label: "Báo cáo của tôi", href: "/staff/reports", icon: Flag },
+        { label: "Tin nhắn", href: "/staff/messages", icon: MessageSquare },
         { label: "Hồ sơ & kỹ năng", href: "/staff/profile", icon: UserCog },
         { label: "Xác minh CCCD", href: "/staff/kyc", icon: BadgeCheck },
       ],

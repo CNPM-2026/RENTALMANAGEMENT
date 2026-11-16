@@ -61,7 +61,12 @@ export type NotificationType =
   | 'CONTRACT_RENEWAL'
   /** 🆕 Hàng đợi Admin — tin đăng chờ duyệt và phiếu hỗ trợ mới. */
   | 'POST_PENDING'
-  | 'SUPPORT_TICKET';
+  | 'SUPPORT_TICKET'
+  /** 🆕 Deep-link cho yêu cầu thuê / sự cố / lời mời ở ghép / hồ sơ KYC. */
+  | 'RENTAL_REQUEST'
+  | 'MAINTENANCE_REQUEST'
+  | 'ROOMMATE_INVITATION'
+  | 'KYC';
 
 /**
  * 🆕 Occupancy — trạng thái khai báo số người ở.

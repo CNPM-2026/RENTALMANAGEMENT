@@ -23,6 +23,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
 import { Report } from "@/types/models";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 function ReportStatusBadge({ status }: { status: string }) {
   if (status === "RESOLVED") {
@@ -45,6 +46,7 @@ function MyReportsList() {
   const [error, setError] = React.useState<string | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -76,6 +78,19 @@ function MyReportsList() {
     setError(null);
     setRefreshKey((prev) => prev + 1);
   };
+
+  // Thông báo DISPUTE của người tố giác mở `?report=<id>`: mở rộng đúng báo
+  // cáo rồi cuộn/tô sáng. Dùng rAF vì danh sách được tải bất đồng bộ.
+  React.useEffect(() => {
+    const id = readFocusParam("report");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setExpandedId(id);
+      setFocusId(id);
+      window.requestAnimationFrame(() => scrollToFocus(`report-${id}`));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [reports]);
 
   const targetTypeLabel = (type: string) => {
     if (type === "POST") return "Bài đăng";
@@ -136,7 +151,10 @@ function MyReportsList() {
         return (
           <div
             key={report.id}
-            className="bg-white rounded-[12px] border border-[#e2e7e1] shadow-sm overflow-hidden"
+            id={`report-${report.id}`}
+            className={`bg-white rounded-[12px] border shadow-sm overflow-hidden scroll-mt-24 ${
+              focusId === report.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+            }`}
           >
             {/* Header row */}
             <button

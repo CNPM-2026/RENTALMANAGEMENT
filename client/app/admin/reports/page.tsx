@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Eye, Flag, MessageCircle, Trash2, Ban, Paperclip } from "lucide-react";
 import { apiClient, resolveMediaUrl } from "@/lib/api";
 import { translateDisputeCategory, translateDisputeStatus } from "@/lib/labels";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 import type { Report, ReportStatus } from "@/types/models";
 
 const STATUS_TABS: Array<{ value: ReportStatus | "ALL"; label: string }> = [
@@ -30,6 +31,7 @@ export default function AdminReportsPage() {
   const [processingId, setProcessingId] = React.useState<string | null>(null);
   const [resolutions, setResolutions] = React.useState<Record<string, string>>({});
   const [error, setError] = React.useState<string | null>(null);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (status: ReportStatus | "ALL") => {
     try {
@@ -62,6 +64,19 @@ export default function AdminReportsPage() {
       active = false;
     };
   }, [statusFilter]);
+
+  // Thông báo DISPUTE mở `?report=<id>`. Báo cáo đã xử lý không nằm trong tab
+  // "Chờ xử lý" mặc định, nên chuyển sang "Tất cả" trước khi cuộn/tô sáng.
+  React.useEffect(() => {
+    const id = readFocusParam("report");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setStatusFilter("ALL");
+      setFocusId(id);
+      window.requestAnimationFrame(() => scrollToFocus(`report-${id}`));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [reports]);
 
   async function messageOwner(report: Report) {
     const ownerId = report.target?.author?.id;
@@ -180,7 +195,7 @@ export default function AdminReportsPage() {
             const resolution = resolutions[rep.id] ?? "";
             const busy = processingId === rep.id;
             return (
-              <div key={rep.id} className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs space-y-4">
+              <div key={rep.id} id={`report-${rep.id}`} className={`scroll-mt-24 rounded-[12px] border bg-white p-5 shadow-xs space-y-4 ${focusId === rep.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"}`}>
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 font-bold text-[15px] text-[#203c37]">

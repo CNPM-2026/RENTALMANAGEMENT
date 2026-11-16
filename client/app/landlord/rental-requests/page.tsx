@@ -5,11 +5,13 @@ import Link from "next/link";
 import { Inbox, Check, X, Clock, User, Phone, Mail, Calendar } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { RentalRequest } from "@/types/models";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 export default function LandlordRentalRequestsPage() {
   const [requests, setRequests] = React.useState<RentalRequest[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   const loadRequests = React.useCallback(() => {
     setIsLoading(true);
@@ -27,6 +29,17 @@ export default function LandlordRentalRequestsPage() {
       .catch(() => setErrorMessage("Không tải được yêu cầu thuê phòng."))
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Thông báo RENTAL_REQUEST mở `?request=<id>` để cuộn/tô sáng yêu cầu mới.
+  React.useEffect(() => {
+    const id = readFocusParam("request");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`request-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [requests]);
 
   const handleUpdate = async (id: string, status: "APPROVED" | "REJECTED") => {
     try {
@@ -63,7 +76,10 @@ export default function LandlordRentalRequestsPage() {
           {requests.map((item) => (
             <div
               key={item.id}
-              className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4"
+              id={`request-${item.id}`}
+              className={`scroll-mt-24 rounded-[12px] border bg-white p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                focusId === item.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+              }`}
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-2">

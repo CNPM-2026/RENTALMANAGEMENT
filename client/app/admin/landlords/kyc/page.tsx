@@ -4,6 +4,7 @@ import * as React from "react";
 import { BadgeCheck, Check, X } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { translateRole } from "@/lib/labels";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 import type { KycSubmission, KycRole } from "@/types/models";
 
 /**
@@ -25,6 +26,7 @@ const ROLE_FILTERS: Array<{ key: KycRole | "ALL"; label: string }> = [
 export default function AdminKycPage() {
   const [kycRequests, setKycRequests] = React.useState<KycSubmission[]>([]);
   const [roleFilter, setRoleFilter] = React.useState<KycRole | "ALL">("ALL");
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     apiClient.adminGovernance
@@ -32,6 +34,17 @@ export default function AdminKycPage() {
       .then(setKycRequests)
       .catch(() => setKycRequests([]));
   }, [roleFilter]);
+
+  // Thông báo KYC mở `?kyc=<id>` để cuộn/tô sáng đúng hồ sơ trong hàng đợi.
+  React.useEffect(() => {
+    const id = readFocusParam("kyc");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`kyc-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [kycRequests]);
 
   const handleAction = async (id: string, action: "APPROVED" | "REJECTED") => {
     await apiClient.adminGovernance.updateKyc(id, { status: action });
@@ -77,7 +90,10 @@ export default function AdminKycPage() {
           {kycRequests.map((req) => (
             <div
               key={req.id}
-              className="rounded-[12px] border border-[#e2e7e1] bg-white p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6"
+              id={`kyc-${req.id}`}
+              className={`scroll-mt-24 rounded-[12px] border bg-white p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6 ${
+                focusId === req.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+              }`}
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-2">

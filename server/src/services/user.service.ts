@@ -101,7 +101,7 @@ export const userService = {
         {
           title: 'Hồ sơ KYC mới',
           content: 'Có hồ sơ xác minh danh tính mới đang chờ duyệt.',
-          type: 'SYSTEM',
+          type: 'KYC',
           referenceId: result.id,
         },
         (adminId) => `kyc:${result.id}:submitted:${adminId}`,

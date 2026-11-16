@@ -26,6 +26,7 @@ import { apiClient } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import { Contract, Post, RoommatePostFilters, RoommatePostItem, User } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 /* Legacy design fixture retained only for type inference; candidates are loaded from the matching API.
 const LEGACY_CANDIDATES = [
@@ -319,6 +320,7 @@ export default function RoommateDiscoveryPage() {
   const [profileReady, setProfileReady] = React.useState<boolean | null>(null);
   const [myRoommatePost, setMyRoommatePost] = React.useState<Post | null>(null);
   const [myPostVersion, setMyPostVersion] = React.useState(0);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [candidates, setCandidates] = React.useState<CandidateShape[]>([]);
@@ -486,6 +488,18 @@ export default function RoommateDiscoveryPage() {
   const myPostMeta = myRoommatePost
     ? ROOMMATE_POST_STATUS_META[myRoommatePost.status] ?? ROOMMATE_POST_STATUS_META.PENDING
     : null;
+
+  // Thông báo POST_APPROVED/POST_REJECTED của tenant mang `?post=<id>`; cuộn
+  // tới thẻ "Bài đăng tìm bạn ở ghép của bạn" và tô sáng trạng thái duyệt.
+  React.useEffect(() => {
+    const id = readFocusParam("post");
+    if (!id || myRoommatePost?.id !== id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`roommate-post-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [myRoommatePost]);
 
   const updateFilter = <K extends keyof RoommateFilterState>(
     key: K,
@@ -707,7 +721,7 @@ export default function RoommateDiscoveryPage() {
         </Card>
 
         {myRoommatePost && myPostMeta && (
-          <Card className="border border-[#e2e7e1] bg-white rounded-[12px] shadow-sm">
+          <Card id={`roommate-post-${myRoommatePost.id}`} className={`scroll-mt-24 border bg-white rounded-[12px] shadow-sm ${focusId === myRoommatePost.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"}`}>
             <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <Info className="mt-0.5 size-4 shrink-0 text-[#15594f]" />

@@ -9,6 +9,12 @@ export function notificationBasePath(portal: NotificationPortal): string {
   return `/${portal}/notifications`;
 }
 
+/** Ghép `?key=<id>` (hoặc nối tiếp query đã có) mà vẫn encode id an toàn. */
+function withFocus(path: string, key: string, id: string): string {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}${key}=${encodeURIComponent(id)}`;
+}
+
 /**
  * Đích đến khi bấm "Xem chi tiết" trên một thông báo.
  *
@@ -32,20 +38,25 @@ export function resolveNotificationTarget(
       return null;
 
     case 'DISPUTE':
-      if (portal === 'admin') return '/admin/disputes';
-      if (portal === 'landlord') return '/landlord/support';
+      // `/admin/disputes` chỉ là trang giới thiệu tĩnh; hàng đợi thật nằm ở
+      // `/admin/reports`. Người tố giác xem lại báo cáo của mình ở trang an toàn
+      // (tenant), mục "Báo cáo của tôi" (landlord) hoặc trang riêng (staff).
+      if (portal === 'admin') return id ? withFocus('/admin/reports', 'report', id) : '/admin/reports';
+      if (portal === 'tenant') return id ? withFocus('/tenant/safety', 'report', id) : '/tenant/safety';
+      if (portal === 'landlord') return id ? withFocus('/landlord/support', 'report', id) : '/landlord/support';
+      if (portal === 'staff') return id ? withFocus('/staff/reports', 'report', id) : '/staff/reports';
       return null;
 
     case 'APPOINTMENT':
-      if (portal === 'landlord') return '/landlord/calendar';
-      if (portal === 'tenant') return '/tenant/appointments';
+      if (portal === 'landlord') return id ? withFocus('/landlord/calendar', 'appointment', id) : '/landlord/calendar';
+      if (portal === 'tenant') return id ? withFocus('/tenant/appointments', 'appointment', id) : '/tenant/appointments';
       return null;
 
     case 'POST_APPROVED':
     case 'POST_REJECTED':
       if (portal === 'landlord' && id) return `/landlord/listings/${id}`;
       // Tenant xem trạng thái duyệt của chính tin mình ở trang tìm bạn ở ghép.
-      if (portal === 'tenant') return '/roommates';
+      if (portal === 'tenant') return id ? withFocus('/roommates', 'post', id) : '/roommates';
       if (portal === 'admin') return '/admin/moderation/listings';
       return null;
 
@@ -66,12 +77,15 @@ export function resolveNotificationTarget(
       return null;
 
     case 'INVOICE':
-      if (portal === 'landlord') return '/landlord/invoices';
-      // Khách thuê xem hoá đơn trong trang hợp đồng của mình.
-      if (portal === 'tenant') return '/tenant/contracts';
+      if (portal === 'landlord') return id ? withFocus('/landlord/invoices', 'invoice', id) : '/landlord/invoices';
+      // Khách thuê có trang hoá đơn riêng; trước đây trỏ nhầm sang hợp đồng.
+      if (portal === 'tenant') return id ? withFocus('/tenant/invoices', 'invoice', id) : '/tenant/invoices';
       return null;
 
     case 'CONTRACT':
+      // Hai bên đều có trang chi tiết hợp đồng thật.
+      if (portal === 'landlord' && id) return `/landlord/contracts/${id}`;
+      if (portal === 'tenant' && id) return `/tenant/contracts/${id}`;
       if (portal === 'landlord') return '/landlord/contracts';
       if (portal === 'tenant') return '/tenant/contracts';
       if (portal === 'admin') return '/admin/contracts';
@@ -79,14 +93,18 @@ export function resolveNotificationTarget(
 
     case 'CONTRACT_TERMINATION':
     case 'CONTRACT_RENEWAL':
-      if (portal === 'admin') return '/admin/contracts';
+      // Thông báo cho Admin giữ ID yêu cầu (màn duyệt chấm dứt); thông báo cho
+      // hai bên lưu ID hợp đồng để mở đúng trang chi tiết.
+      if (portal === 'admin') return id ? withFocus('/admin/contracts', 'request', id) : '/admin/contracts';
+      if (portal === 'landlord' && id) return `/landlord/contracts/${id}`;
+      if (portal === 'tenant' && id) return `/tenant/contracts/${id}`;
       if (portal === 'landlord') return '/landlord/contracts';
       if (portal === 'tenant') return '/tenant/contracts';
       return null;
 
     case 'OCCUPANCY':
-      if (portal === 'landlord') return '/landlord/occupancy';
-      if (portal === 'tenant') return '/tenant/occupancy';
+      if (portal === 'landlord') return id ? withFocus('/landlord/occupancy', 'declaration', id) : '/landlord/occupancy';
+      if (portal === 'tenant') return id ? withFocus('/tenant/occupancy', 'declaration', id) : '/tenant/occupancy';
       return null;
 
     case 'MESSAGE':
@@ -99,10 +117,35 @@ export function resolveNotificationTarget(
       if (portal === 'admin') {
         return id ? `/admin/messages?conversation=${encodeURIComponent(id)}` : '/admin/messages';
       }
+      if (portal === 'staff') {
+        return id ? `/staff/messages?conversation=${encodeURIComponent(id)}` : '/staff/messages';
+      }
       return null;
 
     case 'COMMISSION':
       return portal === 'landlord' ? '/landlord/reports' : null;
+
+    case 'RENTAL_REQUEST':
+      if (portal === 'landlord') return id ? withFocus('/landlord/rental-requests', 'request', id) : '/landlord/rental-requests';
+      if (portal === 'tenant') return id ? withFocus('/tenant/rental-requests', 'request', id) : '/tenant/rental-requests';
+      return null;
+
+    case 'MAINTENANCE_REQUEST':
+      if (portal === 'landlord' && id) return `/landlord/maintenance/${id}`;
+      if (portal === 'tenant' && id) return `/tenant/maintenance/${id}`;
+      if (portal === 'landlord') return '/landlord/maintenance';
+      if (portal === 'tenant') return '/tenant/maintenance';
+      return null;
+
+    case 'ROOMMATE_INVITATION':
+      if (portal === 'tenant') {
+        return id ? withFocus('/tenant/roommate-invitations', 'invitation', id) : '/tenant/roommate-invitations';
+      }
+      return null;
+
+    case 'KYC':
+      if (portal === 'admin') return id ? withFocus('/admin/landlords/kyc', 'kyc', id) : '/admin/landlords/kyc';
+      return null;
 
     case 'SYSTEM':
     default:
@@ -111,11 +154,18 @@ export function resolveNotificationTarget(
 }
 
 /** Nhãn nút hành động tương ứng với loại thông báo. */
-export function notificationActionLabel(type: NotificationType): string {
+export function notificationActionLabel(
+  type: NotificationType,
+  portal?: NotificationPortal,
+): string {
   switch (type) {
     case 'POST_REJECTED':
+      if (portal === 'admin') return 'Xem tin đăng';
+      if (portal === 'tenant') return 'Mở khu ở ghép';
       return 'Xem bài viết bị từ chối';
     case 'POST_APPROVED':
+      if (portal === 'admin') return 'Xem tin đăng';
+      if (portal === 'tenant') return 'Mở khu ở ghép';
       return 'Xem bài viết đã duyệt';
     case 'POST_PENDING':
       return 'Duyệt tin đăng';
@@ -132,17 +182,25 @@ export function notificationActionLabel(type: NotificationType): string {
     case 'CONTRACT':
       return 'Xem hợp đồng';
     case 'CONTRACT_TERMINATION':
-      return 'Xử lý chấm dứt hợp đồng';
+      return portal === 'admin' ? 'Xử lý chấm dứt hợp đồng' : 'Xem hợp đồng';
     case 'CONTRACT_RENEWAL':
-      return 'Xem đề xuất ký tiếp';
+      return portal === 'admin' ? 'Xem yêu cầu ký tiếp' : 'Xem đề xuất ký tiếp';
     case 'OCCUPANCY':
       return 'Xem số người ở';
     case 'MESSAGE':
       return 'Mở hội thoại';
     case 'DISPUTE':
-      return 'Xử lý tranh chấp';
+      return portal === 'admin' ? 'Xử lý tranh chấp' : 'Xem báo cáo của tôi';
     case 'COMMISSION':
       return 'Xem báo cáo hoa hồng';
+    case 'RENTAL_REQUEST':
+      return 'Mở yêu cầu thuê phòng';
+    case 'MAINTENANCE_REQUEST':
+      return 'Mở báo cáo sự cố';
+    case 'ROOMMATE_INVITATION':
+      return 'Mở lời mời ở ghép';
+    case 'KYC':
+      return 'Duyệt hồ sơ KYC';
     case 'SYSTEM':
       return 'Xem chi tiết';
     default:

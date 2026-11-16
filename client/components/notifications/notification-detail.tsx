@@ -116,7 +116,7 @@ export function NotificationDetail({ portal }: NotificationDetailProps) {
                 href={target}
                 className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#15594f] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#124b42]"
               >
-                {notificationActionLabel(notification.type)}
+                {notificationActionLabel(notification.type, portal)}
                 <ChevronRight className="size-4" />
               </Link>
             )}

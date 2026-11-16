@@ -87,7 +87,7 @@ export const roomDemandService = {
           request.tenantId,
           'Yêu cầu thuê phòng đã bị huỷ',
           `Yêu cầu thuê phòng ${roomLabel} đã bị huỷ vì phòng đã được cho thuê.`,
-          'SYSTEM',
+          'RENTAL_REQUEST',
           request.id,
           `room-rented:rental-request:${request.id}`,
         ),

@@ -12,6 +12,7 @@ import {
   TERMINATION_STATUS_CLASS,
 } from "@/lib/contract-lifecycle";
 import type { ContractTerminationRequest, ContractTerminationStatus } from "@/types/models";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 const TABS: Array<{ value: ContractTerminationStatus | "ALL"; label: string }> = [
   { value: "PENDING", label: "Chờ duyệt" },
@@ -35,6 +36,7 @@ export default function AdminContractsPage() {
   const [notes, setNotes] = React.useState<Record<string, string>>({});
   const [refunds, setRefunds] = React.useState<Record<string, string>>({});
   const [effectiveDates, setEffectiveDates] = React.useState<Record<string, string>>({});
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (status: ContractTerminationStatus | "ALL") => {
     try {
@@ -73,6 +75,19 @@ export default function AdminContractsPage() {
       isCancelled = true;
     };
   }, [statusFilter]);
+
+  // Thông báo CONTRACT_TERMINATION cho Admin mang ID yêu cầu: chuyển sang tab
+  // "Tất cả" (yêu cầu có thể đã xử lý) rồi cuộn/tô sáng hồ sơ tương ứng.
+  React.useEffect(() => {
+    const id = readFocusParam("request");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setStatusFilter("ALL");
+      setFocusId(id);
+      window.requestAnimationFrame(() => scrollToFocus(`request-${id}`));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [requests]);
 
   const review = async (
     request: ContractTerminationRequest,
@@ -192,7 +207,10 @@ export default function AdminContractsPage() {
             return (
               <div
                 key={request.id}
-                className="space-y-4 rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs"
+                id={`request-${request.id}`}
+                className={`scroll-mt-24 space-y-4 rounded-[12px] border bg-white p-5 shadow-xs ${
+                  focusId === request.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">

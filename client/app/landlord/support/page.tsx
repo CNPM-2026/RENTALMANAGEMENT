@@ -1,9 +1,37 @@
 "use client";
 
 import * as React from "react";
-import { LifeBuoy, Phone, Mail, MessageCircle, HelpCircle, FileText } from "lucide-react";
+import { LifeBuoy, Phone, Mail, MessageCircle, HelpCircle, FileText, Flag, AlertTriangle } from "lucide-react";
+import { apiClient } from "@/lib/api";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
+import type { Report } from "@/types/models";
 
 export default function LandlordSupportPage() {
+  const [reports, setReports] = React.useState<Report[]>([]);
+  const [reportsError, setReportsError] = React.useState("");
+  const [focusId, setFocusId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    apiClient.reports
+      .getMy()
+      .then((items) => {
+        setReports(items ?? []);
+        setReportsError("");
+      })
+      .catch(() => setReportsError("Không tải được danh sách báo cáo của bạn."));
+  }, []);
+
+  // Thông báo DISPUTE mở `?report=<id>` và cuộn tới đúng báo cáo đã gửi.
+  React.useEffect(() => {
+    const id = readFocusParam("report");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`report-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [reports]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -55,6 +83,61 @@ export default function LandlordSupportPage() {
             </div>
           ))}
         </div>
+      </div>
+      <div className="rounded-[12px] border border-[#e2e7e1] bg-white p-6 shadow-xs space-y-4" id="my-reports">
+        <div className="flex items-center gap-2">
+          <Flag className="size-4 text-[#a4422c]" />
+          <h2 className="text-[17px] font-semibold text-[#203c37]">Báo cáo / tranh chấp tôi đã gửi</h2>
+        </div>
+        <p className="text-[13px] text-[#74817b]">
+          Theo dõi kết luận của Admin. Khi có cập nhật, thông báo sẽ mở đúng báo cáo tại đây.
+        </p>
+
+        {reportsError && (
+          <p className="flex items-start gap-2 rounded-[8px] border border-[#f0d5cd] bg-[#fbeae6] px-3 py-2 text-[12px] text-[#a4422c]">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> {reportsError}
+          </p>
+        )}
+
+        {reports.length === 0 ? (
+          <p className="text-[13px] text-[#74817b]">Bạn chưa gửi báo cáo nào.</p>
+        ) : (
+          <ul className="space-y-2">
+            {reports.map((report) => (
+              <li
+                key={report.id}
+                id={`report-${report.id}`}
+                className={`scroll-mt-24 rounded-[8px] border p-3 ${
+                  focusId === report.id
+                    ? "border-[#15594f] bg-[#eaf2ed]/40 ring-2 ring-[#15594f]/20"
+                    : "border-[#eef3ef]"
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[13px] font-semibold text-[#203c37]">
+                    {report.category ?? "Báo cáo vi phạm"}
+                  </p>
+                  <span className="rounded-full bg-[#f7f6f2] px-2 py-0.5 text-[11px] font-semibold text-[#74817b]">
+                    {report.status === "RESOLVED"
+                      ? "Đã giải quyết"
+                      : report.status === "REJECTED"
+                        ? "Đã bác bỏ"
+                        : report.status === "UNDER_REVIEW"
+                          ? "Đang xem xét"
+                          : "Chờ xử lý"}
+                  </span>
+                </div>
+                <p className="mt-1 whitespace-pre-line text-[12px] text-[#5c6964]">{report.reason}</p>
+                {report.resolution && (
+                  <p className="mt-1 text-[12px] text-[#15594f]">Kết luận: {report.resolution}</p>
+                )}
+                <p className="mt-1 text-[11px] text-[#74817b]">
+                  Gửi lúc {new Date(report.createdAt).toLocaleString("vi-VN")}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api";
 import { Contract, OccupancyDeclaration, OccupancyDeclarationStatus } from "@/types/models";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { parseIntegerInput } from "@/lib/numeric";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 const STATUS_MAP: Record<
   OccupancyDeclarationStatus,
@@ -41,6 +42,7 @@ export default function TenantOccupancyPage() {
   const [submitError, setSubmitError] = React.useState("");
   const [successMessage, setSuccessMessage] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   // Nạp dữ liệu trực tiếp trong effect (setState nằm trong callback promise) —
   // tránh gọi một hàm có setState đồng bộ trong thân effect.
@@ -69,6 +71,17 @@ export default function TenantOccupancyPage() {
       isCancelled = true;
     };
   }, []);
+
+  // Thông báo OCCUPANCY mở `?declaration=<id>` để cuộn/tô sáng khai báo.
+  React.useEffect(() => {
+    const id = readFocusParam("declaration");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`declaration-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [declarations]);
 
   const selectedContract = contracts.find((contract) => contract.roomId === roomId);
   const selectedRoom = selectedContract?.room;
@@ -239,7 +252,15 @@ export default function TenantOccupancyPage() {
                     const config = STATUS_MAP[item.status];
                     const Icon = config.icon;
                     return (
-                      <li key={item.id} className="rounded-[8px] border border-[#eef3ef] p-3">
+                      <li
+                        key={item.id}
+                        id={`declaration-${item.id}`}
+                        className={`scroll-mt-24 rounded-[8px] border p-3 ${
+                          focusId === item.id
+                            ? "border-[#15594f] bg-[#eaf2ed]/40 ring-2 ring-[#15594f]/20"
+                            : "border-[#eef3ef]"
+                        }`}
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-[13px] font-medium text-[#203c37]">
                             Phòng {item.room?.roomNumber ?? item.roomId.slice(0, 8)} · {item.occupants} người

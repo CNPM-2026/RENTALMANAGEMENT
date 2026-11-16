@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   roomFindFirst: vi.fn(),
   requestFindFirst: vi.fn(),
   requestCreate: vi.fn(),
+  notify: vi.fn(),
 }));
 
 vi.mock('../../src/config/db', () => ({
@@ -29,7 +30,7 @@ vi.mock('../../src/services/kycGate.service', async (importOriginal) => {
 });
 
 vi.mock('../../src/services/notification.service', () => ({
-  notificationService: { createNotification: vi.fn() },
+  notificationService: { createNotification: mocks.notify },
 }));
 
 vi.mock('../../src/services/roomDemand.service', () => ({
@@ -84,5 +85,14 @@ describe('rentalRequestService.create — cổng KYC', () => {
     });
     expect(mocks.roomFindFirst).toHaveBeenCalled();
     expect(mocks.requestCreate).toHaveBeenCalled();
+    // Client deep-link dựa vào type riêng; SYSTEM sẽ không biết reference_id là
+    // yêu cầu thuê và rơi về trang nội dung thông báo.
+    expect(mocks.notify).toHaveBeenCalledWith(
+      'landlord-1',
+      'Yêu cầu thuê phòng mới',
+      expect.stringContaining('P.101'),
+      'RENTAL_REQUEST',
+      'request-1',
+    );
   });
 });

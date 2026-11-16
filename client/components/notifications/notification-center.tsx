@@ -83,6 +83,14 @@ function visualOf(type: NotificationType) {
       return { icon: FileText, bg: "bg-[#eaf2ed]", text: "text-[#15594f]", badge: "Ký tiếp" };
     case "OCCUPANCY":
       return { icon: Users, bg: "bg-[#f2ede3]", text: "text-[#6b5a3e]", badge: "Số người ở" };
+    case "RENTAL_REQUEST":
+      return { icon: ClipboardCheck, bg: "bg-[#e0f2fe]", text: "text-[#075985]", badge: "Yêu cầu thuê" };
+    case "MAINTENANCE_REQUEST":
+      return { icon: Wrench, bg: "bg-[#fbf1dc]", text: "text-[#9a6a12]", badge: "Sự cố" };
+    case "ROOMMATE_INVITATION":
+      return { icon: Users, bg: "bg-[#eaf2ed]", text: "text-[#15594f]", badge: "Ở ghép" };
+    case "KYC":
+      return { icon: ClipboardCheck, bg: "bg-[#f2ede3]", text: "text-[#6b5a3e]", badge: "KYC" };
     case "TASK":
       return { icon: Wrench, bg: "bg-[#eaf2ed]", text: "text-[#15594f]", badge: "Công việc" };
     case "OFFER":
@@ -101,7 +109,7 @@ function visualOf(type: NotificationType) {
 function matchesFilter(item: Notification, filter: FilterKey) {
   if (filter === "ALL") return true;
   if (filter === "MODERATION") {
-    return ["POST_PENDING", "POST_APPROVED", "POST_REJECTED"].includes(item.type);
+    return ["POST_PENDING", "POST_APPROVED", "POST_REJECTED", "KYC"].includes(item.type);
   }
   if (filter === "SUPPORT") return item.type === "SUPPORT_TICKET";
   if (filter === "TASK") return ["TASK", "OFFER", "REVIEW"].includes(item.type);
@@ -111,7 +119,14 @@ function matchesFilter(item: Notification, filter: FilterKey) {
   if (filter === "DISPUTE") return item.type === "DISPUTE";
   if (filter === "MESSAGE") return item.type === "MESSAGE";
   if (filter === "SYSTEM") {
-    return ["SYSTEM", "COMMISSION", "OCCUPANCY"].includes(item.type);
+    return [
+      "SYSTEM",
+      "COMMISSION",
+      "OCCUPANCY",
+      "RENTAL_REQUEST",
+      "MAINTENANCE_REQUEST",
+      "ROOMMATE_INVITATION",
+    ].includes(item.type);
   }
   return item.type === filter;
 }
@@ -295,7 +310,7 @@ export function NotificationCenter({ portal, title, subtitle }: NotificationCent
                         onClick={() => void markRead(item.id)}
                         className="inline-flex items-center gap-1 font-semibold text-[#15594f] hover:underline"
                       >
-                        <span>{notificationActionLabel(item.type)}</span>
+                        <span>{notificationActionLabel(item.type, portal)}</span>
                         <ChevronRight className="size-3.5" />
                       </Link>
                     </div>

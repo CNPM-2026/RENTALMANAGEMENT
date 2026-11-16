@@ -4,10 +4,12 @@ import * as React from "react";
 import { Calendar as CalendarIcon, Clock, User, Phone, CheckCircle, MapPin } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Appointment } from "@/types/models";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 export default function LandlordCalendarPage() {
   const [appointments, setAppointments] = React.useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     apiClient.appointments
@@ -16,6 +18,17 @@ export default function LandlordCalendarPage() {
       .catch(() => setAppointments([]))
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Thông báo APPOINTMENT mang `?appointment=<id>`: cuộn tới đúng thẻ lịch hẹn.
+  React.useEffect(() => {
+    const id = readFocusParam("appointment");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`appointment-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [appointments]);
 
   return (
     <div className="space-y-6">
@@ -42,7 +55,10 @@ export default function LandlordCalendarPage() {
           {appointments.map((apt) => (
             <div
               key={apt.id}
-              className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs flex flex-col justify-between"
+              id={`appointment-${apt.id}`}
+              className={`scroll-mt-24 rounded-[12px] border bg-white p-5 shadow-xs flex flex-col justify-between ${
+                focusId === apt.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+              }`}
             >
               <div>
                 <div className="flex items-center justify-between">

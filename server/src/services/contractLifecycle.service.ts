@@ -241,7 +241,7 @@ export const contractLifecycleService = {
     await notifyParties(contract, actor.id, {
       title: 'Có yêu cầu chấm dứt hợp đồng',
       content: `Một yêu cầu chấm dứt hợp đồng phòng ${contract.room.roomNumber} vừa được gửi và đang chờ Admin duyệt.`,
-      referenceId: request.id,
+      referenceId: contract.id,
       type: 'CONTRACT_TERMINATION',
     });
 
@@ -375,7 +375,7 @@ export const contractLifecycleService = {
                 : 'Không phát sinh nghĩa vụ hoàn cọc theo quyết định của Admin.'
             }`
           : `Yêu cầu chấm dứt hợp đồng phòng ${request.contract.room.roomNumber} bị từ chối. Lý do: ${input.reviewNote}`,
-      referenceId: request.id,
+      referenceId: request.contract.id,
       type: 'CONTRACT_TERMINATION',
     });
 
@@ -405,7 +405,7 @@ export const contractLifecycleService = {
     await notifyParties(request.contract, landlordId, {
       title: 'Đã hoàn tiền cọc',
       content: `Chủ trọ đã xác nhận hoàn ${Number(request.depositRefundAmount ?? 0).toLocaleString('vi-VN')} đ tiền cọc cho hợp đồng phòng ${request.contract.room.roomNumber}.`,
-      referenceId: request.id,
+      referenceId: request.contract.id,
       type: 'CONTRACT_TERMINATION',
     });
 
@@ -466,7 +466,7 @@ export const contractLifecycleService = {
     await notifyParties(contract, actor.id, {
       title: 'Có đề xuất ký tiếp hợp đồng',
       content: `Một đề xuất ký tiếp hợp đồng phòng ${contract.room.roomNumber} đang chờ bạn phản hồi.`,
-      referenceId: request.id,
+      referenceId: contract.id,
       type: 'CONTRACT_RENEWAL',
     });
 
@@ -595,7 +595,7 @@ export const contractLifecycleService = {
                 : ' không thời hạn'
             }.`
           : `Đề xuất ký tiếp hợp đồng phòng ${request.contract.room.roomNumber} đã bị từ chối.`,
-      referenceId: request.id,
+      referenceId: request.contract.id,
       type: 'CONTRACT_RENEWAL',
     });
 

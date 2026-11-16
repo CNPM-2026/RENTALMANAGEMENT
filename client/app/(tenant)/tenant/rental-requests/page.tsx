@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
 import { RentalRequest as ApiRentalRequest } from "@/types/models";
 import { useRouter } from "next/navigation";
+import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 
 interface RentalRequest {
   id: string;
@@ -47,6 +48,7 @@ export default function TenantRentalRequestsPage() {
   const [activeTab, setActiveTab] = React.useState<"ALL" | "PENDING" | "APPROVED" | "COMPLETED">("ALL");
   const [requests, setRequests] = React.useState<RentalRequest[]>([]);
   const router = useRouter();
+  const [focusId, setFocusId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     Promise.all([apiClient.rentalRequests.getMine("tenant"), apiClient.contracts.getMyContracts("tenant")]).then(([items, contracts]) => {
@@ -74,6 +76,17 @@ export default function TenantRentalRequestsPage() {
       }));
     }).catch(() => setRequests([]));
   }, []);
+
+  // Thông báo RENTAL_REQUEST của tenant mở `?request=<id>`.
+  React.useEffect(() => {
+    const id = readFocusParam("request");
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocusId(id);
+      scrollToFocus(`request-${id}`);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [requests]);
 
   const handleHandoverConfirmation = async (requestId: string) => {
     try {
@@ -152,7 +165,10 @@ export default function TenantRentalRequestsPage() {
         {filteredRequests.map((req) => (
           <div
             key={req.id}
-            className="p-6 rounded-[16px] bg-white border border-[#e2e7e1] shadow-xs space-y-6"
+            id={`request-${req.id}`}
+            className={`scroll-mt-24 p-6 rounded-[16px] bg-white border shadow-xs space-y-6 ${
+              focusId === req.id ? "border-[#15594f] ring-2 ring-[#15594f]/25" : "border-[#e2e7e1]"
+            }`}
           >
             {/* Top Card Row */}
             <div className="flex gap-4 items-start min-w-0">
