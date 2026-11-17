@@ -129,6 +129,7 @@ type CandidateShape = {
   postCreatedAt: string;
   postExpiredAt: string | null;
   propertyName: string | null;
+  roomId?: string | null;
   roomNumber: string | null;
   maxOccupants: number | null;
   sleepSchedule: string;
@@ -260,6 +261,7 @@ function mapRoommatePost(item: RoommatePostItem): CandidateShape {
     postCreatedAt: item.post.createdAt,
     postExpiredAt: item.post.expiredAt ?? null,
     propertyName: item.post.property?.name ?? null,
+    roomId: item.post.room?.id ?? null,
     roomNumber: item.post.room?.roomNumber ?? null,
     maxOccupants: item.post.room?.maxOccupants ?? null,
     sleepSchedule: formatSleepSchedule(preference?.sleepSchedule),
@@ -1073,10 +1075,16 @@ export default function RoommateDiscoveryPage() {
                             </span>
                           )}
                           {candidate.roomNumber && (
-                            <span className="inline-flex items-center gap-1 rounded-[6px] bg-white px-2 py-1 text-[11px] text-[#203c37] border border-[#e2e7e1]">
+                            <Link
+                              href={`/rooms/${candidate.roomId || candidate.postId}`}
+                              className="inline-flex items-center gap-1 rounded-[6px] bg-[#eaf2ed] px-2 py-1 text-[11px] font-semibold text-[#15594f] border border-[#d2e4d7] hover:underline"
+                              target="_blank"
+                              title="Xem chi tiết phòng"
+                            >
                               Phòng {candidate.roomNumber}
                               {candidate.maxOccupants ? ` · tối đa ${candidate.maxOccupants} người` : ""}
-                            </span>
+                              <span className="text-[10px] ml-0.5">&rarr;</span>
+                            </Link>
                           )}
                           {candidate.postExpiredAt && (
                             <span className="rounded-[6px] bg-white px-2 py-1 text-[11px] text-[#74817b] border border-[#e2e7e1]">

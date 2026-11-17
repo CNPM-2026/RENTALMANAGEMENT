@@ -82,7 +82,20 @@ export const roommateInvitationService = {
     include: {
       sender: { select: { id: true, fullName: true, avatarUrl: true, profile: true } },
       recipient: { select: { id: true, fullName: true, avatarUrl: true, profile: true } },
-      post: { select: { id: true, title: true } },
+      post: {
+        select: {
+          id: true,
+          title: true,
+          roomId: true,
+          room: {
+            select: {
+              id: true,
+              roomNumber: true,
+              property: { select: { id: true, name: true, address: true } },
+            },
+          },
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   }),
@@ -286,26 +299,7 @@ export const roommateInvitationService = {
         throw new AppError('Lời mời vừa được xử lý bởi request khác', 409, 'INVITATION_ALREADY_DECIDED');
       }
 
-      // Link hợp đồng cho người ở ghép nếu chưa có hợp đồng riêng
-      const existingRoommateContract = await tx.contract.findFirst({
-        where: { roomId: room.id, tenantId: roommateUserId, status: 'ACTIVE' },
-      });
-      if (!existingRoommateContract) {
-        await tx.contract.create({
-          data: {
-            roomId: room.id,
-            tenantId: roommateUserId,
-            startDate: hostContract.startDate,
-            endDate: hostContract.endDate,
-            depositPaid: 0,
-            monthlyRent: hostContract.monthlyRent,
-            terms: `Hợp đồng ở ghép liên kết theo hợp đồng của ${hostContract.tenant?.fullName ?? 'chủ hợp đồng'} (Phòng ${room.roomNumber})`,
-            status: 'ACTIVE',
-          },
-        });
-      }
-
-      // Khai báo số người ở mới cho phòng
+      // Khai báo số người ở mới cho phòng và liên kết hợp đồng của người thuê chính cho roommate
       const now = new Date();
       await tx.roomOccupancyDeclaration.updateMany({
         where: {

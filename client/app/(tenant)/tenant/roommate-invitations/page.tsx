@@ -10,6 +10,10 @@ import {
   Check,
   X,
   MessageCircle,
+  Building2,
+  ExternalLink,
+  FileText,
+  Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +36,11 @@ interface Invitation {
   message: string;
   createdAt: string;
   status: "PENDING" | "ACCEPTED" | "DECLINED";
+  postId?: string | null;
+  roomId?: string | null;
+  roomNumber?: string | null;
+  propertyName?: string | null;
+  propertyAddress?: string | null;
 }
 
 export default function TenantRoommateInvitationsPage() {
@@ -52,6 +61,9 @@ export default function TenantRoommateInvitationsPage() {
       const map = (items: ApiInvitation[], type: Invitation["type"]) => items.map((item) => {
         const user = type === "RECEIVED" ? item.sender : item.recipient;
         const counterpartId = type === "RECEIVED" ? item.senderId : item.recipientId;
+        const post = item.post;
+        const room = item.post?.room;
+        const property = room?.property;
         return {
           id: item.id,
           userId: counterpartId,
@@ -64,6 +76,11 @@ export default function TenantRoommateInvitationsPage() {
           message: item.message ?? "",
           createdAt: new Date(item.createdAt).toLocaleString("vi-VN"),
           status: item.status === "CANCELLED" ? "DECLINED" : item.status,
+          postId: item.postId || post?.id || null,
+          roomId: post?.roomId || room?.id || null,
+          roomNumber: room?.roomNumber || null,
+          propertyName: property?.name || null,
+          propertyAddress: property?.address || null,
         };
       });
       setInvitations([...map(received, "RECEIVED"), ...map(sent, "SENT")]);
@@ -247,6 +264,25 @@ export default function TenantRoommateInvitationsPage() {
                       <span className="text-[12px] text-[#74817b]">• {item.createdAt}</span>
                     </div>
                     <p className="text-[13px] text-[#74817b]">{item.userAge} tuổi • {item.userOccupation}</p>
+
+                    {(item.roomNumber || item.propertyName) && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[#eaf2ed] text-[#15594f] text-[12px] font-semibold border border-[#d2e4d7]">
+                          <Building2 className="size-3.5" />
+                          {item.propertyName ? `${item.propertyName} · ` : ""}Phòng {item.roomNumber ?? "—"}
+                        </span>
+                        {(item.roomId || item.postId) && (
+                          <Link
+                            href={`/rooms/${item.roomId || item.postId}`}
+                            className="text-[12px] font-semibold text-[#15594f] hover:underline inline-flex items-center gap-1"
+                            target="_blank"
+                          >
+                            Xem thông tin phòng <ExternalLink className="size-3" />
+                          </Link>
+                        )}
+                      </div>
+                    )}
+
                     <p className="text-[13px] text-[#203c37] bg-[#f7f6f2] p-3 rounded-[8px] mt-2 italic">
                       &ldquo;{item.message}&rdquo;
                     </p>
@@ -287,15 +323,34 @@ export default function TenantRoommateInvitationsPage() {
                   )}
 
                   {item.status === "ACCEPTED" && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={openingChatId === item.id}
-                      onClick={() => handleOpenChat(item)}
-                      leftIcon={<MessageCircle className="size-3.5" />}
-                    >
-                      {openingChatId === item.id ? "Đang mở..." : "Bắt đầu chat"}
-                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                      {(item.roomId || item.postId) && (
+                        <Link href={`/rooms/${item.roomId || item.postId}`} target="_blank">
+                          <Button variant="outline" size="sm" leftIcon={<Building2 className="size-3.5" />}>
+                            Xem phòng
+                          </Button>
+                        </Link>
+                      )}
+                      <Link href="/tenant/rental-requests">
+                        <Button variant="outline" size="sm" leftIcon={<FileText className="size-3.5" />}>
+                          Hợp đồng
+                        </Button>
+                      </Link>
+                      <Link href="/tenant/invoices">
+                        <Button variant="outline" size="sm" leftIcon={<Receipt className="size-3.5" />}>
+                          Hóa đơn
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={openingChatId === item.id}
+                        onClick={() => handleOpenChat(item)}
+                        leftIcon={<MessageCircle className="size-3.5" />}
+                      >
+                        {openingChatId === item.id ? "Đang mở..." : "Nhắn tin"}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
