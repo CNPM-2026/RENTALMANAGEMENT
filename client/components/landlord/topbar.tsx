@@ -87,7 +87,7 @@ export function LandlordTopbar() {
           <TopbarChatButton />
 
           {/* Notification dropdown */}
-          <NotificationDropdown portal="landlord" badgeMode="dot" iconClassName="size-4.5" />
+          <NotificationDropdown badgeMode="dot" iconClassName="size-4.5" />
 
           <div className="h-5 w-px bg-[#e2e7e1]" />
 

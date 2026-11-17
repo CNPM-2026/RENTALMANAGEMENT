@@ -5,7 +5,6 @@ import { NotificationCenter } from "@/components/notifications/notification-cent
 export default function StaffNotificationsPage() {
   return (
     <NotificationCenter
-      portal="staff"
       title="Thông báo công việc"
       subtitle="Việc mới, kết quả ứng tuyển, thương lượng giá và nghiệm thu."
     />

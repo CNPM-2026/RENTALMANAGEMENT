@@ -5,7 +5,6 @@ import { NotificationCenter } from "@/components/notifications/notification-cent
 export default function TenantNotificationsPage() {
   return (
     <NotificationCenter
-      portal="tenant"
       title="Thông báo"
       subtitle="Lịch xem phòng, yêu cầu thuê, hợp đồng, hoá đơn và số người ở."
     />

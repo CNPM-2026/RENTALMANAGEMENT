@@ -5,7 +5,6 @@ import { NotificationCenter } from "@/components/notifications/notification-cent
 export default function AdminNotificationsPage() {
   return (
     <NotificationCenter
-      portal="admin"
       title="Thông báo quản trị"
       subtitle="Kiểm duyệt tin đăng, KYC, báo cáo vi phạm, hợp đồng, hỗ trợ và tin nhắn."
     />

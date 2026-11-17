@@ -100,7 +100,6 @@ export function AdminTopbar() {
 
           {/* Notification dropdown */}
           <NotificationDropdown
-            portal="admin"
             title="Thông báo quản trị"
             badgeMode="dot"
             iconClassName="size-4.5"
