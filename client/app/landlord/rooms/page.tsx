@@ -249,7 +249,9 @@ export default function LandlordRoomsPage() {
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-[#e2e7e1] flex items-center justify-between text-[12px]">
-                  <span className="text-[#74817b]">Cọc: {formatCurrency(room.depositAmount ?? room.priceMonthly)}</span>
+                  <span className="text-[#74817b]">
+                    Cọc: {formatCurrency((room.depositAmount && Number(room.depositAmount) > 0) ? Number(room.depositAmount) : room.priceMonthly)}
+                  </span>
                   <div className="flex items-center gap-3">
                     <button type="button" onClick={() => void openEdit(room)} className="font-semibold text-[#15594f] hover:underline">Sửa</button>
                     <Link href={`/rooms/${room.id}`} className="text-[#15594f] font-semibold hover:underline">Chi tiết</Link>
