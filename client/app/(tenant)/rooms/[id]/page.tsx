@@ -320,11 +320,12 @@ function RoomDetailContent() {
                   Loại giường
                 </p>
                 <p className="text-lg font-bold text-[#203c37]">
-                  {post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("giường đôi"))
-                    ? "Giường đôi"
-                    : post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("giường"))
-                    ? "Giường đơn"
-                    : "Tiêu chuẩn"}
+                  {post?.room?.bedType ||
+                    (post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("giường đôi"))
+                      ? "Giường đôi"
+                      : post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("giường"))
+                      ? "Giường đơn"
+                      : "Tiêu chuẩn")}
                 </p>
               </div>
 
@@ -334,7 +335,11 @@ function RoomDetailContent() {
                   Hướng ban công
                 </p>
                 <p className="text-lg font-bold text-[#203c37]">
-                  {post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("ban công"))
+                  {post?.room?.balconyDirection
+                    ? (post.room.balconyDirection.toLowerCase().startsWith("hướng") || post.room.balconyDirection.toLowerCase().startsWith("không")
+                        ? post.room.balconyDirection
+                        : `Hướng ${post.room.balconyDirection}`)
+                    : post?.room?.roomAmenities?.some((a) => a.amenity?.name?.toLowerCase().includes("ban công"))
                     ? "Có ban công thoáng"
                     : "Đón gió thoáng mát"}
                 </p>

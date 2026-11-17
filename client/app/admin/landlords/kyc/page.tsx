@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { BadgeCheck, Check, X } from "lucide-react";
+import Link from "next/link";
+import { BadgeCheck, Check, X, Eye } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { translateRole } from "@/lib/labels";
 import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
@@ -111,6 +112,13 @@ export default function AdminKycPage() {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
+                <Link
+                  href={`/admin/landlords/kyc/${req.id}`}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[8px] border border-[#e2e7e1] text-[#203c37] hover:bg-[#f7f6f2] text-[13px] font-semibold transition-colors cursor-pointer"
+                >
+                  <Eye className="size-4 text-[#74817b]" />
+                  <span>Chi tiết</span>
+                </Link>
                 <button
                   onClick={() => handleAction(req.id, "APPROVED")}
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[8px] bg-[#15594f] text-white text-[13px] font-semibold hover:bg-[#124b42] cursor-pointer"

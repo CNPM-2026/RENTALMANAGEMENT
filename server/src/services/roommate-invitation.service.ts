@@ -139,7 +139,9 @@ export const roommateInvitationService = {
     },
   ) => {
     const post = invitation.post ?? (await findActiveRoommatePost(invitation.recipientId));
-    const hostContract = await prisma.contract.findFirst({
+
+    // 1. Tìm hợp đồng của người nhận (recipient) hoặc người gửi (sender)
+    let hostContract = await prisma.contract.findFirst({
       where: {
         tenantId: invitation.recipientId,
         status: 'ACTIVE',
@@ -147,6 +149,7 @@ export const roommateInvitationService = {
       },
       orderBy: { startDate: 'desc' },
       include: {
+        tenant: { select: { id: true, fullName: true } },
         room: {
           select: {
             id: true,
@@ -158,9 +161,40 @@ export const roommateInvitationService = {
       },
     });
 
+    let hostUserId = invitation.recipientId;
+    let roommateUserId = invitation.senderId;
+
+    if (!hostContract) {
+      // Nếu bên nhận chưa có phòng/hợp đồng, kiểm tra xem bên gửi có phòng/hợp đồng không
+      hostContract = await prisma.contract.findFirst({
+        where: {
+          tenantId: invitation.senderId,
+          status: 'ACTIVE',
+          ...(post?.roomId ? { roomId: post.roomId } : {}),
+        },
+        orderBy: { startDate: 'desc' },
+        include: {
+          tenant: { select: { id: true, fullName: true } },
+          room: {
+            select: {
+              id: true,
+              roomNumber: true,
+              maxOccupants: true,
+              property: { select: { id: true, name: true, landlordId: true } },
+            },
+          },
+        },
+      });
+
+      if (hostContract) {
+        hostUserId = invitation.senderId;
+        roommateUserId = invitation.recipientId;
+      }
+    }
+
     if (!hostContract) {
       throw new AppError(
-        'Người đăng tin chưa có hợp đồng thuê đang hiệu lực nên chưa thể xác nhận ở ghép.',
+        'Cần ít nhất một người (người mời hoặc người được mời) có hợp đồng thuê phòng đang hiệu lực để liên kết ở ghép.',
         400,
         'ROOMMATE_HOST_HAS_NO_ACTIVE_CONTRACT',
       );
@@ -171,7 +205,7 @@ export const roommateInvitationService = {
       prisma.roomOccupancyDeclaration.findFirst({
         where: {
           roomId: room.id,
-          tenantId: invitation.recipientId,
+          tenantId: { in: [hostUserId, roommateUserId] },
           status: { in: ['PENDING', 'VERIFIED'] },
           supersededAt: null,
         },
@@ -202,7 +236,8 @@ export const roommateInvitationService = {
         return tx.roommateInvitation.findUniqueOrThrow({ where: { id: invitation.id } });
       });
 
-      const reason = `Phòng ${room.roomNumber} chỉ cho phép tối đa ${room.maxOccupants} người, hiện dự kiến ${occupiedBefore} người. Không thể thêm ${invitation.sender.fullName} ở ghép.`;
+      const targetRoommateName = roommateUserId === invitation.senderId ? invitation.sender.fullName : invitation.recipient.fullName;
+      const reason = `Phòng ${room.roomNumber} chỉ cho phép tối đa ${room.maxOccupants} người, hiện dự kiến ${occupiedBefore} người. Không thể thêm ${targetRoommateName} ở ghép.`;
       // Hai bên tenant mở đúng lời mời vừa bị từ chối. Chủ trọ không có "lời mời"
       // để focus (chưa có declaration nào được tạo), nên nhận OCCUPANCY không kèm
       // referenceId — UI sẽ mở hàng đợi khai báo thay vì trỏ tới id phòng sai.
@@ -251,28 +286,75 @@ export const roommateInvitationService = {
         throw new AppError('Lời mời vừa được xử lý bởi request khác', 409, 'INVITATION_ALREADY_DECIDED');
       }
 
-      let declaration: { id: string; occupants: number } | null = null;
-      if (!currentDeclaration || currentDeclaration.occupants !== nextOccupants) {
-        const now = new Date();
-        await tx.roomOccupancyDeclaration.updateMany({
-          where: {
-            roomId: room.id,
-            tenantId: invitation.recipientId,
-            status: { in: ['PENDING', 'VERIFIED'] },
-            supersededAt: null,
-          },
-          data: { status: 'SUPERSEDED', supersededAt: now },
-        });
-        declaration = await tx.roomOccupancyDeclaration.create({
+      // Link hợp đồng cho người ở ghép nếu chưa có hợp đồng riêng
+      const existingRoommateContract = await tx.contract.findFirst({
+        where: { roomId: room.id, tenantId: roommateUserId, status: 'ACTIVE' },
+      });
+      if (!existingRoommateContract) {
+        await tx.contract.create({
           data: {
             roomId: room.id,
-            tenantId: invitation.recipientId,
-            contractId: hostContract.id,
-            occupants: nextOccupants,
-            status: 'PENDING',
-            declaredById: invitation.recipientId,
+            tenantId: roommateUserId,
+            startDate: hostContract.startDate,
+            endDate: hostContract.endDate,
+            depositPaid: 0,
+            monthlyRent: hostContract.monthlyRent,
+            terms: `Hợp đồng ở ghép liên kết theo hợp đồng của ${hostContract.tenant?.fullName ?? 'chủ hợp đồng'} (Phòng ${room.roomNumber})`,
+            status: 'ACTIVE',
           },
-          select: { id: true, occupants: true },
+        });
+      }
+
+      // Khai báo số người ở mới cho phòng
+      const now = new Date();
+      await tx.roomOccupancyDeclaration.updateMany({
+        where: {
+          roomId: room.id,
+          tenantId: { in: [hostUserId, roommateUserId] },
+          status: { in: ['PENDING', 'VERIFIED'] },
+          supersededAt: null,
+        },
+        data: { status: 'SUPERSEDED', supersededAt: now },
+      });
+      const declaration = await tx.roomOccupancyDeclaration.create({
+        data: {
+          roomId: room.id,
+          tenantId: roommateUserId,
+          contractId: hostContract.id,
+          occupants: nextOccupants,
+          status: 'PENDING',
+          declaredById: hostUserId,
+        },
+        select: { id: true, occupants: true },
+      });
+
+      // Ẩn tin ở ghép gắn với lời mời
+      if (invitation.postId) {
+        await tx.post.updateMany({
+          where: { id: invitation.postId, status: { in: ['PENDING', 'APPROVED'] } },
+          data: { status: 'CLOSED' },
+        });
+      }
+
+      // Ẩn tin tìm ở ghép của người được chấp nhận ở ghép (roommateUserId)
+      await tx.post.updateMany({
+        where: {
+          authorId: roommateUserId,
+          postType: 'FIND_ROOMMATE',
+          status: { in: ['PENDING', 'APPROVED'] },
+        },
+        data: { status: 'CLOSED' },
+      });
+
+      // Nếu phòng đã đủ số người tối đa, ẩn luôn tin tìm ở ghép của phòng này
+      if (nextOccupants >= room.maxOccupants) {
+        await tx.post.updateMany({
+          where: {
+            roomId: room.id,
+            postType: 'FIND_ROOMMATE',
+            status: { in: ['PENDING', 'APPROVED'] },
+          },
+          data: { status: 'CLOSED' },
         });
       }
 
@@ -282,10 +364,13 @@ export const roommateInvitationService = {
       };
     });
 
+    const targetRoommateName = roommateUserId === invitation.senderId ? invitation.sender.fullName : invitation.recipient.fullName;
+    const targetHostName = hostUserId === invitation.recipientId ? invitation.recipient.fullName : invitation.sender.fullName;
+
     await notificationService.createNotification(
-      invitation.senderId,
+      roommateUserId,
       'Lời mời ở ghép được chấp nhận',
-      `${invitation.recipient.fullName} đã chấp nhận bạn vào ở ghép tại phòng ${room.roomNumber}. Chủ trọ sẽ xác minh số người ở.`,
+      `${targetHostName} đã xác nhận bạn vào ở ghép tại phòng ${room.roomNumber}. Bạn đã được liên kết với hợp đồng và hóa đơn của phòng.`,
       'OCCUPANCY',
       result.declaration?.id ?? invitation.id,
       `roommate-invitation:${invitation.id}:accepted`,
@@ -294,7 +379,7 @@ export const roommateInvitationService = {
     await notificationService.createNotification(
       room.property.landlordId,
       'Có người ở ghép mới cần xác minh',
-      `${invitation.recipient.fullName} đã chấp nhận ${invitation.sender.fullName} ở ghép phòng ${room.roomNumber}. Số người dự kiến: ${nextOccupants}/${room.maxOccupants}. Vui lòng xác minh khai báo số người.`,
+      `${targetHostName} đã chấp nhận ${targetRoommateName} ở ghép phòng ${room.roomNumber}. Số người dự kiến: ${nextOccupants}/${room.maxOccupants}. Vui lòng xác minh khai báo số người.`,
       'OCCUPANCY',
       result.declaration?.id ?? room.id,
       `roommate-invitation:${invitation.id}:landlord-capacity`,

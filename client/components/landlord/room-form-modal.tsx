@@ -28,6 +28,8 @@ interface RoomFormState {
   priceMonthly: string;
   area: string;
   maxOccupants: string;
+  bedType: string;
+  balconyDirection: string;
   electricityRate: string;
   waterRate: string;
   internetFee: string;
@@ -41,6 +43,8 @@ const EMPTY_FORM: RoomFormState = {
   priceMonthly: "",
   area: "",
   maxOccupants: "1",
+  bedType: "",
+  balconyDirection: "",
   electricityRate: "",
   waterRate: "",
   internetFee: "",
@@ -66,6 +70,8 @@ function buildFormState(room?: Room | null): RoomFormState {
     priceMonthly: toInputValue(room.priceMonthly),
     area: toInputValue(room.area),
     maxOccupants: toInputValue(room.maxOccupants),
+    bedType: room.bedType || "",
+    balconyDirection: room.balconyDirection || "",
     electricityRate: toInputValue(room.electricityRate),
     waterRate: toInputValue(room.waterRate),
     internetFee: toInputValue(room.internetFee),
@@ -179,6 +185,8 @@ export function RoomFormModal({
               priceMonthly,
               area,
               maxOccupants,
+              bedType: form.bedType.trim() || null,
+              balconyDirection: form.balconyDirection.trim() || null,
               amenityIds: form.amenityIds,
               ...(parsedOptional.electricityRate !== null
                 ? { electricityRate: parsedOptional.electricityRate }
@@ -193,6 +201,8 @@ export function RoomFormModal({
               priceMonthly,
               area,
               maxOccupants,
+              bedType: form.bedType.trim() || null,
+              balconyDirection: form.balconyDirection.trim() || null,
               // `null` = xoá cấu hình phí (khác hẳn 0 đ).
               electricityRate: parsedOptional.electricityRate,
               waterRate: parsedOptional.waterRate,
@@ -297,6 +307,45 @@ export function RoomFormModal({
                 Hiện có {verifiedOccupants} người đã xác minh — không thể đặt thấp hơn.
               </span>
             )}
+          </label>
+
+          <label className="space-y-1.5 block">
+            <span className="block text-[13px] font-medium text-[#203c37]">
+              Loại giường
+            </span>
+            <select
+              value={form.bedType}
+              onChange={(e) => update("bedType", e.target.value)}
+              className={FIELD_CLASS}
+            >
+              <option value="">-- Chưa chọn / Không có giường --</option>
+              <option value="Giường đơn (1m2)">Giường đơn (1m2)</option>
+              <option value="Giường đôi (1m6)">Giường đôi (1m6)</option>
+              <option value="Giường King size (1m8)">Giường King size (1m8)</option>
+              <option value="Giường tầng">Giường tầng</option>
+              <option value="2 giường đơn">2 giường đơn</option>
+            </select>
+          </label>
+
+          <label className="space-y-1.5 block">
+            <span className="block text-[13px] font-medium text-[#203c37]">
+              Hướng ban công
+            </span>
+            <select
+              value={form.balconyDirection}
+              onChange={(e) => update("balconyDirection", e.target.value)}
+              className={FIELD_CLASS}
+            >
+              <option value="">-- Không có ban công / Chưa chọn --</option>
+              <option value="Đông">Đông (Đón nắng sớm)</option>
+              <option value="Tây">Tây</option>
+              <option value="Nam">Nam (Mát mẻ)</option>
+              <option value="Bắc">Bắc</option>
+              <option value="Đông Nam">Đông Nam (Mát mẻ, thoáng gió)</option>
+              <option value="Tây Nam">Tây Nam</option>
+              <option value="Đông Bắc">Đông Bắc</option>
+              <option value="Tây Bắc">Tây Bắc</option>
+            </select>
           </label>
 
           {amountField("electricityRate", "Đơn giá điện (đ/kWh)", "3500")}

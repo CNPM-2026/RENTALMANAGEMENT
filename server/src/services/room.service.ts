@@ -7,7 +7,7 @@ export const roomService = {
     const {
       propertyId, roomNumber, priceMonthly, priceYearly,
       depositAmount, electricityRate, waterRate, internetFee, serviceFee, parkingFee,
-      area, maxOccupants, amenityIds
+      area, maxOccupants, bedType, balconyDirection, amenityIds
     } = data;
 
     // 1. Kiểm tra nhà trọ này có tồn tại và thuộc quyền sở hữu của landlord không
@@ -42,6 +42,8 @@ export const roomService = {
         parkingFee,
         area,
         maxOccupants: maxOccupants || 2,
+        bedType: bedType || null,
+        balconyDirection: balconyDirection || null,
         // Nếu có truyền amenityIds, tạo các bản ghi trung gian RoomAmenity
         roomAmenities: amenityIds && amenityIds.length > 0 ? {
           create: amenityIds.map((id: string) => ({ amenityId: id }))
@@ -81,6 +83,8 @@ export const roomService = {
       'parkingFee',
       'area',
       'maxOccupants',
+      'bedType',
+      'balconyDirection',
     ]) {
       if (fields[key] !== undefined) updateData[key] = fields[key];
     }

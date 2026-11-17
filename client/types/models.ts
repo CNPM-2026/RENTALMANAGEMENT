@@ -163,6 +163,7 @@ export interface User {
   avatarUrl?: string | null;
   role: Role;
   isActive: boolean;
+  kycSubmission?: KycSubmission | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -245,6 +246,8 @@ export interface Room {
   parkingFee?: number | null;
   area: number;
   maxOccupants: number;
+  bedType?: string | null;
+  balconyDirection?: string | null;
   status: RoomStatus;
   createdAt: string;
 
@@ -1311,6 +1314,8 @@ export interface CreateRoomPayload {
   depositAmount?: number;
   area: number;
   maxOccupants?: number;
+  bedType?: string | null;
+  balconyDirection?: string | null;
   amenityIds?: string[];
   electricityRate?: number;
   waterRate?: number;
@@ -1327,6 +1332,8 @@ export interface UpdateRoomPayload {
   depositAmount?: number;
   area?: number;
   maxOccupants?: number;
+  bedType?: string | null;
+  balconyDirection?: string | null;
   electricityRate?: number | null;
   waterRate?: number | null;
   internetFee?: number | null;

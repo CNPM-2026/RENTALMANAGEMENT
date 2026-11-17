@@ -419,7 +419,27 @@ export const invoiceService = {
     if (role === 'LANDLORD') {
       whereClause.room = { property: { landlordId: userId } };
     } else if (role === 'TENANT') {
-      whereClause.tenantId = userId;
+      const userContracts = await prisma.contract.findMany({
+        where: { tenantId: userId, status: 'ACTIVE' },
+        select: { roomId: true },
+      });
+      const userDeclarations = await prisma.roomOccupancyDeclaration.findMany({
+        where: { tenantId: userId, status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
+        select: { roomId: true },
+      });
+      const userRoomIds = Array.from(new Set([
+        ...userContracts.map((c) => c.roomId),
+        ...userDeclarations.map((d) => d.roomId),
+      ]));
+
+      if (userRoomIds.length > 0) {
+        whereClause.OR = [
+          { tenantId: userId },
+          { roomId: { in: userRoomIds } },
+        ];
+      } else {
+        whereClause.tenantId = userId;
+      }
     } else {
       throw new AppError('Role không được phép xem hóa đơn cá nhân', 403);
     }

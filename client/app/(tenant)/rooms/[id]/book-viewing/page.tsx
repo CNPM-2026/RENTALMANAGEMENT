@@ -99,8 +99,10 @@ function BookViewingContent() {
       }
       const formattedDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}T${activeSlot.split(" - ")[0]}:00`;
 
+      const resolvedRoomId = post?.roomId || post?.room?.id;
       await apiClient.appointments.create({
-        roomId,
+        roomId: resolvedRoomId || roomId,
+        postId: post?.id || roomId,
         appointmentTime: formattedDate,
         note: `Liên hệ: ${fullName} (${phone}) - ${note || "Xem phòng trực tiếp"}`,
       });

@@ -172,6 +172,36 @@ export const adminService = {
     }));
   },
 
+  getKycSubmissionById: async (id: string) => {
+    const submission = await prisma.kycSubmission.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            role: true,
+            avatarUrl: true,
+            createdAt: true,
+            profile: true,
+          },
+        },
+      },
+    });
+    if (!submission) throw new AppError('Không tìm thấy hồ sơ KYC', 404);
+    return {
+      ...submission,
+      frontIdUrl: submission.frontIdUrl
+        ? storageService.getPrivateImageUrl(submission.frontIdUrl)
+        : null,
+      backIdUrl: submission.backIdUrl
+        ? storageService.getPrivateImageUrl(submission.backIdUrl)
+        : null,
+    };
+  },
+
   updateKyc: async (adminId: string, id: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
     const submission = await prisma.kycSubmission.findUnique({
       where: { id },
@@ -235,6 +265,25 @@ export const adminService = {
     }
 
     await auditService.record({ userId: adminId, action: `KYC_${status}`, entityType: 'KycSubmission', entityId: id });
+
+    // Thông báo kết quả xét duyệt KYC cho người dùng
+    try {
+      await notificationService.notifyUsers?.(
+        [submission.userId],
+        {
+          title: status === 'APPROVED' ? 'Hồ sơ KYC đã được phê duyệt' : 'Hồ sơ KYC đã bị từ chối',
+          content: status === 'APPROVED'
+            ? 'Chúc mừng! Hồ sơ xác minh danh tính của bạn đã được phê duyệt thành công.'
+            : `Hồ sơ xác minh danh tính của bạn đã bị từ chối.${rejectionReason ? ` Lý do: ${rejectionReason}` : ''}`,
+          type: 'KYC',
+          referenceId: id,
+        },
+        (userId) => `kyc:${id}:${status.toLowerCase()}:${userId}`,
+      );
+    } catch {
+      // Lỗi gửi thông báo không làm hỏng kết quả duyệt KYC đã commit
+    }
+
     return updated;
   },
 

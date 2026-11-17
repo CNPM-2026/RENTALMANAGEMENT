@@ -372,43 +372,86 @@ function RoomsDiscoveryContent() {
 
             {/* Filter 4: Area Range */}
             <div className="space-y-3 pt-2 border-t border-[#e2e7e1]">
-              <label className="text-[12px] font-bold text-[#74817b] uppercase tracking-wider block">
-                Diện tích phòng (m²)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[12px] font-bold text-[#74817b] uppercase tracking-wider">
+                  Diện tích phòng
+                </label>
+                <span className="text-[12px] font-bold text-[#15594f]">
+                  {minArea === 0 && maxArea >= 500
+                    ? "Tất cả"
+                    : maxArea >= 500
+                    ? `Từ ${minArea} m² trở lên`
+                    : minArea === 0
+                    ? `Dưới ${maxArea} m²`
+                    : `${minArea} - ${maxArea} m²`}
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  value={minArea}
-                  onChange={(e) => setMinArea(Math.max(0, Number(e.target.value) || 0))}
-                  placeholder="Từ"
-                  aria-label="Diện tích tối thiểu"
-                  className="w-full h-[40px] px-3 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] outline-none"
-                />
-                <input
-                  type="number"
-                  min={minArea}
-                  value={maxArea}
-                  onChange={(e) => setMaxArea(Math.max(minArea, Number(e.target.value) || 0))}
-                  placeholder="Đến"
-                  aria-label="Diện tích tối đa"
-                  className="w-full h-[40px] px-3 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] outline-none"
-                />
+                <div className="relative flex items-center">
+                  <span className="absolute left-2.5 text-[12px] text-[#74817b] font-medium pointer-events-none">Từ</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="500"
+                    value={minArea > 0 ? minArea : ""}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Math.max(0, Number(e.target.value));
+                      setMinArea(val);
+                    }}
+                    placeholder="0"
+                    aria-label="Diện tích tối thiểu"
+                    className="w-full h-[40px] pl-8 pr-7 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] outline-none focus:border-[#15594f] focus:bg-white transition-colors"
+                  />
+                  <span className="absolute right-2.5 text-[12px] text-[#74817b] pointer-events-none">m²</span>
+                </div>
+                <div className="relative flex items-center">
+                  <span className="absolute left-2.5 text-[12px] text-[#74817b] font-medium pointer-events-none">Đến</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="500"
+                    value={maxArea < 500 ? maxArea : ""}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 500 : Math.max(0, Number(e.target.value));
+                      setMaxArea(val);
+                    }}
+                    placeholder="Tối đa"
+                    aria-label="Diện tích tối đa"
+                    className="w-full h-[40px] pl-10 pr-7 bg-[#f7f6f2] border border-[#e2e7e1] rounded-[8px] text-[13px] text-[#203c37] outline-none focus:border-[#15594f] focus:bg-white transition-colors"
+                  />
+                  <span className="absolute right-2.5 text-[12px] text-[#74817b] pointer-events-none">m²</span>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 text-[11px]">
-                {[["Dưới 20", 0, 20], ["20 - 40", 20, 40], ["Trên 40", 40, 500]].map(([label, min, max]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                      setMinArea(Number(min));
-                      setMaxArea(Number(max));
-                    }}
-                    className="px-2 py-1.5 rounded-[6px] bg-[#f7f6f2] text-[#203c37] hover:bg-[#eaf2ed] text-center border border-[#e2e7e1]"
-                  >
-                    {label} m²
-                  </button>
-                ))}
+                {[
+                  { label: "Dưới 20 m²", min: 0, max: 20 },
+                  { label: "20 - 40 m²", min: 20, max: 40 },
+                  { label: "Trên 40 m²", min: 40, max: 500 },
+                ].map((preset) => {
+                  const isActive = minArea === preset.min && maxArea === preset.max;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        if (isActive) {
+                          setMinArea(0);
+                          setMaxArea(500);
+                        } else {
+                          setMinArea(preset.min);
+                          setMaxArea(preset.max);
+                        }
+                      }}
+                      className={`px-2 py-1.5 rounded-[6px] text-center border text-[11px] font-medium transition-all ${
+                        isActive
+                          ? "bg-[#15594f] text-white border-[#15594f] shadow-xs"
+                          : "bg-[#f7f6f2] text-[#203c37] hover:bg-[#eaf2ed] border-[#e2e7e1]"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -511,7 +554,7 @@ function RoomsDiscoveryContent() {
                 )}
                 {(minArea > 0 || maxArea < 500) && (
                   <Badge variant="neutral" size="sm">
-                    Diện tích: {minArea}–{maxArea} m²
+                    Diện tích: {minArea > 0 && maxArea < 500 ? `${minArea}–${maxArea} m²` : maxArea < 500 ? `Dưới ${maxArea} m²` : `Trên ${minArea} m²`}
                   </Badge>
                 )}
                 {petFriendly && (

@@ -62,6 +62,15 @@ export const adminController = {
     } catch (error) { return next(error); }
   },
 
+  getKycById: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.json({
+        success: true,
+        data: await adminService.getKycSubmissionById(String(req.params.id)),
+      });
+    } catch (error) { return next(error); }
+  },
+
   updateKyc: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       return res.json({ success: true, data: await adminService.updateKyc(req.user!.id, String(req.params.id), req.body.status, req.body.rejectionReason) });

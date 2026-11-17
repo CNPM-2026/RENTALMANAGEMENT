@@ -142,7 +142,10 @@ export function resolveNotificationTarget(
       return null;
 
     case 'KYC':
-      if (portal === 'admin') return id ? withFocus('/admin/landlords/kyc', 'kyc', id) : '/admin/landlords/kyc';
+      if (portal === 'admin') return id ? `/admin/landlords/kyc/${id}` : '/admin/landlords/kyc';
+      if (portal === 'tenant') return '/tenant/kyc';
+      if (portal === 'landlord') return '/landlord/kyc';
+      if (portal === 'staff') return '/staff/kyc';
       return null;
 
     case 'SYSTEM':

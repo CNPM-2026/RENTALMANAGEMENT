@@ -49,6 +49,8 @@ export const roomSchema = z.object({
   maxOccupants: strictInteger('Số người tối đa không hợp lệ')
     .pipe(z.number().positive().max(50))
     .optional(),
+  bedType: z.string().trim().max(100).nullable().optional(),
+  balconyDirection: z.string().trim().max(100).nullable().optional(),
   amenityIds: z.array(uuid).max(50).optional(),
 });
 
@@ -75,6 +77,8 @@ export const roomUpdateSchema = z
     maxOccupants: strictInteger('Số người tối đa không hợp lệ')
       .pipe(z.number().positive('Số người tối đa phải lớn hơn 0').max(50))
       .optional(),
+    bedType: z.string().trim().max(100).nullable().optional(),
+    balconyDirection: z.string().trim().max(100).nullable().optional(),
     amenityIds: z.array(uuid).max(50).optional(),
   })
   .refine((value) => Object.values(value).some((item) => item !== undefined), {
