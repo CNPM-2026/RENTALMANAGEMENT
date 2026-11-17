@@ -65,6 +65,7 @@ function RoommateDetailContent() {
     avatarUrl: suggestion.user.avatarUrl ?? "/images/default-avatar.svg",
     matchScore: suggestion.compatibilityPercent,
     postId: suggestion.post.id,
+    postRoomId: suggestion.post.room?.id ?? null,
     postTitle: suggestion.post.title,
     postDescription: suggestion.post.description,
     postRoomNumber: suggestion.post.room?.roomNumber ?? null,
@@ -84,7 +85,7 @@ function RoommateDetailContent() {
   } : {
     id: candidateId, fullName: "Đang tải hồ sơ", age: 0, gender: "Chưa cập nhật",
     occupation: "Chưa cập nhật", avatarUrl: "/images/default-avatar.svg", matchScore: 0,
-    postId: "", postTitle: "Chưa có dữ liệu bài đăng", postDescription: "",
+    postId: "", postRoomId: null, postTitle: "Chưa có dữ liệu bài đăng", postDescription: "",
     postRoomNumber: null, postMaxOccupants: null, postExpiredAt: null,
     statusNote: "Chưa có dữ liệu hồ sơ", budgetMonthly: "Chưa cập nhật",
     targetLocation: "Chưa cập nhật", moveInDate: "Chưa cập nhật", bio: "",
@@ -168,6 +169,16 @@ function RoommateDetailContent() {
                     Phòng {candidate.postRoomNumber}
                     {candidate.postMaxOccupants ? ` · tối đa ${candidate.postMaxOccupants} người` : ""}
                   </p>
+                )}
+                {(candidate.postRoomId || candidate.postId) && (
+                  <div className="pt-1">
+                    <Link
+                      href={`/rooms/${candidate.postRoomId || candidate.postId}`}
+                      className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#15594f] hover:underline"
+                    >
+                      Xem chi tiết phòng trọ này &rarr;
+                    </Link>
+                  </div>
                 )}
               </div>
 

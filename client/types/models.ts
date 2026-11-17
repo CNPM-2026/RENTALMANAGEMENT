@@ -401,6 +401,17 @@ export interface Contract {
   room?: Room & { property?: Partial<Property> };
   tenant?: Partial<User>;
   agent?: Partial<User> | null;
+  coTenants?: Array<{
+    id: string;
+    fullName: string;
+    phone?: string | null;
+    email?: string;
+    avatarUrl?: string | null;
+    role: string;
+    isPrimary: boolean;
+    status?: string;
+    joinedAt?: string;
+  }>;
 }
 
 export interface ContractTerminationAttachment {
@@ -796,7 +807,21 @@ export interface RoommateInvitation {
   updatedAt: string;
   sender?: UserWithProfile;
   recipient?: UserWithProfile;
-  post?: { id: string; title: string } | null;
+  post?: {
+    id: string;
+    title: string;
+    roomId?: string | null;
+    room?: {
+      id: string;
+      roomNumber: string;
+      property?: { id: string; name: string; address?: string } | null;
+    } | null;
+  } | null;
+  room?: {
+    id: string;
+    roomNumber: string;
+    property?: { id: string; name: string; address?: string } | null;
+  } | null;
   /** Chỉ có trong response chấp nhận: hệ thống tự từ chối vì vượt sức chứa. */
   autoRejected?: boolean;
   rejectionReason?: string;

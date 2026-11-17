@@ -119,7 +119,13 @@ export const contractService = {
           include: {
             property: {
               include: {
-                landlord: { select: { id: true, fullName: true, phone: true, email: true } },
+                landlord: { select: { id: true, fullName: true, phone: true, email: true, avatarUrl: true } },
+              },
+            },
+            occupancyDeclarations: {
+              where: { status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
+              include: {
+                tenant: { select: { id: true, fullName: true, phone: true, email: true, avatarUrl: true } },
               },
             },
           }
@@ -133,10 +139,49 @@ export const contractService = {
     // ACTIVE trong DB cho tới khi chủ trọ/người thuê chọn ký tiếp hoặc chấm dứt.
     // Nhờ vậy UI hiển thị đúng "đã đến hạn" mà không cần job nền đổi trạng thái.
     const now = Date.now();
-    return contracts.map((contract) => ({
-      ...contract,
-      isExpired: Boolean(contract.endDate && new Date(contract.endDate).getTime() < now),
-    }));
+    return contracts.map((contract) => {
+      const declarations = contract.room?.occupancyDeclarations ?? [];
+      const primaryTenantId = contract.tenantId;
+
+      const coTenants = [
+        // 1. Người đứng tên hợp đồng (Người thuê chính)
+        ...(contract.tenant
+          ? [
+              {
+                id: contract.tenant.id,
+                fullName: contract.tenant.fullName,
+                phone: contract.tenant.phone,
+                email: contract.tenant.email,
+                avatarUrl: contract.tenant.avatarUrl,
+                role: 'PRIMARY_TENANT',
+                isPrimary: true,
+                status: 'ACTIVE',
+                joinedAt: contract.startDate,
+              },
+            ]
+          : []),
+        // 2. Những người ở ghép trong cùng phòng (khai báo cư trú)
+        ...declarations
+          .filter((dec) => dec.tenant && dec.tenant.id !== primaryTenantId)
+          .map((dec) => ({
+            id: dec.tenant.id,
+            fullName: dec.tenant.fullName,
+            phone: dec.tenant.phone,
+            email: dec.tenant.email,
+            avatarUrl: dec.tenant.avatarUrl,
+            role: 'ROOMMATE',
+            isPrimary: false,
+            status: dec.status,
+            joinedAt: dec.declaredAt,
+          })),
+      ];
+
+      return {
+        ...contract,
+        coTenants,
+        isExpired: Boolean(contract.endDate && new Date(contract.endDate).getTime() < now),
+      };
+    });
   },
 
   // 3. Cập nhật trạng thái hợp đồng (Kết thúc hợp đồng trước hạn)

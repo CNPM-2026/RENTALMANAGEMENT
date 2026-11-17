@@ -3,33 +3,32 @@
 import * as React from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   Download,
   Printer,
   FileCheck,
   ShieldCheck,
-  CheckCircle2,
-  Calendar,
-  DollarSign,
-  User,
   Info,
-  Building,
-  KeyRound,
-  FileText,
+  Users,
+  ExternalLink,
+  Phone,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
 import { Contract } from "@/types/models";
 import { ContractLifecyclePanel } from "@/components/contracts/contract-lifecycle-panel";
+import { getCurrentUser } from "@/lib/auth";
+import { Avatar } from "@/components/ui/avatar";
 
 function TenantContractDetailContent() {
   const params = useParams();
-  const router = useRouter();
   const contractId = params?.id as string;
   const [contract, setContract] = React.useState<Contract | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
 
   const [isSigned, setIsSigned] = React.useState<boolean>(false);
   const [signing, setSigning] = React.useState<boolean>(false);
@@ -43,6 +42,16 @@ function TenantContractDetailContent() {
   const contractTimestamp = contract?.createdAt
     ? new Date(contract.createdAt).toLocaleString("vi-VN")
     : "Chưa cập nhật";
+
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setCurrentUser(getCurrentUser());
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const isPrimaryTenant = Boolean(contract && currentUser && contract.tenantId === currentUser.id);
+  const isRoommate = Boolean(contract && currentUser && contract.tenantId !== currentUser.id);
 
   React.useEffect(() => {
     apiClient.contracts.getMyContracts("tenant")
@@ -132,13 +141,24 @@ function TenantContractDetailContent() {
               <span className="block text-[11px] text-[#74817b]">Nhà trọ / cơ sở</span>
               <strong>{property?.name ?? "Chưa cập nhật"}</strong>
             </div>
-            <div className="rounded-[8px] border border-[#d2e4d7] bg-[#eaf2ed] px-3 py-2">
-              <span className="block text-[11px] text-[#74817b]">Số phòng</span>
-              <strong>Phòng {room?.roomNumber ?? "Chưa cập nhật"}</strong>
+            <div className="rounded-[8px] border border-[#d2e4d7] bg-[#eaf2ed] px-3 py-2 flex items-center justify-between">
+              <div>
+                <span className="block text-[11px] text-[#74817b]">Số phòng</span>
+                <strong>Phòng {room?.roomNumber ?? "Chưa cập nhật"}</strong>
+              </div>
+              {(room?.id ?? contract?.roomId) && (
+                <Link
+                  href={`/rooms/${room?.id ?? contract?.roomId}`}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-[#15594f] hover:underline"
+                  target="_blank"
+                >
+                  Xem phòng <ExternalLink className="size-3" />
+                </Link>
+              )}
             </div>
             <div className="rounded-[8px] border border-[#d2e4d7] bg-[#eaf2ed] px-3 py-2 sm:col-span-1">
               <span className="block text-[11px] text-[#74817b]">Địa chỉ</span>
-              <strong>{property?.address ?? "Chưa cập nhật"}</strong>
+              <strong className="truncate block" title={property?.address}>{property?.address ?? "Chưa cập nhật"}</strong>
             </div>
           </div>
         </div>
@@ -166,6 +186,20 @@ function TenantContractDetailContent() {
           </Button>
         </div>
       </div>
+
+      {isRoommate && (
+        <div className="rounded-[12px] border border-[#a2c8b8] bg-[#f0f8f4] p-4 flex items-start gap-3 shadow-xs">
+          <Info className="size-5 text-[#15594f] shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-[14px] font-bold text-[#15594f]">
+              Bạn đang xem hợp đồng với tư cách Bạn ở ghép
+            </h4>
+            <p className="text-[13px] text-[#203c37] leading-relaxed">
+              Hợp đồng này được xác lập giữa Bên thuê chính (người đầu tiên thuê phòng): <strong>{tenantName}</strong> và Chủ nhà: <strong>{landlordName}</strong>. Bạn đã được liên kết thông tin phòng trọ, danh sách thành viên cư trú, hợp đồng và hoá đơn liên quan.
+            </p>
+          </div>
+        </div>
+      )}
 
       {contract && (
         <ContractLifecyclePanel
@@ -245,7 +279,7 @@ function TenantContractDetailContent() {
               </div>
             </div>
 
-            {!isSigned && (
+            {!isSigned && isPrimaryTenant && (
               <Button
                 variant="primary"
                 size="md"
@@ -256,6 +290,12 @@ function TenantContractDetailContent() {
               >
                 Ký số hợp đồng ngay
               </Button>
+            )}
+
+            {isRoommate && (
+              <div className="p-3 rounded-[8px] bg-[#f7f6f2] border border-[#e2e7e1] text-[12px] text-[#74817b] text-center mt-3">
+                Hợp đồng đứng tên người thuê chính: <strong className="text-[#203c37]">{tenantName}</strong>
+              </div>
             )}
           </div>
 
@@ -295,23 +335,103 @@ function TenantContractDetailContent() {
           {/* Parties Information */}
           <section id="parties" className="space-y-4 pt-4 border-t border-[#e2e7e1] font-sans text-[13px]">
             <div className="space-y-1.5 p-4 rounded-[10px] bg-[#f7f6f2] border border-[#e2e7e1]">
-              <h3 className="font-bold text-[#15594f] text-[14px]">
-                BÊN A (BÊN CHO THUÊ):
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-[#15594f] text-[14px]">
+                  BÊN A (BÊN CHO THUÊ - CHỦ TRỌ):
+                </h3>
+                <span className="text-[11px] font-semibold text-[#15594f] bg-[#eaf2ed] px-2 py-0.5 rounded">
+                  Chủ trọ / Đại diện
+                </span>
+              </div>
               <p>Họ và tên: <strong>{landlord?.fullName ?? "Chưa cập nhật"}</strong></p>
-              <p>Số CCCD: <strong>Chưa cập nhật</strong></p>
-              <p>Địa chỉ: {property?.address ?? "Chưa cập nhật"}</p>
               <p>Số điện thoại liên hệ: <strong>{landlord?.phone ?? "Chưa cập nhật"}</strong></p>
+              {landlord?.email && <p>Email: <strong>{landlord.email}</strong></p>}
+              <p>Địa chỉ: {property?.address ?? "Chưa cập nhật"}</p>
             </div>
 
             <div className="space-y-1.5 p-4 rounded-[10px] bg-[#f7f6f2] border border-[#e2e7e1]">
-              <h3 className="font-bold text-[#15594f] text-[14px]">
-                BÊN B (BÊN THUÊ):
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-[#15594f] text-[14px]">
+                  BÊN B (BÊN THUÊ CHÍNH - NGƯỜI ĐỨNG TÊN HỢP ĐỒNG):
+                </h3>
+                <span className="text-[11px] font-semibold text-[#15594f] bg-[#eaf2ed] px-2 py-0.5 rounded">
+                  Người thuê đầu tiên
+                </span>
+              </div>
               <p>Họ và tên: <strong>{tenant?.fullName ?? "Chưa cập nhật"}</strong></p>
-              <p>Số CCCD: <strong>Chưa cập nhật</strong></p>
-              <p>Địa chỉ: Chưa cập nhật</p>
               <p>Số điện thoại liên hệ: <strong>{tenant?.phone ?? "Chưa cập nhật"}</strong></p>
+              {tenant?.email && <p>Email: <strong>{tenant.email}</strong></p>}
+              <p>Vai trò trong phòng: <strong>Người thuê chính (Chủ hợp đồng)</strong></p>
+            </div>
+          </section>
+
+          {/* Co-tenants / Roommates Section */}
+          <section id="co-tenants" className="space-y-3 pt-4 border-t border-[#e2e7e1] font-sans">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-[15px] text-[#15594f] flex items-center gap-2">
+                <Users className="size-4 text-[#15594f]" /> DANH SÁCH THÀNH VIÊN Ở CÙNG PHÒNG ({contract?.coTenants?.length ?? 1})
+              </h3>
+              {(room?.id ?? contract?.roomId) && (
+                <Link
+                  href={`/rooms/${room?.id ?? contract?.roomId}`}
+                  className="text-[12px] font-semibold text-[#15594f] hover:underline inline-flex items-center gap-1"
+                >
+                  Xem thông tin phòng &rarr;
+                </Link>
+              )}
+            </div>
+            <p className="text-[12px] text-[#74817b]">
+              Các thành viên hiện đang cùng cư trú hợp pháp tại Phòng {room?.roomNumber ?? "—"} theo hợp đồng và khai báo cư trú:
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {(contract?.coTenants && contract.coTenants.length > 0) ? (
+                contract.coTenants.map((member) => (
+                  <div
+                    key={member.id}
+                    className={`p-3.5 rounded-[10px] border flex items-start gap-3 transition-colors ${
+                      member.isPrimary
+                        ? "bg-[#f4f8f5] border-[#b8dbc6]"
+                        : "bg-white border-[#e2e7e1] hover:border-[#15594f]/40"
+                    }`}
+                  >
+                    <div className="size-11 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#d2e4d7]">
+                      <Avatar src={member.avatarUrl ?? "/images/default-avatar.svg"} alt={member.fullName} className="size-full object-cover" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-[14px] text-[#203c37] truncate">{member.fullName}</span>
+                        {member.isPrimary ? (
+                          <Badge variant="success" size="sm">Người thuê chính</Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">Bạn ở ghép</Badge>
+                        )}
+                      </div>
+                      <div className="text-[12px] text-[#74817b] space-y-0.5">
+                        <p className="flex items-center gap-1.5 truncate">
+                          <Phone className="size-3 text-[#15594f] shrink-0" />
+                          <span>{member.phone || "Chưa có SĐT"}</span>
+                        </p>
+                        {member.email && (
+                          <p className="flex items-center gap-1.5 truncate">
+                            <Mail className="size-3 text-[#15594f] shrink-0" />
+                            <span>{member.email}</span>
+                          </p>
+                        )}
+                        {member.joinedAt && (
+                          <p className="text-[11px] text-[#74817b]">
+                            Vào ở từ: {new Date(member.joinedAt).toLocaleDateString("vi-VN")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 rounded-[10px] border border-[#e2e7e1] bg-[#f7f6f2] col-span-2 text-center text-[13px] text-[#74817b]">
+                  Chưa có bạn ở ghép nào được thêm vào phòng này.
+                </div>
+              )}
             </div>
           </section>
 
