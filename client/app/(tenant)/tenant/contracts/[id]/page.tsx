@@ -3,20 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   Download,
   Printer,
   FileCheck,
   ShieldCheck,
-  CheckCircle2,
-  Calendar,
-  DollarSign,
-  User,
   Info,
-  Building,
-  KeyRound,
-  FileText,
   Users,
   ExternalLink,
   Phone,
@@ -32,7 +25,6 @@ import { Avatar } from "@/components/ui/avatar";
 
 function TenantContractDetailContent() {
   const params = useParams();
-  const router = useRouter();
   const contractId = params?.id as string;
   const [contract, setContract] = React.useState<Contract | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -40,7 +32,6 @@ function TenantContractDetailContent() {
 
   const [isSigned, setIsSigned] = React.useState<boolean>(false);
   const [signing, setSigning] = React.useState<boolean>(false);
-  const [signatureTimestamp, setSignatureTimestamp] = React.useState<string | null>(null);
   const landlord = contract?.room?.property?.landlord;
   const tenant = contract?.tenant;
   const property = contract?.room?.property;
@@ -52,7 +43,10 @@ function TenantContractDetailContent() {
     : "Chưa cập nhật";
 
   React.useEffect(() => {
-    setCurrentUser(getCurrentUser());
+    const frame = window.requestAnimationFrame(() => {
+      setCurrentUser(getCurrentUser());
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const isPrimaryTenant = Boolean(contract && currentUser && contract.tenantId === currentUser.id);
@@ -93,7 +87,6 @@ function TenantContractDetailContent() {
       .then((updated) => {
         setContract(updated);
         setIsSigned(true);
-        setSignatureTimestamp(new Date().toLocaleString("vi-VN"));
       })
       .catch((error) => setLoadError(error instanceof Error ? error.message : "Không thể ký hợp đồng."))
       .finally(() => setSigning(false));
