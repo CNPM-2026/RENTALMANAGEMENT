@@ -8,7 +8,7 @@ export default function LandlordNotificationDetailPage() {
     <React.Suspense
       fallback={<div className="py-12 text-center text-sm text-[#74817b]">Đang tải thông báo...</div>}
     >
-      <NotificationDetail portal="landlord" />
+      <NotificationDetail />
     </React.Suspense>
   );
 }

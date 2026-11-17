@@ -19,15 +19,14 @@ import {
   XCircle,
 } from "lucide-react";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useCurrentUserRole } from "@/hooks/use-current-user-role";
 import {
   notificationBasePath,
   resolveNotificationTarget,
-  type NotificationPortal,
 } from "@/lib/notification-links";
 import type { Notification, NotificationType } from "@/types/models";
 
 interface NotificationDropdownProps {
-  portal: NotificationPortal;
   buttonClassName?: string;
   iconClassName?: string;
   badgeMode?: "dot" | "count";
@@ -77,7 +76,6 @@ function relativeTime(value: string) {
  * Dữ liệu lấy từ server và cập nhật realtime qua kênh notification hiện có.
  */
 export function NotificationDropdown({
-  portal,
   buttonClassName = "relative size-9 rounded-full flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors",
   iconClassName = "size-4.5",
   badgeMode = "count",
@@ -86,7 +84,10 @@ export function NotificationDropdown({
   const [open, setOpen] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-  const basePath = notificationBasePath(portal);
+  // Role lấy từ user đang đăng nhập — không dùng portal của trang hiện tại.
+  const role = useCurrentUserRole();
+  const basePath = notificationBasePath(role);
+  const notificationsRoot = basePath ?? "/login";
 
   React.useEffect(() => {
     if (!open) return;
@@ -165,10 +166,10 @@ export function NotificationDropdown({
                 const visual = visualOf(notification.type);
                 const Icon = visual.icon;
                 const target = resolveNotificationTarget(
-                  portal,
+                  role,
                   notification.type,
                   notification.referenceId,
-                ) ?? `${basePath}/${notification.id}`;
+                ) ?? `${notificationsRoot}/${notification.id}`;
                 return (
                   <Link
                     key={notification.id}
@@ -205,7 +206,7 @@ export function NotificationDropdown({
           </div>
 
           <Link
-            href={basePath}
+            href={notificationsRoot}
             onClick={() => setOpen(false)}
             className="block bg-[#f7faf8] px-4 py-2.5 text-center text-[12px] font-semibold text-[#15594f] hover:bg-[#eaf2ed]"
           >

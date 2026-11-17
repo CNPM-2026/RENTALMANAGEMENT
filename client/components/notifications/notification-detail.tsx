@@ -12,23 +12,21 @@ import {
   notificationActionLabel,
   notificationBasePath,
   resolveNotificationTarget,
-  type NotificationPortal,
 } from "@/lib/notification-links";
-
-interface NotificationDetailProps {
-  portal: NotificationPortal;
-}
+import { useCurrentUserRole } from "@/hooks/use-current-user-role";
 
 /**
  * Trang nội dung một thông báo (dùng chung cho 4 portal).
  *
+ * Role để tính link lấy từ USER đang đăng nhập, không lấy từ route hiện tại.
  * Khác với danh sách: ở đây luôn hiển thị đầy đủ nội dung, và nút hành động chỉ
  * hiện khi `resolveNotificationTarget` tìm được trang đích thật.
  */
-export function NotificationDetail({ portal }: NotificationDetailProps) {
+export function NotificationDetail() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const basePath = notificationBasePath(portal);
+  const role = useCurrentUserRole();
+  const basePath = notificationBasePath(role) ?? "/login";
   const [notification, setNotification] = React.useState<Notification | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -61,7 +59,7 @@ export function NotificationDetail({ portal }: NotificationDetailProps) {
   }, [id]);
 
   const target = notification
-    ? resolveNotificationTarget(portal, notification.type, notification.referenceId)
+    ? resolveNotificationTarget(role, notification.type, notification.referenceId)
     : null;
 
   return (
@@ -116,7 +114,7 @@ export function NotificationDetail({ portal }: NotificationDetailProps) {
                 href={target}
                 className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#15594f] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#124b42]"
               >
-                {notificationActionLabel(notification.type, portal)}
+                {notificationActionLabel(notification.type, role)}
                 <ChevronRight className="size-4" />
               </Link>
             )}

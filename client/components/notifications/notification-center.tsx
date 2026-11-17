@@ -32,8 +32,8 @@ import {
   notificationActionLabel,
   notificationBasePath,
   resolveNotificationTarget,
-  type NotificationPortal,
 } from "@/lib/notification-links";
+import { useCurrentUserRole } from "@/hooks/use-current-user-role";
 
 type FilterKey =
   | "ALL"
@@ -132,7 +132,6 @@ function matchesFilter(item: Notification, filter: FilterKey) {
 }
 
 interface NotificationCenterProps {
-  portal: NotificationPortal;
   title?: string;
   subtitle?: string;
 }
@@ -140,14 +139,16 @@ interface NotificationCenterProps {
 /**
  * Trang thông báo dùng chung cho cả 4 portal (admin / landlord / tenant / staff).
  *
+ * Role dùng để tính link lấy từ USER đang đăng nhập, không lấy từ route hiện tại.
  * Mỗi thông báo có HAI hành động tách biệt:
  *  - "Chi tiết thông báo" → trang nội dung của chính thông báo;
  *  - "Xem chi tiết" → thẳng tới đối tượng liên quan (công việc, hoá đơn...),
  *    tính bằng `resolveNotificationTarget` để không bao giờ trỏ 404.
  */
-export function NotificationCenter({ portal, title, subtitle }: NotificationCenterProps) {
+export function NotificationCenter({ title, subtitle }: NotificationCenterProps) {
   const router = useRouter();
-  const basePath = notificationBasePath(portal);
+  const role = useCurrentUserRole();
+  const basePath = notificationBasePath(role) ?? "/login";
   const [items, setItems] = React.useState<Notification[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -201,7 +202,7 @@ export function NotificationCenter({ portal, title, subtitle }: NotificationCent
 
   const openTarget = async (item: Notification) => {
     await markRead(item.id);
-    const target = resolveNotificationTarget(portal, item.type, item.referenceId);
+    const target = resolveNotificationTarget(role, item.type, item.referenceId);
     router.push(target ?? `${basePath}/${item.id}`);
   };
 
@@ -273,7 +274,7 @@ export function NotificationCenter({ portal, title, subtitle }: NotificationCent
           filtered.map((item) => {
             const visual = visualOf(item.type);
             const VisualIcon = visual.icon;
-            const target = resolveNotificationTarget(portal, item.type, item.referenceId);
+            const target = resolveNotificationTarget(role, item.type, item.referenceId);
             return (
               <div
                 key={item.id}
@@ -310,7 +311,7 @@ export function NotificationCenter({ portal, title, subtitle }: NotificationCent
                         onClick={() => void markRead(item.id)}
                         className="inline-flex items-center gap-1 font-semibold text-[#15594f] hover:underline"
                       >
-                        <span>{notificationActionLabel(item.type, portal)}</span>
+                        <span>{notificationActionLabel(item.type, role)}</span>
                         <ChevronRight className="size-3.5" />
                       </Link>
                     </div>

@@ -140,7 +140,6 @@ export function PublicNavbar({
 
               {/* Notifications dropdown */}
               <NotificationDropdown
-                portal="tenant"
                 badgeMode="dot"
                 buttonClassName="size-10 rounded-[8px] border border-[#e2e7e1] flex items-center justify-center text-[#74817b] hover:text-[#15594f] hover:bg-[#f7f6f2] transition-colors relative"
                 iconClassName="size-5"
@@ -297,7 +296,6 @@ export function PublicNavbar({
             <>
               <TopbarChatButton className="size-9" iconClassName="size-5" />
               <NotificationDropdown
-                portal="tenant"
                 badgeMode="dot"
                 buttonClassName="relative flex size-9 items-center justify-center rounded-full text-[#74817b] hover:bg-[#f7f6f2] hover:text-[#15594f]"
                 iconClassName="size-5"

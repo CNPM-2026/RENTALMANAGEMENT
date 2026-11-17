@@ -73,7 +73,6 @@ export function StaffTopbar() {
           <TopbarChatButton />
 
           <NotificationDropdown
-            portal="staff"
             title="Thông báo công việc"
             badgeMode="dot"
             iconClassName="size-4.5"

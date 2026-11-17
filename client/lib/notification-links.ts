@@ -1,12 +1,40 @@
-import type { NotificationType } from '@/types/models';
+import type { NotificationType, Role } from '@/types/models';
 
 /** Bốn không gian có trang thông báo riêng. */
 export type NotificationPortal = 'admin' | 'landlord' | 'tenant' | 'staff';
 
-/** Đường dẫn gốc của trang thông báo theo portal. */
-export function notificationBasePath(portal: NotificationPortal): string {
+/**
+ * Role của tài khoản đang đăng nhập → không gian thông báo tương ứng.
+ *
+ * Luôn lấy role từ user (session), KHÔNG suy ra từ URL/portal của trang hiện tại:
+ * một tài khoản có thể mở trang công khai hoặc trang được cấp quyền, nhưng link
+ * thông báo vẫn phải trỏ về đúng không gian của chính tài khoản đó.
+ */
+export function notificationPortalForRole(role: Role | null | undefined): NotificationPortal | null {
+  switch (role) {
+    case 'ADMIN':
+      return 'admin';
+    case 'LANDLORD':
+      return 'landlord';
+    case 'TENANT':
+      return 'tenant';
+    case 'STAFF':
+      return 'staff';
+    default:
+      return null;
+  }
+}
+
+/** Đường dẫn gốc của trang thông báo theo portal (dùng nội bộ sau khi đã có role). */
+function basePathForPortal(portal: NotificationPortal): string {
   if (portal === 'tenant') return '/tenant/notifications';
   return `/${portal}/notifications`;
+}
+
+/** Đường dẫn gốc của trang thông báo theo role của user đang đăng nhập. */
+export function notificationBasePath(role: Role | null | undefined): string | null {
+  const portal = notificationPortalForRole(role);
+  return portal ? basePathForPortal(portal) : null;
 }
 
 /** Ghép `?key=<id>` (hoặc nối tiếp query đã có) mà vẫn encode id an toàn. */
@@ -18,11 +46,12 @@ function withFocus(path: string, key: string, id: string): string {
 /**
  * Đích đến khi bấm "Xem chi tiết" trên một thông báo.
  *
- * Chỉ trả về đường dẫn ĐÃ TỒN TẠI trong app. Khi không xác định được đối tượng
- * (hoặc portal không có trang tương ứng), trả `null` để UI quay về trang chi
+ * `role` là role của USER đang đăng nhập (không phải portal của trang hiện tại).
+ * Chỉ trả về đường dẫn ĐÃ TỒN TẠI trong app. Khi không xác định được role/đối
+ * tượng (hoặc role không có trang tương ứng), trả `null` để UI quay về trang chi
  * tiết thông báo — tránh link chết/404 như trước đây.
  */
-export function resolveNotificationTarget(
+function resolveForPortal(
   portal: NotificationPortal,
   type: NotificationType,
   referenceId?: string | null,
@@ -158,8 +187,24 @@ export function resolveNotificationTarget(
   }
 }
 
-/** Nhãn nút hành động tương ứng với loại thông báo. */
-export function notificationActionLabel(
+/**
+ * Đích đến theo ROLE của user đang đăng nhập.
+ *
+ * Đây là API mà UI phải gọi. `role` lấy từ `getCurrentUser()?.role`, tuyệt đối
+ * không truyền portal của route hiện tại.
+ */
+export function resolveNotificationTarget(
+  role: Role | null | undefined,
+  type: NotificationType,
+  referenceId?: string | null,
+): string | null {
+  const portal = notificationPortalForRole(role);
+  if (!portal) return null;
+  return resolveForPortal(portal, type, referenceId);
+}
+
+/** Nhãn nút hành động tương ứng với loại thông báo (theo portal đã suy ra từ role). */
+function actionLabelForPortal(
   type: NotificationType,
   portal?: NotificationPortal,
 ): string {
@@ -211,4 +256,12 @@ export function notificationActionLabel(
     default:
       return 'Xem chi tiết';
   }
+}
+
+/** Nhãn nút hành động theo ROLE của user đang đăng nhập. */
+export function notificationActionLabel(
+  type: NotificationType,
+  role?: Role | null,
+): string {
+  return actionLabelForPortal(type, notificationPortalForRole(role) ?? undefined);
 }
