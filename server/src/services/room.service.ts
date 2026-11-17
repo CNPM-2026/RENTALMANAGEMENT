@@ -34,7 +34,7 @@ export const roomService = {
         roomNumber,
         priceMonthly,
         priceYearly,
-        depositAmount: depositAmount || 0,
+        depositAmount: (depositAmount !== undefined && depositAmount !== null && Number(depositAmount) > 0) ? depositAmount : priceMonthly,
         electricityRate,
         waterRate,
         internetFee,
