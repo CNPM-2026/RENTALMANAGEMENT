@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Building2, CalendarDays, FileCheck, User } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, ExternalLink, FileCheck, Mail, Phone, ShieldCheck, User, Users } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
 import { formatCurrency } from "@/lib/utils";
 import { ContractLifecyclePanel } from "@/components/contracts/contract-lifecycle-panel";
 import type { Contract } from "@/types/models";
@@ -112,10 +113,21 @@ export default function LandlordContractDetailPage() {
           <p className="mt-1 text-[14px] font-semibold text-[#203c37]">{contract.tenant?.fullName ?? "Chưa cập nhật"}</p>
           <p className="text-[12px] text-[#74817b]">{contract.tenant?.phone ?? "Chưa có SĐT"}</p>
         </div>
-        <div className="rounded-[10px] border border-[#e2e7e1] bg-white p-4">
-          <p className="flex items-center gap-1 text-[11px] text-[#74817b]"><Building2 className="size-3" /> Phòng</p>
-          <p className="mt-1 text-[14px] font-semibold text-[#203c37]">Phòng {contract.room?.roomNumber ?? "—"}</p>
-          <p className="text-[12px] text-[#74817b]">{property?.name ?? "Chưa cập nhật"}</p>
+        <div className="rounded-[10px] border border-[#e2e7e1] bg-white p-4 flex flex-col justify-between">
+          <div>
+            <p className="flex items-center gap-1 text-[11px] text-[#74817b]"><Building2 className="size-3" /> Phòng</p>
+            <p className="mt-1 text-[14px] font-semibold text-[#203c37]">Phòng {contract.room?.roomNumber ?? "—"}</p>
+            <p className="text-[12px] text-[#74817b]">{property?.name ?? "Chưa cập nhật"}</p>
+          </div>
+          {contract.roomId && (
+            <Link
+              href={`/rooms/${contract.roomId}`}
+              className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#15594f] hover:underline"
+              target="_blank"
+            >
+              Xem chi tiết phòng <ExternalLink className="size-3" />
+            </Link>
+          )}
         </div>
         <div className="rounded-[10px] border border-[#e2e7e1] bg-white p-4">
           <p className="flex items-center gap-1 text-[11px] text-[#74817b]"><CalendarDays className="size-3" /> Thời hạn</p>
@@ -130,6 +142,145 @@ export default function LandlordContractDetailPage() {
           <p className="text-[12px] text-[#74817b]">
             Cọc {formatCurrency(contract.depositPaid, { showUnit: false })} đ
           </p>
+        </div>
+      </div>
+
+      {/* Thông tin các bên ký kết & Người ở chung phòng */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Cột trái: Thông tin Chủ trọ & Bên thuê chính */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs space-y-4">
+            <h3 className="text-[15px] font-bold text-[#203c37] border-b border-[#e2e7e1] pb-2 flex items-center justify-between">
+              <span>Thông tin các bên ký kết</span>
+              <ShieldCheck className="size-4 text-[#15594f]" />
+            </h3>
+
+            {/* Chủ trọ */}
+            <div className="rounded-[8px] bg-[#f7f6f2] p-3.5 space-y-1.5 text-[13px] border border-[#e2e7e1]">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#15594f]">
+                  BÊN A · CHỦ TRỌ
+                </span>
+                <Badge variant="success" size="sm">Đại diện cho thuê</Badge>
+              </div>
+              <p className="font-semibold text-[#203c37] text-[14px]">
+                {property?.landlord?.fullName ?? "Chưa cập nhật"}
+              </p>
+              <p className="text-[#74817b] flex items-center gap-1.5 text-[12px]">
+                <Phone className="size-3 text-[#15594f]" />
+                {property?.landlord?.phone ?? "Chưa có SĐT"}
+              </p>
+              {property?.landlord?.email && (
+                <p className="text-[#74817b] flex items-center gap-1.5 text-[12px]">
+                  <Mail className="size-3 text-[#15594f]" />
+                  {property?.landlord?.email}
+                </p>
+              )}
+              <p className="text-[#74817b] text-[12px] pt-0.5">
+                Cơ sở: <strong>{property?.name}</strong> · {property?.address}
+              </p>
+            </div>
+
+            {/* Người thuê chính */}
+            <div className="rounded-[8px] bg-[#f7f6f2] p-3.5 space-y-1.5 text-[13px] border border-[#e2e7e1]">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#15594f]">
+                  BÊN B · BÊN THUÊ CHÍNH
+                </span>
+                <Badge variant="success" size="sm">Chủ hợp đồng</Badge>
+              </div>
+              <p className="font-semibold text-[#203c37] text-[14px]">
+                {contract.tenant?.fullName ?? "Chưa cập nhật"}
+              </p>
+              <p className="text-[#74817b] flex items-center gap-1.5 text-[12px]">
+                <Phone className="size-3 text-[#15594f]" />
+                {contract.tenant?.phone ?? "Chưa có SĐT"}
+              </p>
+              {contract.tenant?.email && (
+                <p className="text-[#74817b] flex items-center gap-1.5 text-[12px]">
+                  <Mail className="size-3 text-[#15594f]" />
+                  {contract.tenant?.email}
+                </p>
+              )}
+              <p className="text-[11px] text-[#74817b] pt-0.5">
+                Là người đầu tiên ký kết hợp đồng thuê phòng số {contract.room?.roomNumber ?? "—"}.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Cột phải: Danh sách người ở chung phòng */}
+        <div className="lg:col-span-7">
+          <div className="rounded-[12px] border border-[#e2e7e1] bg-white p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-[#e2e7e1] pb-2">
+              <h3 className="text-[15px] font-bold text-[#203c37] flex items-center gap-2">
+                <Users className="size-4.5 text-[#15594f]" />
+                Người ở chung phòng ({contract.coTenants?.length ?? 1})
+              </h3>
+              {contract.roomId && (
+                <Link
+                  href={`/rooms/${contract.roomId}`}
+                  className="text-[12px] font-semibold text-[#15594f] hover:underline inline-flex items-center gap-1"
+                >
+                  Xem phòng &rarr;
+                </Link>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {(contract.coTenants && contract.coTenants.length > 0) ? (
+                contract.coTenants.map((person) => (
+                  <div
+                    key={person.id}
+                    className={`p-3.5 rounded-[10px] border flex items-start gap-3.5 transition-colors ${
+                      person.isPrimary
+                        ? "bg-[#f4f8f5] border-[#b8dbc6]"
+                        : "bg-white border-[#e2e7e1] hover:border-[#15594f]/40"
+                    }`}
+                  >
+                    <div className="size-11 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#d2e4d7]">
+                      <Avatar
+                        src={person.avatarUrl ?? "/images/default-avatar.svg"}
+                        alt={person.fullName}
+                        className="size-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-bold text-[14px] text-[#203c37] truncate">{person.fullName}</span>
+                        {person.isPrimary ? (
+                          <Badge variant="success" size="sm">Người thuê chính (Chủ HĐ)</Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">Bạn ở ghép</Badge>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[12px] text-[#74817b]">
+                        <p className="flex items-center gap-1.5 truncate">
+                          <Phone className="size-3 text-[#15594f] shrink-0" />
+                          <span>{person.phone || "Chưa có SĐT"}</span>
+                        </p>
+                        {person.email && (
+                          <p className="flex items-center gap-1.5 truncate">
+                            <Mail className="size-3 text-[#15594f] shrink-0" />
+                            <span>{person.email}</span>
+                          </p>
+                        )}
+                      </div>
+                      {person.joinedAt && (
+                        <p className="text-[11px] text-[#74817b]">
+                          Ngày vào ở: {new Date(person.joinedAt).toLocaleDateString("vi-VN")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 rounded-[8px] bg-[#f7f6f2] text-center text-[13px] text-[#74817b]">
+                  Chưa có bạn ở ghép nào được thêm vào phòng này.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
