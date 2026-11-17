@@ -32,6 +32,7 @@ function TenantContractDetailContent() {
 
   const [isSigned, setIsSigned] = React.useState<boolean>(false);
   const [signing, setSigning] = React.useState<boolean>(false);
+  const [signatureTimestamp, setSignatureTimestamp] = React.useState<string | null>(null);
   const landlord = contract?.room?.property?.landlord;
   const tenant = contract?.tenant;
   const property = contract?.room?.property;
@@ -87,6 +88,7 @@ function TenantContractDetailContent() {
       .then((updated) => {
         setContract(updated);
         setIsSigned(true);
+        setSignatureTimestamp(new Date().toLocaleString("vi-VN"));
       })
       .catch((error) => setLoadError(error instanceof Error ? error.message : "Không thể ký hợp đồng."))
       .finally(() => setSigning(false));
