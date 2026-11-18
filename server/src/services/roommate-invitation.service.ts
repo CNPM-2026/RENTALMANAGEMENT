@@ -55,6 +55,22 @@ export const roommateInvitationService = {
       where: { senderId_recipientId: { senderId, recipientId: data.recipientId } },
     });
     if (existing && existing.status !== 'PENDING') {
+      // Cho phép gửi lại nếu lời mời trước đó đã bị huỷ hoặc từ chối
+      if (existing.status === 'DECLINED' || existing.status === 'CANCELLED') {
+        const reinvitation = await prisma.roommateInvitation.update({
+          where: { id: existing.id },
+          data: { status: 'PENDING', message: data.message, postId: postId ?? existing.postId },
+        });
+        await notificationService.createNotification(
+          data.recipientId,
+          'Lời mời kết nối mới',
+          'Bạn nhận được lời mời tìm bạn ở ghép.',
+          'ROOMMATE_INVITATION',
+          reinvitation.id,
+          `roommate-invitation:${reinvitation.id}:received:${Date.now()}`,
+        );
+        return reinvitation;
+      }
       throw new AppError('Lời mời trước đó đã được xử lý, không thể ghi đè lịch sử', 409);
     }
     const invitation = existing
@@ -118,6 +134,17 @@ export const roommateInvitationService = {
     }
 
     const updated = await prisma.roommateInvitation.update({ where: { id }, data: { status } });
+    if (status === 'DECLINED' || status === 'CANCELLED') {
+      // Hủy bỏ các khai báo cư trú PENDING của cặp này để số người không bị tăng ảo nếu hủy rồi thuê/mời lại
+      await prisma.roomOccupancyDeclaration.updateMany({
+        where: {
+          tenantId: { in: [invitation.senderId, invitation.recipientId] },
+          status: 'PENDING',
+          supersededAt: null,
+        },
+        data: { status: 'SUPERSEDED', supersededAt: new Date() },
+      }).catch(() => undefined);
+    }
     if (status === 'DECLINED') {
       await notificationService.createNotification(
         invitation.senderId,
@@ -214,25 +241,28 @@ export const roommateInvitationService = {
     }
 
     const room = hostContract.room;
-    const [currentDeclaration, activeContractCount] = await Promise.all([
-      prisma.roomOccupancyDeclaration.findFirst({
+    // Đếm số người thực tế đang ở phòng này (tránh đếm trùng roommate đang xử lý)
+    const [activeDeclarations, activeContractCount] = await Promise.all([
+      prisma.roomOccupancyDeclaration.findMany({
         where: {
           roomId: room.id,
-          tenantId: { in: [hostUserId, roommateUserId] },
           status: { in: ['PENDING', 'VERIFIED'] },
           supersededAt: null,
         },
-        orderBy: { declaredAt: 'desc' },
-        select: { id: true, occupants: true },
+        select: { tenantId: true },
       }),
       prisma.contract.count({ where: { roomId: room.id, status: 'ACTIVE' } }),
     ]);
 
-    const occupiedBefore = Math.max(
-      currentDeclaration?.occupants ?? 0,
-      activeContractCount,
-      1,
-    );
+    const activeOccupantIds = new Set<string>();
+    if (hostContract.tenantId) activeOccupantIds.add(hostContract.tenantId);
+    for (const dec of activeDeclarations) {
+      if (dec.tenantId && dec.tenantId !== roommateUserId) {
+        activeOccupantIds.add(dec.tenantId);
+      }
+    }
+
+    const occupiedBefore = Math.max(activeOccupantIds.size, activeContractCount, 1);
     const nextOccupants = occupiedBefore + 1;
 
     if (nextOccupants > room.maxOccupants) {

@@ -153,6 +153,11 @@ function ApplyRentalContent() {
 
   async function handleSubmitApplication(e: React.FormEvent) {
     e.preventDefault();
+    const currentUser = getCurrentUser();
+    if (currentUser && (currentUser.id === post?.property?.landlordId || currentUser.id === post?.authorId)) {
+      setErrorMsg("Chủ trọ không thể tự thuê phòng của chính mình.");
+      return;
+    }
     if (kycApproved !== true) {
       setErrorMsg("Bạn cần xác thực KYC trước khi gửi yêu cầu thuê phòng.");
       return;

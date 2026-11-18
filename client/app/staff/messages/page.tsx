@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getChatSocket, refreshChatSocketAuth } from "@/lib/socket";
 import { Conversation, Message } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
+import { filterChatMessage } from "@/lib/chat-filter";
 
 export default function StaffMessagesPage() {
   const [conversations, setConversations] = React.useState<Conversation[]>([]);
@@ -47,18 +48,24 @@ export default function StaffMessagesPage() {
 
   function sendMessage(event: React.FormEvent) {
     event.preventDefault();
-    if (!input.trim() || !selectedId || sending) return;
+    const rawContent = input.trim();
+    if (!rawContent || !selectedId || sending) return;
+    const { filteredText, hasBannedWords } = filterChatMessage(rawContent);
+    if (hasBannedWords) {
+      setError("Thông báo: Tin nhắn chứa từ cấm đã được chuyển thành ****.");
+    } else {
+      setError(null);
+    }
     setSending(true);
     getChatSocket().emit(
       "send_message",
-      { conversationId: selectedId, content: input.trim(), messageType: "TEXT" },
+      { conversationId: selectedId, content: filteredText, messageType: "TEXT" },
       (result: { success: boolean; message?: string }) => {
         setSending(false);
         if (!result.success) {
           setError(result.message ?? "Không thể gửi tin nhắn.");
           return;
         }
-        setError(null);
         setInput("");
       },
     );

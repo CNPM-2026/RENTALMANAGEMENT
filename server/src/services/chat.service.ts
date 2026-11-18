@@ -99,12 +99,12 @@ const memberListOf = async (conversationId: string) => {
   return members.map((member) => member.userId);
 };
 
-/** Từ khoá bị cấm (bảng `content_filter_keywords`) — kiểm tra trước khi ghi. */
+/** Từ khoá bị cấm (bảng `content_filter_keywords` và danh sách từ nhạy cảm) — thay thế bằng **** */
 export const findBannedChatKeyword = async (content: string) => {
   const normalizedContent = content.trim().toLocaleLowerCase('vi-VN');
   if (!normalizedContent) return undefined;
   const keywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } });
-  return keywords.find(({ keyword }) => normalizedContent.includes(keyword));
+  return keywords.find(({ keyword }) => keyword && normalizedContent.includes(keyword.trim().toLowerCase()));
 };
 
 export const chatService = {

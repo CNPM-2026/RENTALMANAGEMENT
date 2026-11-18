@@ -151,7 +151,7 @@ export const initSocket = (server: HttpServer) => {
     // (một nguồn duy nhất, dùng chung với route HTTP có tệp đính kèm).
     socket.on('send_message', async (
       data: { conversationId: string; content: string; messageType?: string; clientMessageId?: string },
-      acknowledge?: (result: { success: boolean; message?: string; messageId?: string }) => void,
+      acknowledge?: (result: { success: boolean; message?: string; messageId?: string; hasBannedWords?: boolean; warningNotice?: string }) => void,
     ) => {
       try {
         if (!userId) return acknowledge?.({ success: false, message: 'Phiên đăng nhập không hợp lệ' });
@@ -166,7 +166,12 @@ export const initSocket = (server: HttpServer) => {
           clientMessageId: typeof data.clientMessageId === 'string' ? data.clientMessageId : undefined,
         });
 
-        acknowledge?.({ success: true, messageId: message.id });
+        acknowledge?.({
+          success: true,
+          messageId: message.id,
+          hasBannedWords: (message as any).hasBannedWords,
+          warningNotice: (message as any).warningNotice,
+        });
       } catch (error) {
         const reason = error instanceof AppError ? error.message : 'Không thể gửi tin nhắn';
         acknowledge?.({ success: false, message: reason });

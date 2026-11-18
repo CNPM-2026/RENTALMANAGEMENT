@@ -7,7 +7,7 @@ import { Footer } from "@/components/tenant/footer";
 import { PortalSidebar } from "@/components/tenant/portal-sidebar";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser, logout } from "@/lib/auth";
+import { AUTH_CHANGE_EVENT, getCurrentUser, logout } from "@/lib/auth";
 
 function TenantLayoutContent({
   children,
@@ -32,7 +32,7 @@ function TenantLayoutContent({
   } | null>(null);
 
   React.useEffect(() => {
-    const handle = requestAnimationFrame(() => {
+    const syncUser = () => {
       try {
         const user = getCurrentUser();
         if (user) {
@@ -43,13 +43,23 @@ function TenantLayoutContent({
             role: user.role,
             avatar: user.avatarUrl ?? undefined,
           });
+        } else {
+          setCurrentUser(null);
         }
       } catch {
         // LocalStorage access failure fallback
       }
-    });
+    };
 
-    return () => cancelAnimationFrame(handle);
+    const handle = requestAnimationFrame(syncUser);
+    window.addEventListener(AUTH_CHANGE_EVENT, syncUser);
+    window.addEventListener("storage", syncUser);
+
+    return () => {
+      cancelAnimationFrame(handle);
+      window.removeEventListener(AUTH_CHANGE_EVENT, syncUser);
+      window.removeEventListener("storage", syncUser);
+    };
   }, [isPortalRoute]);
 
   function handleConfirmLogout() {

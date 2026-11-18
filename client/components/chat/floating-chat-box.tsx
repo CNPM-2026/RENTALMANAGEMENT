@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { refreshChatSocketAuth } from "@/lib/socket";
 import { Message } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
+import { filterChatMessage } from "@/lib/chat-filter";
 
 export function FloatingChatBox() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export function FloatingChatBox() {
   >(null);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const [warningNotice, setWarningNotice] = React.useState<string | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const currentUserId = getCurrentUser()?.id;
 
@@ -92,14 +94,20 @@ export function FloatingChatBox() {
   // Send message
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    const content = input.trim();
-    if (!content || !conversationId || sending) return;
+    const rawContent = input.trim();
+    if (!rawContent || !conversationId || sending) return;
+
+    const { filteredText, hasBannedWords } = filterChatMessage(rawContent);
+    if (hasBannedWords) {
+      setWarningNotice("Thông báo: Tin nhắn chứa từ cấm đã được chuyển thành ****.");
+      setTimeout(() => setWarningNotice(null), 6000);
+    }
 
     setSending(true);
     try {
       // Chat chỉ gửi văn bản. `clientMessageId` giữ tính idempotent khi retry.
       const saved = await apiClient.chats.sendMessage(conversationId, {
-        content,
+        content: filteredText,
         clientMessageId: `c_${crypto.randomUUID()}`,
       });
       setMessages((prev) =>
@@ -109,8 +117,12 @@ export function FloatingChatBox() {
       );
       setInput("");
       setTimeout(() => scrollToBottom("smooth"), 50);
-    } catch {
-      // Lỗi gửi: giữ nguyên nội dung để người dùng thử lại.
+    } catch (err: unknown) {
+      const errObj = err as { message?: string; code?: string };
+      if (errObj.code === "MESSAGE_BANNED_KEYWORD" || errObj.message?.includes("từ khóa bị cấm")) {
+        setWarningNotice("Thông báo: Tin nhắn chứa từ cấm đã được chuyển thành ****.");
+        setTimeout(() => setWarningNotice(null), 6000);
+      }
     } finally {
       setSending(false);
     }
@@ -278,6 +290,13 @@ export function FloatingChatBox() {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {warningNotice && (
+        <div className="bg-amber-50 border-t border-amber-200 px-3 py-1.5 text-[11px] text-amber-800 font-medium flex items-center justify-between animate-in fade-in">
+          <span>⚠️ {warningNotice}</span>
+          <button type="button" onClick={() => setWarningNotice(null)} className="text-amber-600 hover:text-amber-900 ml-2">×</button>
+        </div>
+      )}
 
       {/* Facebook-style Input Footer — chỉ gửi văn bản */}
       <form

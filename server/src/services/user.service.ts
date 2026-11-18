@@ -13,23 +13,26 @@ export const userService = {
         await tx.user.update({
           where: { id: userId },
           data: {
-            ...(fullName && { fullName }),
-            ...(phone && { phone }),
-            ...(avatarUrl && { avatarUrl }),
+            ...(fullName !== undefined && { fullName }),
+            ...(phone !== undefined && { phone }),
+            ...(avatarUrl !== undefined && { avatarUrl }),
           }
         });
 
         await tx.userProfile.upsert({
           where: { userId },
           create: {
-            userId, gender, bio, occupation,
-            dob: dob ? new Date(dob) : null
+            userId,
+            gender: gender ?? null,
+            bio: bio ?? null,
+            occupation: occupation ?? null,
+            dob: dob ? new Date(dob) : null,
           },
           update: {
-            ...(gender && { gender }),
-            ...(bio && { bio }),
-            ...(occupation && { occupation }),
-            ...(dob && { dob: new Date(dob) }),
+            ...(gender !== undefined && { gender }),
+            ...(bio !== undefined && { bio }),
+            ...(occupation !== undefined && { occupation }),
+            ...(dob !== undefined && { dob: dob ? new Date(dob) : null }),
           }
         });
 

@@ -31,9 +31,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient, ApiError } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getCurrentUser } from "@/lib/auth";
 import { Post } from "@/types/models";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 
 function RoomDetailContent() {
@@ -48,6 +48,39 @@ function RoomDetailContent() {
   const [post, setPost] = React.useState<Post | null>(null);
   const [roomImages, setRoomImages] = React.useState<string[]>([]);
   const [reviewSummary, setReviewSummary] = React.useState<{ averageRating: number; totalReviews: number; reviews: import("@/types/models").Review[] } | null>(null);
+  const [newRating, setNewRating] = React.useState<number>(5);
+  const [newComment, setNewComment] = React.useState<string>("");
+  const [submittingReview, setSubmittingReview] = React.useState(false);
+  const [reviewFeedback, setReviewFeedback] = React.useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!post?.id) return;
+    const token = getAuthToken();
+    if (!token) {
+      setReviewFeedback({ type: "error", message: "Vui lòng đăng nhập để gửi đánh giá." });
+      return;
+    }
+    setSubmittingReview(true);
+    setReviewFeedback(null);
+    try {
+      await apiClient.reviews.create({
+        targetType: "POST",
+        targetId: post.id,
+        rating: newRating,
+        comment: newComment.trim() || undefined,
+      });
+      setReviewFeedback({ type: "success", message: "Cảm ơn bạn đã gửi đánh giá!" });
+      setNewComment("");
+      const updated = await apiClient.reviews.getByTarget("POST", post.id).catch(() => null);
+      if (updated) setReviewSummary(updated);
+    } catch (err: unknown) {
+      const message = err instanceof ApiError ? err.message : (err as { message?: string })?.message || "Không thể gửi đánh giá. Vui lòng thử lại sau.";
+      setReviewFeedback({ type: "error", message });
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   React.useEffect(() => {
     apiClient.posts.getById(roomId).then((value) => {
@@ -517,22 +550,97 @@ function RoomDetailContent() {
                 </div>
               </div>
 
-              {/* Sample Review */}
-              {reviewSummary?.reviews.map((review) => <div key={review.id} className="pt-3 border-t border-[#e2e7e1] space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar src={review.reviewer?.avatarUrl} alt={review.reviewer?.fullName ?? "Người thuê"} className="size-8 rounded-full object-cover" />
-                    <div>
-                      <h4 className="text-[13px] font-bold text-[#203c37]">{review.reviewer?.fullName ?? "Người thuê"}</h4>
-                      <p className="text-[11px] text-[#74817b]">{new Date(review.createdAt).toLocaleDateString("vi-VN")}</p>
+              {/* Review Submission Form */}
+              {(() => {
+                const currentUser = getCurrentUser();
+                const isOwner = Boolean(
+                  currentUser &&
+                  (currentUser.id === post?.property?.landlordId || currentUser.id === post?.authorId)
+                );
+                if (isOwner) return null;
+
+                return (
+                  <form onSubmit={handleSubmitReview} className="pt-4 border-t border-[#e2e7e1] space-y-3">
+                    <p className="text-[14px] font-semibold text-[#203c37]">Viết đánh giá của bạn</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] text-[#74817b]">Điểm đánh giá:</span>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            type="button"
+                            key={star}
+                            onClick={() => setNewRating(star)}
+                            className="p-0.5 focus:outline-none cursor-pointer"
+                          >
+                            <Star
+                              className={cn(
+                                "size-5 transition-colors",
+                                star <= newRating ? "fill-amber-400 text-amber-400" : "text-gray-300"
+                              )}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-[13px] font-bold text-amber-600 ml-1">{newRating} sao</span>
                     </div>
+
+                    <textarea
+                      rows={2}
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Chia sẻ cảm nhận thực tế của bạn về phòng trọ, chủ trọ, tiện ích và an ninh..."
+                      className="w-full p-3 rounded-[8px] border border-[#e2e7e1] text-[13px] text-[#203c37] focus:outline-none focus:border-[#15594f] resize-none"
+                    />
+
+                    {reviewFeedback && (
+                      <div
+                        className={cn(
+                          "p-2.5 rounded-[8px] text-[12px] font-medium",
+                          reviewFeedback.type === "success"
+                            ? "bg-[#eaf2ed] text-[#15594f] border border-[#d2e4d7]"
+                            : "bg-red-50 text-red-700 border border-red-200"
+                        )}
+                      >
+                        {reviewFeedback.message}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={submittingReview}
+                        className="bg-[#15594f] hover:bg-[#103f39] text-white font-medium"
+                      >
+                        {submittingReview ? "Đang gửi..." : "Gửi đánh giá"}
+                      </Button>
+                    </div>
+                  </form>
+                );
+              })()}
+
+              {/* Review List */}
+              {reviewSummary?.reviews && reviewSummary.reviews.length > 0 ? (
+                reviewSummary.reviews.map((review) => (
+                  <div key={review.id} className="pt-3 border-t border-[#e2e7e1] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar src={review.reviewer?.avatarUrl} alt={review.reviewer?.fullName ?? "Người thuê"} className="size-8 rounded-full object-cover" />
+                        <div>
+                          <h4 className="text-[13px] font-bold text-[#203c37]">{review.reviewer?.fullName ?? "Người thuê"}</h4>
+                          <p className="text-[11px] text-[#74817b]">{new Date(review.createdAt).toLocaleDateString("vi-VN")}</p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{review.rating} / 5 ★</span>
+                    </div>
+                    <p className="text-[13px] text-[#203c37] leading-relaxed">
+                      {review.comment ?? "Người thuê chưa để lại nội dung đánh giá."}
+                    </p>
                   </div>
-                  <span className="text-[11px] text-[#74817b]">{review.rating}/5</span>
-                </div>
-                <p className="text-[13px] text-[#203c37] leading-relaxed">
-                  {review.comment ?? "Người thuê chưa để lại nội dung đánh giá."}
-                </p>
-              </div>)}
+                ))
+              ) : (
+                <p className="text-[13px] text-[#74817b] pt-2">Chưa có đánh giá nào cho phòng này. Hãy là người đầu tiên chia sẻ cảm nhận!</p>
+              )}
             </div>
           </div>
 
@@ -561,20 +669,45 @@ function RoomDetailContent() {
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                {post?.status === "APPROVED" && (
-                  <>
-                    <Link href={`/rooms/${roomId}/book-viewing`} className="block">
-                      <Button variant="primary" size="lg" className="w-full font-bold shadow-md h-[48px]" leftIcon={<CalendarDays className="size-4.5" />}>
-                        Đặt lịch xem phòng
-                      </Button>
-                    </Link>
-                    <Link href={`/rooms/${roomId}/apply`} className="block">
-                      <Button variant="secondary" size="lg" className="w-full font-bold h-[48px] border border-[#d2e4d7]" leftIcon={<FileCheck className="size-4.5" />}>
-                        Gửi yêu cầu thuê phòng
-                      </Button>
-                    </Link>
-                  </>
-                )}
+                {(() => {
+                  const currentUser = getCurrentUser();
+                  const isOwner = Boolean(
+                    currentUser &&
+                    (currentUser.id === post?.property?.landlordId || currentUser.id === post?.authorId)
+                  );
+
+                  if (isOwner) {
+                    return (
+                      <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-[10px] text-center space-y-1">
+                        <p className="text-[13px] font-bold text-amber-900">
+                          Bạn là chủ sở hữu phòng này
+                        </p>
+                        <p className="text-[11px] text-amber-700">
+                          Chủ trọ không thể tự đặt lịch hoặc gửi yêu cầu thuê phòng của chính mình.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (post?.status === "APPROVED") {
+                    return (
+                      <>
+                        <Link href={`/rooms/${roomId}/book-viewing`} className="block">
+                          <Button variant="primary" size="lg" className="w-full font-bold shadow-md h-[48px]" leftIcon={<CalendarDays className="size-4.5" />}>
+                            Đặt lịch xem phòng
+                          </Button>
+                        </Link>
+                        <Link href={`/rooms/${roomId}/apply`} className="block">
+                          <Button variant="secondary" size="lg" className="w-full font-bold h-[48px] border border-[#d2e4d7]" leftIcon={<FileCheck className="size-4.5" />}>
+                            Gửi yêu cầu thuê phòng
+                          </Button>
+                        </Link>
+                      </>
+                    );
+                  }
+
+                  return null;
+                })()}
               </div>
 
               <p className="text-[11px] text-center text-[#74817b]">
