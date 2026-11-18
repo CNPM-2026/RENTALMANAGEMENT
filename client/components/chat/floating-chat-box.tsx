@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { refreshChatSocketAuth } from "@/lib/socket";
 import { Message } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
+import { filterChatMessage } from "@/lib/chat-filter";
 
 export function FloatingChatBox() {
   const router = useRouter();
@@ -93,21 +94,22 @@ export function FloatingChatBox() {
   // Send message
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    const content = input.trim();
-    if (!content || !conversationId || sending) return;
+    const rawContent = input.trim();
+    if (!rawContent || !conversationId || sending) return;
+
+    const { filteredText, hasBannedWords } = filterChatMessage(rawContent);
+    if (hasBannedWords) {
+      setWarningNotice("Thông báo: Tin nhắn chứa từ cấm đã được chuyển thành ****.");
+      setTimeout(() => setWarningNotice(null), 6000);
+    }
 
     setSending(true);
     try {
       // Chat chỉ gửi văn bản. `clientMessageId` giữ tính idempotent khi retry.
       const saved = await apiClient.chats.sendMessage(conversationId, {
-        content,
+        content: filteredText,
         clientMessageId: `c_${crypto.randomUUID()}`,
       });
-      const resultPayload = saved as { hasBannedWords?: boolean; warningNotice?: string; content?: string };
-      if (resultPayload.hasBannedWords || resultPayload.warningNotice || resultPayload.content?.includes("****")) {
-        setWarningNotice("Tin nhắn chứa từ ngữ không phù hợp và đã được chuyển thành ****.");
-        setTimeout(() => setWarningNotice(null), 6000);
-      }
       setMessages((prev) =>
         prev.some((m) => m.id === saved.id || (!!saved.clientMessageId && m.clientMessageId === saved.clientMessageId))
           ? prev
@@ -115,8 +117,12 @@ export function FloatingChatBox() {
       );
       setInput("");
       setTimeout(() => scrollToBottom("smooth"), 50);
-    } catch {
-      // Lỗi gửi: giữ nguyên nội dung để người dùng thử lại.
+    } catch (err: unknown) {
+      const errObj = err as { message?: string; code?: string };
+      if (errObj.code === "MESSAGE_BANNED_KEYWORD" || errObj.message?.includes("từ khóa bị cấm")) {
+        setWarningNotice("Thông báo: Tin nhắn chứa từ cấm đã được chuyển thành ****.");
+        setTimeout(() => setWarningNotice(null), 6000);
+      }
     } finally {
       setSending(false);
     }

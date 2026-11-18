@@ -84,18 +84,18 @@ export const reviewService = {
       counterpartId = targetType === 'USER' ? targetId : null;
     }
 
-    const review = await prisma.review.upsert({
-      where: {
-        reviewerId_targetType_targetId: {
-          reviewerId,
-          targetType,
-          targetId,
-        },
-      },
-      create: { reviewerId, targetType, targetId, rating, comment: comment ?? null },
-      update: { rating, comment: comment ?? null },
-      include: { reviewer: { select: { fullName: true, avatarUrl: true } } },
-    });
+    let review;
+    try {
+      review = await prisma.review.create({
+        data: { reviewerId, targetType, targetId, rating, comment: comment ?? null },
+        include: { reviewer: { select: { fullName: true, avatarUrl: true } } },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new AppError('Bạn đã đánh giá đối tượng này rồi', 409, 'REVIEW_ALREADY_EXISTS');
+      }
+      throw error;
+    }
 
     if (targetType === 'TASK' && counterpartId) {
       await notificationService
