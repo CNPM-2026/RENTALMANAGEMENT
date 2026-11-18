@@ -8,6 +8,7 @@ import { Role, User } from '@/types/models';
 export const TOKEN_KEY = '5k_access_token';
 export const REFRESH_TOKEN_KEY = '5k_refresh_token';
 export const USER_KEY = '5k_user_profile';
+export const ACTIVITY_STATUS_KEY = '5k_activity_status';
 /**
  * Thời điểm HẾT HẠN TUYỆT ĐỐI của phiên (epoch ms). Đăng nhập tối đa 2 giờ —
  * khớp với `REFRESH_TOKEN_TTL_MS` ở server, nơi refresh token cũng không được
@@ -37,7 +38,7 @@ function notifyAuthChange(): void {
 }
 
 /** Các key lưu trên thiết bị thuộc về tài khoản — xoá sạch khi đăng xuất. */
-const SESSION_SCOPED_KEYS = [TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, SESSION_KEY, '5k_notification_settings'];
+const SESSION_SCOPED_KEYS = [TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, SESSION_KEY, ACTIVITY_STATUS_KEY, '5k_notification_settings'];
 
 /** Cookie phiên dùng cho Next middleware — chỉ sống tối đa 2 giờ. */
 const SESSION_COOKIE_MAX_AGE_SECONDS = Math.floor(SESSION_TTL_MS / 1000);
@@ -72,6 +73,33 @@ export function getRefreshToken(): string | null {
   } catch (err) {
     console.error('Failed to read refresh token from localStorage', err);
     return null;
+  }
+}
+
+/**
+ * Kiểm tra trạng thái hoạt động của người dùng (mặc định: true = Đang hoạt động).
+ */
+export function getUserActivityStatus(): boolean {
+  if (!isClient()) return true;
+  try {
+    const raw = localStorage.getItem(ACTIVITY_STATUS_KEY);
+    if (raw === null) return true;
+    return raw === 'true';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Bật/tắt trạng thái hoạt động của người dùng và phát sự kiện đồng bộ toàn hệ thống.
+ */
+export function setUserActivityStatus(active: boolean): void {
+  if (!isClient()) return;
+  try {
+    localStorage.setItem(ACTIVITY_STATUS_KEY, String(active));
+    notifyAuthChange();
+  } catch (err) {
+    console.error('Failed to update activity status in localStorage', err);
   }
 }
 
@@ -175,6 +203,7 @@ export function updateStoredUser(updates: Partial<User>): User | null {
     if (!current) return null;
     const updated = { ...current, ...updates };
     localStorage.setItem(USER_KEY, JSON.stringify(updated));
+    notifyAuthChange();
     return updated;
   } catch (err) {
     console.error('Failed to update user profile in localStorage', err);

@@ -28,6 +28,7 @@ export function FloatingChatBox() {
   >(null);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const [warningNotice, setWarningNotice] = React.useState<string | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const currentUserId = getCurrentUser()?.id;
 
@@ -102,6 +103,11 @@ export function FloatingChatBox() {
         content,
         clientMessageId: `c_${crypto.randomUUID()}`,
       });
+      const resultPayload = saved as { hasBannedWords?: boolean; warningNotice?: string; content?: string };
+      if (resultPayload.hasBannedWords || resultPayload.warningNotice || resultPayload.content?.includes("****")) {
+        setWarningNotice("Tin nhắn chứa từ ngữ không phù hợp và đã được chuyển thành ****.");
+        setTimeout(() => setWarningNotice(null), 6000);
+      }
       setMessages((prev) =>
         prev.some((m) => m.id === saved.id || (!!saved.clientMessageId && m.clientMessageId === saved.clientMessageId))
           ? prev
@@ -278,6 +284,13 @@ export function FloatingChatBox() {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {warningNotice && (
+        <div className="bg-amber-50 border-t border-amber-200 px-3 py-1.5 text-[11px] text-amber-800 font-medium flex items-center justify-between animate-in fade-in">
+          <span>⚠️ {warningNotice}</span>
+          <button type="button" onClick={() => setWarningNotice(null)} className="text-amber-600 hover:text-amber-900 ml-2">×</button>
+        </div>
+      )}
 
       {/* Facebook-style Input Footer — chỉ gửi văn bản */}
       <form

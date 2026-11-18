@@ -7,13 +7,16 @@
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Quản trị viên",
   LANDLORD: "Chủ trọ",
-  TENANT: "Người thuê",
+  TENANT: "Khách thuê",
+  RENTER: "Khách thuê",
   STAFF: "Thợ / Dịch vụ",
   SUPPORT: "Bộ phận hỗ trợ",
 };
 
 export function translateRole(role?: string | null) {
-  return role ? ROLE_LABELS[role] ?? role : "Chưa cập nhật";
+  if (!role) return "Chưa cập nhật";
+  const normalized = role.trim().toUpperCase();
+  return ROLE_LABELS[normalized] ?? role;
 }
 
 /**

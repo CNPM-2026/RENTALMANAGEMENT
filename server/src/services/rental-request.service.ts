@@ -21,6 +21,9 @@ export const rentalRequestService = {
       },
     });
     if (!room) throw new AppError('Không tìm thấy phòng', 404);
+    if (room.property.landlordId === tenantId) {
+      throw new AppError('Chủ trọ không thể tự thuê phòng của chính mình', 400);
+    }
     if (room.status !== 'AVAILABLE' || room.contracts.length > 0) {
       throw new AppError('Phòng không tồn tại hoặc không còn trống', 400);
     }

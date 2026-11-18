@@ -99,12 +99,37 @@ const memberListOf = async (conversationId: string) => {
   return members.map((member) => member.userId);
 };
 
-/** Từ khoá bị cấm (bảng `content_filter_keywords`) — kiểm tra trước khi ghi. */
+/** Từ khoá bị cấm (bảng `content_filter_keywords` và danh sách từ nhạy cảm) — thay thế bằng **** */
+export const maskBannedKeywords = async (content: string): Promise<{ text: string; hasBannedWords: boolean; matched: string[] }> => {
+  if (!content || !content.trim()) return { text: content, hasBannedWords: false, matched: [] };
+
+  const dbKeywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } }).catch(() => []);
+  const keywordList = Array.from(new Set([
+    ...dbKeywords.map((k) => k.keyword.trim().toLowerCase()),
+    'đm', 'dcm', 'vcl', 'clmm', 'dmm', 'vkl', 'lừa đảo', 'lua dao', 'concac', 'con cac', 'địt', 'ditme', 'dit me', 'buồi', 'đụ'
+  ])).filter(Boolean);
+
+  let maskedText = content;
+  let hasBannedWords = false;
+  const matched: string[] = [];
+
+  for (const kw of keywordList) {
+    if (!kw) continue;
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'gi');
+    if (regex.test(maskedText)) {
+      hasBannedWords = true;
+      matched.push(kw);
+      maskedText = maskedText.replace(regex, '****');
+    }
+  }
+
+  return { text: maskedText, hasBannedWords, matched };
+};
+
 export const findBannedChatKeyword = async (content: string) => {
-  const normalizedContent = content.trim().toLocaleLowerCase('vi-VN');
-  if (!normalizedContent) return undefined;
-  const keywords = await prisma.contentFilterKeyword.findMany({ select: { keyword: true } });
-  return keywords.find(({ keyword }) => normalizedContent.includes(keyword));
+  const result = await maskBannedKeywords(content);
+  return result.hasBannedWords ? { keyword: result.matched[0] } : undefined;
 };
 
 export const chatService = {
@@ -229,14 +254,14 @@ export const chatService = {
       throw new AppError('Nội dung tin nhắn không hợp lệ', 400, 'MESSAGE_TOO_LONG');
     }
 
+    let finalContent = content;
+    let hasBannedWords = false;
+
     if (content.length > 0) {
-      const matchedKeyword = await findBannedChatKeyword(content);
-      if (matchedKeyword) {
-        throw new AppError(
-          `Tin nhắn chứa từ khóa bị cấm "${matchedKeyword.keyword}". Vui lòng chỉnh sửa nội dung trước khi gửi.`,
-          400,
-          'MESSAGE_BANNED_KEYWORD',
-        );
+      const maskResult = await maskBannedKeywords(content);
+      if (maskResult.hasBannedWords) {
+        finalContent = maskResult.text;
+        hasBannedWords = true;
       }
     }
 
@@ -258,7 +283,7 @@ export const chatService = {
       data: {
         conversationId,
         senderId: userId,
-        content: content.length ? content : (attachment?.name ?? ''),
+        content: finalContent.length ? finalContent : (attachment?.name ?? ''),
         messageType: attachment ? 'IMAGE' : (input.messageType ?? 'TEXT'),
         clientMessageId: input.clientMessageId ?? null,
         attachmentRef: attachment?.fileRef ?? null,
@@ -290,6 +315,10 @@ export const chatService = {
       ),
     );
 
-    return toMessagePayload(message, userId);
+    return {
+      ...toMessagePayload(message, userId),
+      hasBannedWords,
+      warningNotice: hasBannedWords ? 'Tin nhắn chứa từ ngữ không phù hợp và đã được chuyển thành ****.' : undefined,
+    };
   },
 };

@@ -368,10 +368,46 @@ export const authService = {
     const { email, password, fullName, phone, role } = data;
     const normalizedEmail = normalizeEmail(email);
 
+    // Tự động dọn dẹp các tài khoản chưa xác minh mà OTP đã hết hạn
+    const expiredCandidates = await prisma.user.findMany({
+      where: {
+        isEmailVerified: false,
+        emailVerificationCodes: {
+          every: { expiresAt: { lt: new Date() } },
+        },
+      },
+      select: { id: true },
+    }).catch(() => []);
+    if (expiredCandidates.length > 0) {
+      await prisma.user.deleteMany({
+        where: { id: { in: expiredCandidates.map((u) => u.id) } },
+      }).catch(() => undefined);
+    }
+
     // Check email tồn tại (không phân biệt hoa/thường; ném 400 nếu trùng lặp)
     const existingUser = await findUserByEmail(normalizedEmail);
     if (existingUser) {
-      throw new AppError('Email này đã được sử dụng', 400);
+      if (existingUser.isEmailVerified) {
+        throw new AppError('Email này đã được sử dụng', 400);
+      }
+
+      // Tài khoản chưa xác minh email: kiểm tra xem OTP đã hết hạn chưa
+      const activeOtp = await prisma.emailVerificationCode.findFirst({
+        where: {
+          userId: existingUser.id,
+          purpose: OTP_PURPOSE.SIGNUP_VERIFY,
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+          attempts: { lt: OTP_MAX_ATTEMPTS },
+        },
+      });
+
+      if (!activeOtp) {
+        // OTP đã hết hạn mà người dùng không nhập: xóa tài khoản trong DB để tránh không tạo tài khoản rác
+        await prisma.user.delete({ where: { id: existingUser.id } }).catch(() => undefined);
+      } else {
+        throw new AppError('Email này đang chờ xác minh OTP. Vui lòng nhập mã OTP hoặc chờ mã hết hạn để đăng ký lại.', 400);
+      }
     }
 
     // Mã hóa mật khẩu
@@ -615,7 +651,24 @@ export const authService = {
         FOR UPDATE
       `;
       // 0 = không có challenge hợp lệ; >1 = trạng thái bất thường -> fail closed.
-      if (challenges.length !== 1) return null;
+      if (challenges.length !== 1) {
+        const hasValidOtp = await tx.emailVerificationCode.findFirst({
+          where: {
+            userId: locked.id,
+            purpose: OTP_PURPOSE.SIGNUP_VERIFY,
+            usedAt: null,
+            expiresAt: { gt: new Date() },
+            attempts: { lt: OTP_MAX_ATTEMPTS },
+          },
+          select: { id: true },
+        });
+        if (!hasValidOtp && !locked.isEmailVerified) {
+          // Xóa tài khoản chưa kích hoạt khi OTP đã hết hạn
+          await tx.user.delete({ where: { id: locked.id } }).catch(() => undefined);
+          return { expiredDeleted: true };
+        }
+        return null;
+      }
       const challenge = challenges[0];
 
       if (!otpHashMatches(presentedHash, challenge.code_hash)) {
@@ -680,6 +733,9 @@ export const authService = {
     });
 
     if (!outcome) throw invalidOtpError();
+    if ((outcome as any).expiredDeleted) {
+      throw new AppError('Mã xác minh đã hết hạn. Tài khoản chưa kích hoạt đã được xoá, vui lòng đăng ký lại.', 400);
+    }
 
     // H-05/Batch 2B2.2 (L1.2): `outcome` khác null nghĩa là transaction đã COMMIT
     // việc tăng `authVersion`. Tài khoản chưa xác minh email thì thường chưa có

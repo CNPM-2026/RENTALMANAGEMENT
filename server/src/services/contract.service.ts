@@ -16,6 +16,9 @@ export const contractService = {
     });
 
     if (!room) throw new AppError('Không tìm thấy phòng', 404);
+    if (tenantId === landlordId || room.property.landlordId === tenantId) {
+      throw new AppError('Chủ trọ không thể tạo hợp đồng tự thuê phòng của chính mình', 400);
+    }
     if (room.property.landlordId !== landlordId) {
       throw new AppError('Bạn không có quyền tạo hợp đồng cho phòng này', 403);
     }

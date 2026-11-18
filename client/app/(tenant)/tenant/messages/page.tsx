@@ -48,13 +48,17 @@ export default function TenantMessagesPage() {
     getChatSocket().emit(
       "send_message",
       { conversationId: selectedId, content, messageType: "TEXT" },
-      (result: { success: boolean; message?: string }) => {
+      (result: { success: boolean; message?: string; warningNotice?: string; hasBannedWords?: boolean }) => {
         setSending(false);
         if (!result.success) {
           setError(result.message ?? "Không thể gửi tin nhắn.");
           return;
         }
-        setError(null);
+        if (result.warningNotice || result.hasBannedWords) {
+          setError("Tin nhắn chứa từ ngữ không phù hợp và đã được chuyển thành ****.");
+        } else {
+          setError(null);
+        }
         setInput("");
       },
     );

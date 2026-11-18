@@ -63,62 +63,39 @@ export const reviewService = {
     } else {
       const targetExists =
         targetType === 'POST'
-          ? await prisma.post.findUnique({ where: { id: targetId }, select: { id: true } })
+          ? await prisma.post.findUnique({ where: { id: targetId }, include: { property: true } })
           : targetType === 'ROOM'
-            ? await prisma.room.findUnique({ where: { id: targetId }, select: { id: true } })
+            ? await prisma.room.findUnique({ where: { id: targetId }, include: { property: true } })
             : await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
       if (!targetExists) throw new AppError('Đối tượng đánh giá không tồn tại', 404);
 
-      const isRelated =
-        targetType === 'POST'
-          ? Boolean(
-              await prisma.appointment.findFirst({
-                where: { postId: targetId, tenantId: reviewerId, status: 'COMPLETED' },
-                select: { id: true },
-              }),
-            )
-          : targetType === 'ROOM'
-            ? Boolean(
-                await prisma.room.findFirst({
-                  where: {
-                    id: targetId,
-                    OR: [
-                      { property: { landlordId: reviewerId } },
-                      { contracts: { some: { tenantId: reviewerId } } },
-                    ],
-                  },
-                  select: { id: true },
-                }),
-              )
-            : Boolean(
-                await prisma.contract.findFirst({
-                  where: {
-                    OR: [
-                      { tenantId: reviewerId, room: { property: { landlordId: targetId } } },
-                      { tenantId: targetId, room: { property: { landlordId: reviewerId } } },
-                    ],
-                  },
-                  select: { id: true },
-                }),
-              );
-      if (!isRelated) {
-        throw new AppError('Bạn chưa có quan hệ giao dịch phù hợp để đánh giá đối tượng này', 403, 'REVIEW_FORBIDDEN');
+      if (targetType === 'POST') {
+        const post = targetExists as any;
+        if (post.authorId === reviewerId || post.property?.landlordId === reviewerId) {
+          throw new AppError('Bạn không thể tự đánh giá bài đăng của chính mình', 400);
+        }
+      } else if (targetType === 'ROOM') {
+        const room = targetExists as any;
+        if (room.property?.landlordId === reviewerId) {
+          throw new AppError('Chủ trọ không thể tự đánh giá phòng của chính mình', 400);
+        }
       }
+
       counterpartId = targetType === 'USER' ? targetId : null;
     }
 
-    let review;
-    try {
-      review = await prisma.review.create({
-        data: { reviewerId, targetType, targetId, rating, comment: comment ?? null },
-        include: { reviewer: { select: { fullName: true, avatarUrl: true } } },
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new AppError('Bạn đã đánh giá đối tượng này rồi', 409, 'REVIEW_ALREADY_EXISTS');
-      }
-      throw error;
-    }
+    const review = await prisma.review.upsert({
+      where: {
+        reviewerId_targetType_targetId: {
+          reviewerId,
+          targetType,
+          targetId,
+        },
+      },
+      create: { reviewerId, targetType, targetId, rating, comment: comment ?? null },
+      update: { rating, comment: comment ?? null },
+      include: { reviewer: { select: { fullName: true, avatarUrl: true } } },
+    });
 
     if (targetType === 'TASK' && counterpartId) {
       await notificationService

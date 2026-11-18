@@ -6,8 +6,9 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Settings, LogOut, HelpCircle, UserRound } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser, logout } from "@/lib/auth";
+import { getCurrentUser, logout, getUserActivityStatus, setUserActivityStatus, AUTH_CHANGE_EVENT } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 import { translateRole } from "@/lib/labels";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import { TopbarChatButton } from "@/components/chat/topbar-chat-button";
@@ -18,12 +19,22 @@ export function LandlordTopbar() {
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<ReturnType<typeof getCurrentUser>>(null);
+  const [isOnline, setIsOnline] = React.useState(true);
   const roleLabel = translateRole(currentUser?.role);
+
   React.useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
+    const sync = () => {
       setCurrentUser(getCurrentUser());
-    });
-    return () => window.cancelAnimationFrame(frame);
+      setIsOnline(getUserActivityStatus());
+    };
+    const frame = window.requestAnimationFrame(sync);
+    window.addEventListener(AUTH_CHANGE_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener(AUTH_CHANGE_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
   }, []);
   // Generate readable breadcrumb segment
   function getBreadcrumb() {
@@ -97,7 +108,16 @@ export function LandlordTopbar() {
               onClick={() => setProfileOpen((prev) => !prev)}
               className="flex items-center gap-2.5 p-1 rounded-[100px] hover:bg-[#f7f6f2] transition-colors cursor-pointer"
             >
-              <Avatar src={currentUser?.avatarUrl} alt={currentUser?.fullName ?? "Chủ trọ"} className="size-[34px] rounded-full object-cover border border-[#e2e7e1]" />
+              <div className="relative">
+                <Avatar src={currentUser?.avatarUrl} alt={currentUser?.fullName ?? "Chủ trọ"} className="size-[34px] rounded-full object-cover border border-[#e2e7e1]" />
+                <span
+                  title={isOnline ? "Đang hoạt động" : "Không hoạt động"}
+                  className={cn(
+                    "absolute bottom-0 right-0 size-2.5 rounded-full ring-2 ring-white",
+                    isOnline ? "bg-emerald-500" : "bg-gray-400"
+                  )}
+                />
+              </div>
               <div className="hidden md:flex flex-col text-left">
                 <span className="text-[13px] font-semibold text-[#203c37] leading-tight">
                   {currentUser?.fullName ?? "Chủ trọ"}
@@ -110,7 +130,7 @@ export function LandlordTopbar() {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-52 bg-white rounded-[10px] border border-[#e2e7e1] shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 mt-2 w-60 bg-white rounded-[10px] border border-[#e2e7e1] shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-4 py-2 border-b border-[#e2e7e1]">
                   <p className="text-[13px] font-semibold text-[#203c37]">
                     {currentUser?.fullName ?? "Chủ trọ"}
@@ -121,6 +141,36 @@ export function LandlordTopbar() {
                   <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#15594f]">
                     {roleLabel}
                   </p>
+
+                  {/* Trạng thái hoạt động Toggle */}
+                  <div className="mt-2.5 pt-2 border-t border-[#e2e7e1]/60 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("size-2 rounded-full", isOnline ? "bg-emerald-500" : "bg-gray-400")} />
+                      <span className="text-[11px] text-[#203c37] font-medium">
+                        {isOnline ? "Đang hoạt động" : "Không hoạt động"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !isOnline;
+                        setIsOnline(next);
+                        setUserActivityStatus(next);
+                      }}
+                      className={cn(
+                        "relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        isOnline ? "bg-[#15594f]" : "bg-gray-300"
+                      )}
+                      title="Bật/tắt trạng thái hoạt động"
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block size-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                          isOnline ? "translate-x-3.5" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 <Link

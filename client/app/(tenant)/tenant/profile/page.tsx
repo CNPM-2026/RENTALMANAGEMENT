@@ -172,6 +172,19 @@ export default function TenantProfilePage() {
       });
 
       setUser((prev) => ({ ...prev, ...updated }));
+      setFullName(updated.fullName || "");
+      setPhone(updated.phone || "");
+      setAvatarFile(null);
+      if (updated.avatarUrl) {
+        setAvatarPreview(updated.avatarUrl);
+      }
+      const updatedProfile = (updated as UserWithProfile).profile;
+      if (updatedProfile) {
+        setDob(updatedProfile.dob ? updatedProfile.dob.split("T")[0] : "");
+        setGender((updatedProfile.gender as "MALE" | "FEMALE" | "OTHER") || "MALE");
+        setOccupation(updatedProfile.occupation || "");
+        setBio(updatedProfile.bio || "");
+      }
       setFeedback({ type: "success", message: "Cập nhật hồ sơ cá nhân thành công!" });
     } catch (err: unknown) {
       if (err instanceof ApiError) {
