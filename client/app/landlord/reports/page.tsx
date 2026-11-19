@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BarChart3, TrendingUp, DollarSign, Download, Calendar, ArrowUpRight } from "lucide-react";
+import { BarChart3, TrendingUp, DollarSign, Download } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { LandlordStatsResponse } from "@/types/models";
 

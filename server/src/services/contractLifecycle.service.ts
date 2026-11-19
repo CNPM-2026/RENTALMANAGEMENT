@@ -357,6 +357,10 @@ export const contractLifecycleService = {
           where: { id: request.contract.roomId, status: 'RENTED' },
           data: { status: 'AVAILABLE' },
         });
+        await tx.roomOccupancyDeclaration.updateMany({
+          where: { roomId: request.contract.roomId, status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
+          data: { status: 'SUPERSEDED', supersededAt: new Date() },
+        });
       }
 
       return tx.contractTerminationRequest.findUniqueOrThrow({

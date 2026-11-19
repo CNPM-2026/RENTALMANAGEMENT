@@ -13,6 +13,16 @@ export const appointmentService = {
 
     let landlordId = '';
     let targetRoomId = roomId || null;
+
+    if (roomId && postId) {
+      const post = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { roomId: true, propertyId: true },
+      });
+      if (post && post.roomId && post.roomId !== roomId) {
+        throw new AppError('Phòng không khớp với bài đăng đã chọn', 400);
+      }
+    }
     
     // 1. Tự động tìm Chủ trọ dựa vào Phòng hoặc Bài đăng
     if (roomId) {

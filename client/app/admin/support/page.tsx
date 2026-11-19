@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { LifeBuoy, Check, MessageSquare, Clock } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { SupportTicket } from "@/types/models";
 

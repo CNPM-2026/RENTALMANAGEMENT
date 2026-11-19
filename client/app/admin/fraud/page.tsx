@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { ShieldAlert, Search, Filter, AlertOctagon } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Post } from "@/types/models";
 

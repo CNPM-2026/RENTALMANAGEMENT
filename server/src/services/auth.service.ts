@@ -13,6 +13,7 @@ import { isUserEmailUniqueViolation } from '../utils/prisma-errors';
 import { OAuth2Client } from 'google-auth-library';
 import { env } from '../config/env';
 import { invalidateSocketsForRefreshToken, invalidateUserSockets } from '../socket/sessionInvalidation';
+import { auditService } from './audit.service';
 
 // `users.email` là unique index phân biệt hoa/thường, nên tra cứu phải không
 // phân biệt casing để vẫn thấy các row cũ được `register` lưu nguyên văn.
@@ -814,6 +815,12 @@ export const authService = {
     // H-05/Batch 2B2.2 (L1.2): chỉ chạy khi transaction ở trên đã COMMIT; mọi lỗi
     // (token đã dùng, hết hạn, user không tồn tại) đều ném ra trước đó.
     invalidateUserSockets(reset.userId);
+    await auditService.record({
+      userId: reset.userId,
+      action: 'RESET_PASSWORD',
+      entityType: 'User',
+      entityId: reset.userId,
+    }).catch(() => undefined);
   },
 };
 

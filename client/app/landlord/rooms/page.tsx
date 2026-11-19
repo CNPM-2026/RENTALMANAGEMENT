@@ -222,14 +222,21 @@ export default function LandlordRoomsPage() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[18px] font-bold text-[#203c37]">Phòng {room.roomNumber}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[18px] font-bold text-[#203c37]">Phòng {room.roomNumber}</span>
+                      {room.floor !== null && room.floor !== undefined && (
+                        <span className="text-[11px] font-medium bg-[#eef3f0] text-[#15594f] px-2 py-0.5 rounded-[6px]">
+                          Tầng {room.floor}
+                        </span>
+                      )}
+                    </div>
                     <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
                       <Icon className="size-3" />
                       <span>{cfg.label}</span>
                     </span>
                   </div>
                   <p className="text-[12px] text-[#74817b] mt-1">
-                    Diện tích: {room.area} m² • Tối đa {room.maxOccupants} người
+                    {room.floor !== null && room.floor !== undefined ? `Tầng ${room.floor} · ` : ""}Diện tích: {room.area} m² · Tối đa {room.maxOccupants} người
                   </p>
                   <p className="text-[15px] font-semibold text-[#15594f] mt-3">
                     {formatCurrency(room.priceMonthly)} <span className="text-[11px] font-normal text-[#74817b]">/ tháng</span>

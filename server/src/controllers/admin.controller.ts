@@ -22,7 +22,12 @@ export const adminController = {
         return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ' });
       }
 
-      const result = await adminService.updatePostStatus(String(id), status as PostStatus, reason ? String(reason) : undefined);
+      const result = await adminService.updatePostStatus(
+        String(id),
+        status as PostStatus,
+        reason ? String(reason) : undefined,
+        req.user?.id
+      );
       return res.status(200).json({ 
         success: true, 
         message: `Đã ${status === 'APPROVED' ? 'duyệt' : 'từ chối'} bài đăng`,
@@ -46,6 +51,9 @@ export const adminController = {
 
   updateUserStatus: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      if (typeof req.body.isActive !== 'boolean') {
+        return res.status(400).json({ success: false, message: 'Trạng thái isActive phải là giá trị boolean' });
+      }
       return res.json({ success: true, data: await adminService.updateUserStatus(req.user!.id, String(req.params.id), req.body.isActive) });
     } catch (error) { return next(error); }
   },

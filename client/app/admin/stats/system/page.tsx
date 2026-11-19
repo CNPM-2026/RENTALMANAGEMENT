@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Activity, Server, Cpu, Database, CheckCircle2 } from "lucide-react";
+import { Activity, Server, Cpu, Database } from "lucide-react";
 
 export default function AdminStatsSystemPage() {
   return (

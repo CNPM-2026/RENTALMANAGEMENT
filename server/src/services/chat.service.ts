@@ -173,14 +173,6 @@ export const chatService = {
     const safePage = Number.isInteger(page) && page > 0 ? page : 1;
     const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : 20;
 
-    const unread = await prisma.message.updateMany({
-      where: { conversationId, senderId: { not: userId }, isRead: false },
-      data: { isRead: true },
-    });
-    if (unread.count > 0 && io) {
-      io.to(`user_${userId}`).emit('conversation_read', { conversationId, unreadCount: 0 });
-    }
-
     const rows = await prisma.message.findMany({
       where: { conversationId },
       select: messageSelect,
@@ -188,6 +180,20 @@ export const chatService = {
       skip: (safePage - 1) * safeLimit,
       take: safeLimit,
     });
+
+    const unreadIds = rows.filter((r) => r.senderId !== userId && !r.isRead).map((r) => r.id);
+    if (unreadIds.length > 0) {
+      await prisma.message.updateMany({
+        where: { id: { in: unreadIds } },
+        data: { isRead: true },
+      });
+      const remainingUnread = await prisma.message.count({
+        where: { conversationId, senderId: { not: userId }, isRead: false },
+      });
+      if (io) {
+        io.to(`user_${userId}`).emit('conversation_read', { conversationId, unreadCount: remainingUnread });
+      }
+    }
 
     return rows.map((row) => toMessagePayload(row, userId));
   },

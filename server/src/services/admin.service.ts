@@ -27,17 +27,42 @@ export const adminService = {
   },
 
   // Duyệt hoặc từ chối bài
-  updatePostStatus: async (postId: string, status: PostStatus, reason?: string) => {
+  updatePostStatus: async (postId: string, status: PostStatus, reason?: string, adminId?: string) => {
     const post = await prisma.post.findUnique({
-      where: { id: postId }
+      where: { id: postId },
+      include: {
+        author: { select: { id: true, isActive: true } },
+        room: { select: { id: true, status: true } },
+      },
     });
 
     if (!post) throw new AppError('Không tìm thấy bài đăng', 404);
+
+    if (status === 'APPROVED') {
+      if (post.author && !post.author.isActive) {
+        throw new AppError('Không thể duyệt bài của tài khoản đã bị khóa', 400);
+      }
+      if (post.room && post.room.status !== 'AVAILABLE') {
+        throw new AppError('Không thể duyệt bài khi phòng không còn trống', 400);
+      }
+      if (post.expiredAt && post.expiredAt < new Date()) {
+        throw new AppError('Bài đăng đã hết hạn, không thể duyệt', 400);
+      }
+    }
 
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: { status }
     });
+
+    if (adminId) {
+      await auditService.record({
+        userId: adminId,
+        action: status === 'APPROVED' ? 'APPROVE_POST' : 'REJECT_POST',
+        entityType: 'Post',
+        entityId: postId,
+      }).catch(() => undefined);
+    }
 
     // Gửi thông báo cho tác giả khi bài đăng được duyệt hoặc từ chối
     if (status === 'APPROVED') {
@@ -94,10 +119,13 @@ export const adminService = {
     // thứ tự khóa users -> refresh_tokens với luồng cấp phiên. Nhờ vậy không có
     // phiên nào chen được vào giữa hai bước (và ngược lại).
     const updated = await prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM users WHERE id = ${userId} FOR UPDATE
+      const locked = await tx.$queryRaw<Array<{ id: string; role?: string; is_active?: boolean }>>`
+        SELECT id, role, is_active FROM users WHERE id = ${userId} FOR UPDATE
       `;
       if (locked.length !== 1) throw new AppError('Không tìm thấy người dùng', 404);
+      if (locked[0].role === 'ADMIN') {
+        throw new AppError('Không thể thay đổi trạng thái của tài khoản admin khác', 400);
+      }
 
       // H-05/Batch 2B1.1 (F-2): mọi thay đổi trạng thái do admin thực hiện đều tăng
       // `authVersion`, nên một "password-setup grant" đang bay bị vô hiệu vĩnh viễn —
@@ -114,6 +142,10 @@ export const adminService = {
           isActive: true,
         },
       });
+
+      if (user.role === 'ADMIN') {
+        throw new AppError('Không thể thay đổi trạng thái của tài khoản admin khác', 400);
+      }
 
       if (!isActive) {
         await tx.refreshToken.updateMany({

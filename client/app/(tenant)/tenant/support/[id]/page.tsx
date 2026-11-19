@@ -2,19 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
-  HelpCircle,
-  Clock,
   Send,
   Paperclip,
   CheckCircle2,
   FileImage,
-  User,
-  ShieldCheck,
   ChevronLeft,
-  XCircle,
-  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +29,6 @@ interface ThreadMessage {
 
 function TenantTicketDetailContent() {
   const params = useParams();
-  const router = useRouter();
   const ticketId = params?.id as string;
   const [ticket, setTicket] = React.useState<SupportTicket | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -176,7 +169,7 @@ function TenantTicketDetailContent() {
                   <Button type="button" variant="ghost" size="sm" leftIcon={<Paperclip className="size-4" />}>
                     Đính kèm tệp
                   </Button>
-                  <Button type="submit" variant="primary" size="sm" leftIcon={<Send className="size-4" />}>
+                  <Button type="submit" variant="primary" size="sm" loading={isSubmitting} leftIcon={<Send className="size-4" />}>
                     Gửi phản hồi
                   </Button>
                 </div>

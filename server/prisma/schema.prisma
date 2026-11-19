@@ -793,6 +793,7 @@ model Room {
   parkingFee      Decimal?   @map("parking_fee") @db.Decimal(10, 2)
   area            Float // Diện tích (m2)
   maxOccupants    Int        @default(2) @map("max_occupants")
+  floor           Int?       @map("floor") // Tầng của phòng (Ví dụ: 1, 2, 3...)
   bedType         String?    @map("bed_type") // Loại giường: Giường đơn, Giường đôi, Giường tầng, v.v.
   balconyDirection String?   @map("balcony_direction") // Hướng ban công: Đông, Tây, Nam, Bắc, Đông Nam,...
   status          RoomStatus @default(AVAILABLE)

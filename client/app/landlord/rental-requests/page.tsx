@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { Inbox, Check, X, Clock, User, Phone, Mail, Calendar } from "lucide-react";
+import { Inbox, Check, X, Phone, Mail, Calendar } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { RentalRequest } from "@/types/models";
 import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
@@ -45,7 +44,7 @@ export default function LandlordRentalRequestsPage() {
     try {
       await apiClient.rentalRequests.updateStatus(id, status);
       loadRequests();
-    } catch (e) {
+    } catch {
       setErrorMessage("Cập nhật trạng thái thất bại. Vui lòng thử lại.");
     }
   };

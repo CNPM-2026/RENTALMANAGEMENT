@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { ContractStatus } from '@prisma/client';
 import { notificationService } from './notification.service';
 import { roomDemandService } from './roomDemand.service';
+import { assertKycApproved, loadKycState, TENANT_KYC_REQUIRED } from './kycGate.service';
 
 export const contractService = {
   // 1. Chủ trọ tạo hợp đồng mới
@@ -22,6 +23,20 @@ export const contractService = {
     if (room.property.landlordId !== landlordId) {
       throw new AppError('Bạn không có quyền tạo hợp đồng cho phòng này', 403);
     }
+
+    // Kiểm tra KYC bắt buộc của khách thuê trước khi lập hợp đồng
+    const kycState = await loadKycState(tenantId);
+    assertKycApproved(kycState, 'tạo hợp đồng thuê phòng', TENANT_KYC_REQUIRED);
+
+    // Không cho phép tạo 2 hợp đồng ACTIVE cho cùng 1 phòng
+    const existingActiveContract = await prisma.contract.findFirst({
+      where: { roomId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (existingActiveContract) {
+      throw new AppError('Phòng này hiện đã có hợp đồng đang có hiệu lực', 400, 'ROOM_ALREADY_RENTED');
+    }
+
     const approvedRequest = await prisma.rentalRequest.findFirst({
       where: { roomId, tenantId, status: 'APPROVED' },
       select: { id: true },
@@ -34,8 +49,26 @@ export const contractService = {
       throw new AppError('Người thuê không hợp lệ', 400);
     }
 
+    const resolvedDepositPaid =
+      depositPaid !== undefined && depositPaid !== null && Number(depositPaid) >= 0
+        ? Number(depositPaid)
+        : (room.depositAmount && Number(room.depositAmount) > 0 ? room.depositAmount : room.priceMonthly);
+
+    const resolvedMonthlyRent =
+      monthlyRent !== undefined && monthlyRent !== null && Number(monthlyRent) > 0
+        ? Number(monthlyRent)
+        : room.priceMonthly;
+
     // Sử dụng Transaction để tạo hợp đồng VÀ đổi trạng thái phòng cùng lúc
     const result = await prisma.$transaction(async (tx) => {
+      const activeInTx = await tx.contract.findFirst({
+        where: { roomId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (activeInTx) {
+        throw new AppError('Phòng này vừa được tạo hợp đồng bởi người khác', 409, 'ROOM_ALREADY_RENTED');
+      }
+
       const claimedRoom = await tx.room.updateMany({
         where: { id: roomId, status: 'AVAILABLE' },
         data: { status: 'RENTED' },
@@ -54,8 +87,8 @@ export const contractService = {
           tenantId,
           startDate: new Date(startDate),
           endDate: endDate ? new Date(endDate) : null,
-          depositPaid: room.priceMonthly,
-          monthlyRent: room.priceMonthly,
+          depositPaid: resolvedDepositPaid,
+          monthlyRent: resolvedMonthlyRent,
           terms,
           status: 'ACTIVE',
         },
@@ -207,6 +240,9 @@ export const contractService = {
     if (!allowedTransitions[contract.status].includes(status)) {
       throw new AppError(`Không thể chuyển hợp đồng từ ${contract.status} sang ${status}`, 400);
     }
+    if (status === 'EXPIRED' && contract.endDate && new Date(contract.endDate) > new Date()) {
+      throw new AppError('Hợp đồng chưa đến ngày kết thúc, không thể đánh dấu hết hạn', 400);
+    }
 
     const result = await prisma.$transaction(async (tx) => {
       let cancelled: Awaited<ReturnType<typeof roomDemandService.cancelOpenDemand>> = {
@@ -237,6 +273,11 @@ export const contractService = {
             throw new AppError('Trạng thái phòng không khớp với hợp đồng đang hoạt động', 409);
           }
         }
+        // Vô hiệu hoá khai báo cư trú của phòng khi hợp đồng kết thúc/chấm dứt
+        await tx.roomOccupancyDeclaration.updateMany({
+          where: { roomId: contract.roomId, status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
+          data: { status: 'SUPERSEDED', supersededAt: new Date() },
+        });
       }
 
       const updated = await tx.contract.updateMany({

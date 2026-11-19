@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calendar as CalendarIcon, Clock, User, Phone, CheckCircle, MapPin } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, Phone } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Appointment } from "@/types/models";
 import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";

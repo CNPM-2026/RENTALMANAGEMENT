@@ -39,6 +39,7 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { apiLimiter } from './middlewares/rateLimit.middleware';
 const app: Application = express();
+app.set('trust proxy', 1);
 // Middlewares
 app.use(helmet());
 app.use(compression());

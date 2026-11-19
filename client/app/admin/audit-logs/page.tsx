@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { History, Search, Filter, Shield, Clock } from "lucide-react";
+import { Search } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { AuditLog } from "@/types/models";
 

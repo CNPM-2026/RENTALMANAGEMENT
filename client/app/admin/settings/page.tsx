@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Settings, Save, Shield, Mail, Database, Bell } from "lucide-react";
+import { Settings, Save, Shield } from "lucide-react";
 
 export default function AdminSettingsPage() {
   const [siteName, setSiteName] = React.useState("5K-Rental Manager");

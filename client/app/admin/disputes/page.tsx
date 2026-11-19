@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Scale, Check, AlertCircle } from "lucide-react";
+import { Scale } from "lucide-react";
 
 export default function AdminDisputesPage() {
   return (

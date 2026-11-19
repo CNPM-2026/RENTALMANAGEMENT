@@ -100,6 +100,20 @@ export const postService = {
           } else {
             throw new AppError('Bạn không có quyền đăng tin cho phòng này', 403);
           }
+        } else {
+          // Chủ trọ đăng tin cho thuê: phòng phải còn trống
+          if (room.status !== 'AVAILABLE') {
+            throw new AppError('Chỉ phòng đang trống mới có thể tạo tin đăng cho thuê', 400);
+          }
+        }
+
+        // Mỗi phòng chỉ được có tối đa 1 tin đăng. Muốn đăng lại (khi phòng trống) phải xóa tin cũ trước.
+        const existingPost = await prisma.post.findFirst({
+          where: { roomId: room.id },
+          select: { id: true, title: true },
+        });
+        if (existingPost) {
+          throw new AppError('Phòng này đã có tin đăng. Mỗi phòng chỉ được đăng 1 tin, nếu muốn đăng lại vui lòng xóa tin cũ trước', 400);
         }
       }
       if (roomId && propertyId && room && room.propertyId !== propertyId) {
@@ -196,6 +210,9 @@ export const postService = {
   // Lấy danh sách bài đăng đã được duyệt (Dành cho mọi người xem)
   getApprovedPosts: async (query: any) => {
     const { postType, province } = query;
+    const page = query?.page ? Math.max(1, Number(query.page)) : undefined;
+    const limit = query?.limit ? Math.min(100, Math.max(1, Number(query.limit))) : undefined;
+    const skip = page && limit ? (page - 1) * limit : undefined;
     
     return await prisma.post.findMany({
       where: {
@@ -208,11 +225,13 @@ export const postService = {
       },
       include: {
         images: true,
-        author: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
+        author: { select: { id: true, fullName: true, avatarUrl: true } },
         property: { select: { name: true, address: true, province: true, district: true } },
         room: { include: { roomAmenities: { include: { amenity: true } } } }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      ...(skip !== undefined && { skip }),
+      ...(limit !== undefined && { take: limit }),
     });
   },
   searchPosts: async (query: any) => {

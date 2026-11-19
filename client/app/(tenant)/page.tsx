@@ -7,7 +7,6 @@ import {
   Search,
   MapPin,
   Home,
-  Users,
   ShieldCheck,
   CheckCircle2,
   Sparkles,

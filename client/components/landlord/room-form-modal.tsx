@@ -25,6 +25,7 @@ interface RoomFormModalProps {
 
 interface RoomFormState {
   roomNumber: string;
+  floor: string;
   priceMonthly: string;
   area: string;
   maxOccupants: string;
@@ -40,6 +41,7 @@ interface RoomFormState {
 
 const EMPTY_FORM: RoomFormState = {
   roomNumber: "",
+  floor: "",
   priceMonthly: "",
   area: "",
   maxOccupants: "1",
@@ -67,6 +69,7 @@ function buildFormState(room?: Room | null): RoomFormState {
   if (!room) return { ...EMPTY_FORM };
   return {
     roomNumber: room.roomNumber,
+    floor: toInputValue(room.floor),
     priceMonthly: toInputValue(room.priceMonthly),
     area: toInputValue(room.area),
     maxOccupants: toInputValue(room.maxOccupants),
@@ -175,6 +178,12 @@ export function RoomFormModal({
       parsedOptional[key] = value;
     }
 
+    const floor = form.floor.trim() !== "" ? parseIntegerInput(form.floor) : null;
+    if (form.floor.trim() !== "" && (floor === null || floor < 0 || floor > 200)) {
+      setError("Số tầng phải là số nguyên không âm hợp lệ (0 - 200).");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const saved =
@@ -185,6 +194,7 @@ export function RoomFormModal({
               priceMonthly,
               area,
               maxOccupants,
+              ...(floor !== null ? { floor } : {}),
               bedType: form.bedType.trim() || null,
               balconyDirection: form.balconyDirection.trim() || null,
               amenityIds: form.amenityIds,
@@ -201,6 +211,7 @@ export function RoomFormModal({
               priceMonthly,
               area,
               maxOccupants,
+              floor: floor !== null ? floor : null,
               bedType: form.bedType.trim() || null,
               balconyDirection: form.balconyDirection.trim() || null,
               // `null` = xoá cấu hình phí (khác hẳn 0 đ).
@@ -256,14 +267,29 @@ export function RoomFormModal({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <Input
-          label="Số phòng"
-          required
-          value={form.roomNumber}
-          onChange={(event) => update("roomNumber", event.target.value)}
-          placeholder="Ví dụ: 101"
-          maxLength={30}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="Số phòng"
+            required
+            value={form.roomNumber}
+            onChange={(event) => update("roomNumber", event.target.value)}
+            placeholder="Ví dụ: 101"
+            maxLength={30}
+          />
+
+          <label className="space-y-1.5 block">
+            <span className="block text-[13px] font-medium text-[#203c37]">
+              Số tầng (Tầng)
+            </span>
+            <NumericInput
+              value={form.floor}
+              onChange={(value) => update("floor", value)}
+              maxDecimals={0}
+              placeholder="Ví dụ: 1, 2, 3..."
+              className={FIELD_CLASS}
+            />
+          </label>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="space-y-1.5 block">

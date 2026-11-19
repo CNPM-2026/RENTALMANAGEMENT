@@ -245,6 +245,7 @@ export interface Room {
   serviceFee?: number | null;
   parkingFee?: number | null;
   area: number;
+  floor?: number | null;
   maxOccupants: number;
   bedType?: string | null;
   balconyDirection?: string | null;
@@ -1338,6 +1339,7 @@ export interface CreateRoomPayload {
   priceYearly?: number;
   depositAmount?: number;
   area: number;
+  floor?: number | null;
   maxOccupants?: number;
   bedType?: string | null;
   balconyDirection?: string | null;
@@ -1356,6 +1358,7 @@ export interface UpdateRoomPayload {
   priceYearly?: number | null;
   depositAmount?: number;
   area?: number;
+  floor?: number | null;
   maxOccupants?: number;
   bedType?: string | null;
   balconyDirection?: string | null;

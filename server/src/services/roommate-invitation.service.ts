@@ -96,8 +96,22 @@ export const roommateInvitationService = {
   getMine: (userId: string, type: 'received' | 'sent') => prisma.roommateInvitation.findMany({
     where: type === 'received' ? { recipientId: userId } : { senderId: userId },
     include: {
-      sender: { select: { id: true, fullName: true, avatarUrl: true, profile: true } },
-      recipient: { select: { id: true, fullName: true, avatarUrl: true, profile: true } },
+      sender: {
+        select: {
+          id: true,
+          fullName: true,
+          avatarUrl: true,
+          profile: { select: { id: true, gender: true, bio: true, occupation: true } },
+        },
+      },
+      recipient: {
+        select: {
+          id: true,
+          fullName: true,
+          avatarUrl: true,
+          profile: { select: { id: true, gender: true, bio: true, occupation: true } },
+        },
+      },
       post: {
         select: {
           id: true,
@@ -135,15 +149,18 @@ export const roommateInvitationService = {
 
     const updated = await prisma.roommateInvitation.update({ where: { id }, data: { status } });
     if (status === 'DECLINED' || status === 'CANCELLED') {
-      // Hủy bỏ các khai báo cư trú PENDING của cặp này để số người không bị tăng ảo nếu hủy rồi thuê/mời lại
-      await prisma.roomOccupancyDeclaration.updateMany({
-        where: {
-          tenantId: { in: [invitation.senderId, invitation.recipientId] },
-          status: 'PENDING',
-          supersededAt: null,
-        },
-        data: { status: 'SUPERSEDED', supersededAt: new Date() },
-      }).catch(() => undefined);
+      const roomId = invitation.post?.roomId;
+      if (roomId) {
+        await prisma.roomOccupancyDeclaration.updateMany({
+          where: {
+            roomId,
+            tenantId: { in: [invitation.senderId, invitation.recipientId] },
+            status: 'PENDING',
+            supersededAt: null,
+          },
+          data: { status: 'SUPERSEDED', supersededAt: new Date() },
+        });
+      }
     }
     if (status === 'DECLINED') {
       await notificationService.createNotification(
