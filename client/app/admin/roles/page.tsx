@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Key, ShieldCheck, Check } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { User } from "@/types/models";
 

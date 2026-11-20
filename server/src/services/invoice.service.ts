@@ -83,6 +83,7 @@ const nonNegativeInteger = (value: unknown): value is number =>
  */
 const buildComputation = async (landlordId: string, input: InvoiceInput) => {
   const { roomId, month, year } = input;
+  const periodEnd = billingPeriodEnd(month, year);
 
   // Sai quyền sở hữu là lỗi FATAL (không phải "blocker"): không được lộ dữ liệu.
   const room = await prisma.room.findUnique({
@@ -97,10 +98,12 @@ const buildComputation = async (landlordId: string, input: InvoiceInput) => {
 
   const contract = await prisma.contract.findFirst({
     where: { roomId, status: 'ACTIVE' },
-    select: { id: true, tenantId: true, monthlyRent: true },
+    select: { id: true, tenantId: true, monthlyRent: true, endDate: true },
   });
   if (!contract) {
     blockers.push(blocked('CONTRACT_REQUIRED', 'Phòng này hiện không có hợp đồng thuê nào đang hoạt động'));
+  } else if (contract.endDate && contract.endDate < periodEnd) {
+    blockers.push(blocked('CONTRACT_REQUIRED', 'Hợp đồng thuê đã hết hạn trong kỳ hoá đơn này', 400));
   }
 
   const existingInvoice = await prisma.invoice.findUnique({
@@ -204,7 +207,6 @@ const buildComputation = async (landlordId: string, input: InvoiceInput) => {
 
   // Số người ĐÃ XÁC MINH áp dụng cho kỳ. PENDING/REJECTED không bao giờ được dùng.
   // Chưa xác minh ⇒ mặc định 1 người (yêu cầu nghiệp vụ), KHÔNG chặn phát hành.
-  const periodEnd = billingPeriodEnd(month, year);
   const verifiedOccupancy = contract
     ? await occupancyService.resolveVerifiedOccupancy({ roomId, tenantId: contract.tenantId, month, year })
     : null;
@@ -358,7 +360,10 @@ export const invoiceService = {
       throw new AppError('Không đủ dữ liệu để phát hành hoá đơn', 409, 'INVOICE_NOT_READY');
     }
 
-    const dueDate = new Date(year, month - 1, 10);
+    // Đáo hạn vào ngày 10 của tháng sau, nhưng tối thiểu 7 ngày sau ngày phát hành
+    const nextMonth10th = new Date(year, month, 10);
+    const minDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const dueDate = nextMonth10th > minDueDate ? nextMonth10th : minDueDate;
 
     let invoice;
     try {
@@ -467,9 +472,16 @@ export const invoiceService = {
     }
     if (invoice.status === 'PAID') throw new AppError('Hóa đơn này đã được thanh toán', 400);
 
-    const paidInvoice = await prisma.invoice.update({
-      where: { id: invoiceId },
+    const updateResult = await prisma.invoice.updateMany({
+      where: { id: invoiceId, status: { not: 'PAID' } },
       data: { status: 'PAID', paidAt: new Date() },
+    });
+    if (updateResult.count === 0) {
+      throw new AppError('Hóa đơn này đã được thanh toán', 400);
+    }
+
+    const paidInvoice = await prisma.invoice.findUniqueOrThrow({
+      where: { id: invoiceId },
     });
     await notificationService.createNotification(
       invoice.tenantId,

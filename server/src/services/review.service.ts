@@ -74,10 +74,48 @@ export const reviewService = {
         if (post.authorId === reviewerId || post.property?.landlordId === reviewerId) {
           throw new AppError('Bạn không thể tự đánh giá bài đăng của chính mình', 400);
         }
+        if (!post.roomId) {
+          throw new AppError('Bài đăng không gắn với phòng cụ thể để đánh giá', 400);
+        }
+        const hasRented = await prisma.contract.findFirst({
+          where: {
+            roomId: post.roomId,
+            tenantId: reviewerId,
+            status: { in: ['ACTIVE', 'EXPIRED', 'TERMINATED'] },
+          },
+          select: { id: true },
+        });
+        if (!hasRented) {
+          throw new AppError('Chỉ người đã hoặc đang thuê phòng của bài đăng này mới có thể viết đánh giá', 403, 'REVIEW_FORBIDDEN');
+        }
       } else if (targetType === 'ROOM') {
         const room = targetExists as any;
         if (room.property?.landlordId === reviewerId) {
           throw new AppError('Chủ trọ không thể tự đánh giá phòng của chính mình', 400);
+        }
+        const hasRented = await prisma.contract.findFirst({
+          where: {
+            roomId: targetId,
+            tenantId: reviewerId,
+            status: { in: ['ACTIVE', 'EXPIRED', 'TERMINATED'] },
+          },
+          select: { id: true },
+        });
+        if (!hasRented) {
+          throw new AppError('Chỉ người đã hoặc đang thuê phòng này mới có thể viết đánh giá', 403, 'REVIEW_FORBIDDEN');
+        }
+      } else if (targetType === 'USER') {
+        const hasContract = await prisma.contract.findFirst({
+          where: {
+            OR: [
+              { tenantId: reviewerId, room: { property: { landlordId: targetId } } },
+              { tenantId: targetId, room: { property: { landlordId: reviewerId } } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!hasContract) {
+          throw new AppError('Bạn chưa có giao dịch hợp đồng thuê để đánh giá người này', 403, 'REVIEW_FORBIDDEN');
         }
       }
 

@@ -42,6 +42,7 @@ export const roomService = {
         parkingFee,
         area,
         maxOccupants: maxOccupants || 2,
+        floor: (data.floor !== undefined && data.floor !== null && data.floor !== '') ? Number(data.floor) : null,
         bedType: bedType || null,
         balconyDirection: balconyDirection || null,
         // Nếu có truyền amenityIds, tạo các bản ghi trung gian RoomAmenity
@@ -73,6 +74,7 @@ export const roomService = {
     const updateData: Record<string, unknown> = {};
     for (const key of [
       'roomNumber',
+      'floor',
       'priceMonthly',
       'priceYearly',
       'depositAmount',
@@ -88,8 +90,22 @@ export const roomService = {
     ]) {
       if (fields[key] !== undefined) updateData[key] = fields[key];
     }
+    if (updateData.floor !== undefined) {
+      updateData.floor = updateData.floor !== null && updateData.floor !== '' ? Number(updateData.floor) : null;
+    }
 
     if (typeof updateData.maxOccupants === 'number') {
+      const activeContracts = await prisma.contract.count({
+        where: { roomId, status: 'ACTIVE' },
+      });
+      if (updateData.maxOccupants < activeContracts) {
+        throw new AppError(
+          `Không thể giảm sức chứa xuống ${updateData.maxOccupants}: hiện có ${activeContracts} hợp đồng đang có hiệu lực`,
+          400,
+          'CAPACITY_BELOW_ACTIVE_CONTRACTS',
+        );
+      }
+
       const verified = await prisma.roomOccupancyDeclaration.findFirst({
         where: { roomId, status: 'VERIFIED', supersededAt: null },
         orderBy: { verifiedAt: 'desc' },
@@ -156,11 +172,12 @@ export const roomService = {
         property: {
           include: {
             propertyAmenities: { include: { amenity: true } },
-            landlord: { select: { id: true, fullName: true, avatarUrl: true, phone: true } },
+            landlord: { select: { id: true, fullName: true, avatarUrl: true } },
           },
         },
         roomAmenities: { include: { amenity: true } },
         posts: {
+          where: { status: 'APPROVED' },
           include: { images: true },
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -185,6 +202,24 @@ export const roomService = {
     if (room.status === 'RENTED') {
       throw new AppError('Không thể xóa phòng đang có người thuê', 400);
     }
+
+    const activeContract = await prisma.contract.findFirst({
+      where: { roomId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (activeContract) {
+      throw new AppError('Không thể xóa phòng đang có hợp đồng hoạt động', 400);
+    }
+
+    const pendingRequest = await prisma.rentalRequest.findFirst({
+      where: { roomId, status: { in: ['SUBMITTED', 'APPROVED', 'CONTRACT_READY'] } },
+      select: { id: true },
+    });
+    if (pendingRequest) {
+      throw new AppError('Không thể xóa phòng đang có yêu cầu thuê chờ xử lý', 400);
+    }
+
+    await prisma.post.deleteMany({ where: { roomId } });
     return prisma.room.delete({ where: { id: roomId } });
   }
 };

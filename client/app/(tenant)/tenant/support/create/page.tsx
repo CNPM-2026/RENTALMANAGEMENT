@@ -4,14 +4,11 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  HelpCircle,
   Upload,
   Send,
   X,
   FileImage,
-  Info,
   Clock,
-  ShieldCheck,
   Phone,
   ChevronLeft,
 } from "lucide-react";

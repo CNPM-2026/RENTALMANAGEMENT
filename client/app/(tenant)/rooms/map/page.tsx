@@ -4,9 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import {
   List,
-  MapPin,
-  SlidersHorizontal,
-  Heart,
   ArrowUpRight,
   ZoomIn,
   ZoomOut,
@@ -34,7 +31,6 @@ interface MapRoom {
   landmark: string;
 }
 
-const MAP_ROOMS: MapRoom[] = [];
 /*
   {
     id: "studio-ban-mai",

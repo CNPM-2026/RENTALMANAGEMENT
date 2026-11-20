@@ -3,22 +3,17 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  HelpCircle,
   Search,
   Plus,
   FileText,
   CreditCard,
   ShieldCheck,
   ChevronRight,
-  Info,
-  Clock,
-  CheckCircle,
-  AlertCircle,
   PhoneCall,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
 import { SupportTicket } from "@/types/models";
 

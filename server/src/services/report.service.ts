@@ -108,14 +108,33 @@ export const reportService = {
     } else {
       const targetExists =
         targetType === 'POST'
-          ? await prisma.post.findUnique({ where: { id: targetId }, select: { id: true } })
+          ? await prisma.post.findUnique({ where: { id: targetId }, select: { id: true, authorId: true } })
           : targetType === 'ROOM'
-            ? await prisma.room.findUnique({ where: { id: targetId }, select: { id: true } })
+            ? await prisma.room.findUnique({ where: { id: targetId }, select: { id: true, property: { select: { landlordId: true } } } })
             : await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
       if (!targetExists) throw new AppError('Đối tượng báo cáo không tồn tại', 404);
       if (targetType === 'USER' && targetId === reporterId) {
         throw new AppError('Bạn không thể tự báo cáo chính mình', 400, 'SELF_REPORT');
       }
+      if (targetType === 'POST' && (targetExists as any).authorId === reporterId) {
+        throw new AppError('Bạn không thể tự báo cáo bài đăng của chính mình', 400, 'SELF_REPORT');
+      }
+      if (targetType === 'ROOM' && (targetExists as any).property?.landlordId === reporterId) {
+        throw new AppError('Bạn không thể tự báo cáo phòng của chính mình', 400, 'SELF_REPORT');
+      }
+    }
+
+    const recentReport = await prisma.report.findFirst({
+      where: {
+        reporterId,
+        targetType,
+        targetId,
+        createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+      },
+      select: { id: true },
+    });
+    if (recentReport) {
+      throw new AppError('Bạn vừa gửi báo cáo cho đối tượng này. Vui lòng chờ ít nhất 5 phút trước khi gửi lại.', 429, 'REPORT_SPAM_LIMITED');
     }
 
     const uploaded = await uploadAttachments(files);

@@ -36,6 +36,38 @@ export const meterReadingService = {
       throw new AppError('Bạn không có quyền ghi chỉ số cho phòng này', 403);
     }
 
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    if (year > currentYear || (year === currentYear && month > currentMonth)) {
+      throw new AppError(`Không thể ghi nhận chỉ số cho kỳ tương lai (${month}/${year})`, 400, 'READING_FUTURE_DATE');
+    }
+
+    const nextReading = await prisma.meterReading.findFirst({
+      where: {
+        roomId,
+        OR: [{ year: { gt: year } }, { year, month: { gt: month } }],
+      },
+      orderBy: [{ year: 'asc' }, { month: 'asc' }],
+      select: { electricityStart: true, waterStart: true, month: true, year: true },
+    });
+    if (nextReading) {
+      if (electricityEnd > nextReading.electricityStart) {
+        throw new AppError(
+          `Chỉ số điện cuối kỳ (${electricityEnd}) lớn hơn chỉ số đầu kỳ ${nextReading.month}/${nextReading.year} (${nextReading.electricityStart})`,
+          400,
+          'READING_INCONSISTENT_WITH_NEXT_PERIOD',
+        );
+      }
+      if (waterEnd > nextReading.waterStart) {
+        throw new AppError(
+          `Chỉ số nước cuối kỳ (${waterEnd}) lớn hơn chỉ số đầu kỳ ${nextReading.month}/${nextReading.year} (${nextReading.waterStart})`,
+          400,
+          'READING_INCONSISTENT_WITH_NEXT_PERIOD',
+        );
+      }
+    }
+
     const previous = await prisma.meterReading.findFirst({
       where: {
         roomId,

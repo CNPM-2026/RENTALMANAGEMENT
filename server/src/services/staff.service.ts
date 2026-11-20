@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { auditService } from './audit.service';
 
 const staffSelect = {
   id: true,
@@ -50,25 +51,30 @@ export const staffService = {
       where: { landlordId_userId: { landlordId, userId: user.id } },
     });
     if (existing) throw new AppError('Tài khoản này đã có trong danh sách nhân viên', 409);
-    return prisma.staffMembership.create({
+    const created = await prisma.staffMembership.create({
       data: { landlordId, userId: user.id, permissions: permissions as never[] },
       select: staffSelect,
     });
+    await auditService.record({ userId: landlordId, action: 'INVITE_STAFF', entityType: 'StaffMembership', entityId: created.id }).catch(() => undefined);
+    return created;
   },
 
   update: async (landlordId: string, id: string, data: { permissions?: string[]; isActive?: boolean }) => {
     const membership = await prisma.staffMembership.findFirst({ where: { id, landlordId } });
     if (!membership) throw new AppError('Không tìm thấy nhân viên', 404);
-    return prisma.staffMembership.update({
+    const updated = await prisma.staffMembership.update({
       where: { id },
       data: { ...data, permissions: data.permissions as never[] | undefined },
       select: staffSelect,
     });
+    await auditService.record({ userId: landlordId, action: 'UPDATE_STAFF', entityType: 'StaffMembership', entityId: updated.id }).catch(() => undefined);
+    return updated;
   },
 
   remove: async (landlordId: string, id: string) => {
     const membership = await prisma.staffMembership.findFirst({ where: { id, landlordId } });
     if (!membership) throw new AppError('Không tìm thấy nhân viên', 404);
     await prisma.staffMembership.delete({ where: { id } });
+    await auditService.record({ userId: landlordId, action: 'REMOVE_STAFF', entityType: 'StaffMembership', entityId: id }).catch(() => undefined);
   },
 };

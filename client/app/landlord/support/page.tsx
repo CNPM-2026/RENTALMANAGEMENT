@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { LifeBuoy, Phone, Mail, MessageCircle, HelpCircle, FileText, Flag, AlertTriangle } from "lucide-react";
+import { Phone, Mail, MessageCircle, Flag, AlertTriangle } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { readFocusParam, scrollToFocus } from "@/lib/notification-focus";
 import type { Report } from "@/types/models";

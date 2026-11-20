@@ -12,6 +12,7 @@ import {
   Maximize2,
   Users,
   BedDouble,
+  Building,
   Sun,
   ShieldCheck,
   Info,
@@ -325,8 +326,8 @@ function RoomDetailContent() {
               LEFT COLUMN: SPECS, DESCRIPTION, AMENITIES, LOCATION (910px)
           -------------------------------------------------------------------- */}
           <div className="lg:col-span-8 space-y-6">
-            {/* 4 Specs KPI Cards (Figma Node 44:63131) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Specs KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
                 <Maximize2 className="size-5 text-[#15594f]" />
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
@@ -334,6 +335,16 @@ function RoomDetailContent() {
                 </p>
                 <p className="text-lg font-bold text-[#203c37]">
                   {post?.room?.area ? `${post.room.area} m²` : "Chưa cập nhật"}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
+                <Building className="size-5 text-[#15594f]" />
+                <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
+                  Vị trí tầng
+                </p>
+                <p className="text-lg font-bold text-[#203c37]">
+                  {post?.room?.floor !== null && post?.room?.floor !== undefined ? `Tầng ${post.room.floor}` : "Tầng trệt"}
                 </p>
               </div>
 
@@ -362,7 +373,7 @@ function RoomDetailContent() {
                 </p>
               </div>
 
-              <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left">
+              <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] space-y-1 text-left col-span-2 sm:col-span-1">
                 <Sun className="size-5 text-[#15594f]" />
                 <p className="text-[11px] text-[#74817b] uppercase font-bold tracking-wider">
                   Hướng ban công
@@ -561,7 +572,12 @@ function RoomDetailContent() {
 
                 return (
                   <form onSubmit={handleSubmitReview} className="pt-4 border-t border-[#e2e7e1] space-y-3">
-                    <p className="text-[14px] font-semibold text-[#203c37]">Viết đánh giá của bạn</p>
+                    <div>
+                      <p className="text-[14px] font-semibold text-[#203c37]">Viết đánh giá của bạn</p>
+                      <p className="text-[12px] text-[#74817b] mt-0.5">
+                        Lưu ý: Chỉ khách thuê đã hoặc đang có hợp đồng thuê phòng này mới có thể viết đánh giá.
+                      </p>
+                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] text-[#74817b]">Điểm đánh giá:</span>
                       <div className="flex gap-1">

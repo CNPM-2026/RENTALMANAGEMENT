@@ -10,6 +10,7 @@ import { userService } from '../../src/services/user.service';
  */
 const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
+  findFirst: vi.fn(),
   upsert: vi.fn(),
   findAdmins: vi.fn(),
   deleteImage: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('../../src/config/db', () => ({
   default: {
     kycSubmission: {
       findUnique: mocks.findUnique,
+      findFirst: mocks.findFirst,
       upsert: mocks.upsert,
     },
     user: { findMany: mocks.findAdmins },

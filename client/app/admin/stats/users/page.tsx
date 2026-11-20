@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Users, TrendingUp, UserCheck, UserX } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { AdminStatsResponse } from "@/types/models";
 

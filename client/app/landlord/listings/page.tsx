@@ -45,7 +45,10 @@ export default function LandlordListingsPage() {
     }
   }, [form.propertyId]);
 
-  const availableRooms = rooms.filter((room) => room.propertyId === form.propertyId && room.status === "AVAILABLE");
+  const postedRoomIds = React.useMemo(() => new Set(posts.map((p) => p.roomId).filter(Boolean)), [posts]);
+  const availableRooms = rooms.filter(
+    (room) => room.propertyId === form.propertyId && room.status === "AVAILABLE" && !postedRoomIds.has(room.id),
+  );
   const filtered = posts.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -220,11 +223,17 @@ export default function LandlordListingsPage() {
               {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
             </select>
             <select required value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="rounded border p-2 text-sm" disabled={!form.propertyId}>
-              <option value="">Chọn phòng</option>
-              {availableRooms.map((room) => <option key={room.id} value={room.id}>{room.roomNumber} · {formatCurrency(room.priceMonthly)}</option>)}
+              <option value="">Chọn phòng trống chưa đăng tin</option>
+              {availableRooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.floor !== null && room.floor !== undefined ? `Tầng ${room.floor} - ` : ""}Phòng {room.roomNumber} · {formatCurrency(room.priceMonthly)}
+                </option>
+              ))}
             </select>
           </div>
-          <p className="text-xs text-[#74817b]">Giá bài đăng được lấy tự động từ giá phòng đã thiết lập.</p>
+          <p className="text-xs text-[#74817b]">
+            Giá bài đăng được lấy tự động từ giá phòng. Mỗi phòng chỉ được có 1 tin đăng; nếu muốn đăng lại phòng đã có tin cũ, vui lòng xoá tin cũ trước.
+          </p>
           <button type="submit" disabled={isSubmitting} className="rounded bg-[#15594f] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Đang gửi..." : "Gửi duyệt"}</button>
         </form>
       </Modal>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ClipboardCheck, Check, X, Eye, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, Check, X, Eye } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Post } from "@/types/models";
 import { Modal } from "@/components/ui/modal";

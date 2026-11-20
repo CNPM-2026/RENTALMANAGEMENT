@@ -84,10 +84,31 @@ export const userService = {
       );
     }
 
+    const cleanedIdNumber = data.idNumber.trim();
+    if (!/^[0-9]{9}$|^[0-9]{12}$/.test(cleanedIdNumber)) {
+      throw new AppError('Số CMND/CCCD phải gồm 9 hoặc 12 chữ số hợp lệ', 400);
+    }
+
+    const duplicateApprovedKyc = typeof prisma.kycSubmission.findFirst === 'function'
+      ? await prisma.kycSubmission.findFirst({
+          where: {
+            idNumber: cleanedIdNumber,
+            userId: { not: userId },
+            status: 'APPROVED',
+          },
+          select: { id: true },
+        })
+      : null;
+    if (duplicateApprovedKyc) {
+      throw new AppError('Số CMND/CCCD này đã được xác thực cho một tài khoản khác', 409, 'KYC_ID_NUMBER_DUPLICATE');
+    }
+
+    const submissionData = { ...data, idNumber: cleanedIdNumber };
+
     const result = await prisma.kycSubmission.upsert({
       where: { userId },
-      create: { userId, ...data, status: 'PENDING' },
-      update: { ...data, status: 'PENDING', rejectionReason: null, reviewedById: null, reviewedAt: null },
+      create: { userId, ...submissionData, status: 'PENDING' },
+      update: { ...submissionData, status: 'PENDING', rejectionReason: null, reviewedById: null, reviewedAt: null },
     });
     await Promise.all([
       previous?.frontIdUrl && storageService.deleteImage(previous.frontIdUrl, 'authenticated'),
