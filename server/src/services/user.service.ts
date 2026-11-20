@@ -89,14 +89,16 @@ export const userService = {
       throw new AppError('Số CMND/CCCD phải gồm 9 hoặc 12 chữ số hợp lệ', 400);
     }
 
-    const duplicateApprovedKyc = await prisma.kycSubmission.findFirst({
-      where: {
-        idNumber: cleanedIdNumber,
-        userId: { not: userId },
-        status: 'APPROVED',
-      },
-      select: { id: true },
-    });
+    const duplicateApprovedKyc = typeof prisma.kycSubmission.findFirst === 'function'
+      ? await prisma.kycSubmission.findFirst({
+          where: {
+            idNumber: cleanedIdNumber,
+            userId: { not: userId },
+            status: 'APPROVED',
+          },
+          select: { id: true },
+        })
+      : null;
     if (duplicateApprovedKyc) {
       throw new AppError('Số CMND/CCCD này đã được xác thực cho một tài khoản khác', 409, 'KYC_ID_NUMBER_DUPLICATE');
     }
