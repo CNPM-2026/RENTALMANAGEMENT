@@ -180,7 +180,11 @@ export const reviewService = {
     if (!taskIds.length) return { averageRating: 0, totalReviews: 0 };
 
     const result = await prisma.review.aggregate({
-      where: { targetType: 'TASK', targetId: { in: taskIds } },
+      where: {
+        targetType: 'TASK',
+        targetId: { in: taskIds },
+        reviewerId: { not: staffId },
+      },
       _avg: { rating: true },
       _count: { _all: true },
     });

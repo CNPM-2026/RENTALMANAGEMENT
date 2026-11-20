@@ -86,8 +86,17 @@ export const adminController = {
   },
 
   getAuditLogs: async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try { return res.json({ success: true, data: await adminService.getAuditLogs({ search: req.query.search as string, limit: Number(req.query.limit) || 100 }) }); }
-    catch (error) { return next(error); }
+    try {
+      const logs = await adminService.getAuditLogs({
+        search: req.query.search as string,
+        limit: Number(req.query.limit) || 50,
+        page: Number(req.query.page) || 1,
+        userId: req.query.userId as string,
+        startDate: req.query.startDate as string,
+        endDate: req.query.endDate as string,
+      });
+      return res.json({ success: true, data: logs });
+    } catch (error) { return next(error); }
   },
 
   getContentFilterKeywords: async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -96,12 +105,12 @@ export const adminController = {
   },
 
   addContentFilterKeyword: async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try { return res.status(201).json({ success: true, data: await adminService.addContentFilterKeyword(String(req.body.keyword ?? '')) }); }
+    try { return res.status(201).json({ success: true, data: await adminService.addContentFilterKeyword(String(req.body.keyword ?? ''), req.user?.id) }); }
     catch (error) { return next(error); }
   },
 
   removeContentFilterKeyword: async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try { return res.json({ success: true, data: await adminService.removeContentFilterKeyword(String(req.params.id)) }); }
+    try { return res.json({ success: true, data: await adminService.removeContentFilterKeyword(String(req.params.id), req.user?.id) }); }
     catch (error) { return next(error); }
   },
 
@@ -114,14 +123,14 @@ export const adminController = {
     try {
       return res.status(201).json({
         success: true,
-        data: await adminService.createAmenity(req.body.name, req.body.iconUrl),
+        data: await adminService.createAmenity(req.body.name, req.body.iconUrl, req.user?.id),
       });
     } catch (error) { return next(error); }
   },
 
   deleteAmenity: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      return res.json({ success: true, data: await adminService.deleteAmenity(String(req.params.id)) });
+      return res.json({ success: true, data: await adminService.deleteAmenity(String(req.params.id), req.user?.id) });
     } catch (error) { return next(error); }
   },
 
