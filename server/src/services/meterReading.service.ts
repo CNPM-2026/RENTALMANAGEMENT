@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { auditService } from './audit.service';
 
 /**
  * GHI CHỈ SỐ ĐIỆN NƯỚC (Batch 7).
@@ -134,9 +135,17 @@ export const meterReadingService = {
     });
     if (existing) throw new AppError(`Đã ghi nhận chỉ số cho phòng này vào tháng ${month}/${year}`, 400);
 
-    return await prisma.meterReading.create({
+    const created = await prisma.meterReading.create({
       data: { roomId, month, year, electricityStart, electricityEnd, waterStart, waterEnd }
     });
+    await auditService.record({
+      userId: landlordId,
+      action: 'METER_READING_RECORDED',
+      entityType: 'MeterReading',
+      entityId: created.id,
+      metadata: { roomId, month, year },
+    }).catch(() => undefined);
+    return created;
   },
 
   /** Chỉ số gần nhất của một phòng — dùng để điền sẵn chỉ số đầu kỳ trên UI. */

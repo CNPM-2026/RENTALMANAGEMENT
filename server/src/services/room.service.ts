@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { auditService } from './audit.service';
 
 export const roomService = {
   // Tạo phòng mới
@@ -203,12 +204,24 @@ export const roomService = {
       throw new AppError('Không thể xóa phòng đang có người thuê', 400);
     }
 
-    const activeContract = await prisma.contract.findFirst({
-      where: { roomId, status: 'ACTIVE' },
-      select: { id: true },
-    });
-    if (activeContract) {
-      throw new AppError('Không thể xóa phòng đang có hợp đồng hoạt động', 400);
+    const hasContract = typeof prisma.contract?.findFirst === 'function'
+      ? await prisma.contract.findFirst({
+          where: { roomId },
+          select: { id: true },
+        })
+      : null;
+    if (hasContract) {
+      throw new AppError('Không thể xóa phòng đã có lịch sử hợp đồng để bảo toàn dữ liệu pháp lý. Hãy chuyển trạng thái phòng sang BẢO TRÌ.', 400);
+    }
+
+    const hasInvoice = typeof prisma.invoice?.findFirst === 'function'
+      ? await prisma.invoice.findFirst({
+          where: { roomId },
+          select: { id: true },
+        })
+      : null;
+    if (hasInvoice) {
+      throw new AppError('Không thể xóa phòng đã có lịch sử hóa đơn để bảo toàn chứng từ kế toán. Hãy chuyển trạng thái phòng sang BẢO TRÌ.', 400);
     }
 
     const pendingRequest = await prisma.rentalRequest.findFirst({
@@ -220,6 +233,13 @@ export const roomService = {
     }
 
     await prisma.post.deleteMany({ where: { roomId } });
-    return prisma.room.delete({ where: { id: roomId } });
+    const deleted = await prisma.room.delete({ where: { id: roomId } });
+    await auditService.record({
+      userId: landlordId,
+      action: 'DELETE_ROOM',
+      entityType: 'Room',
+      entityId: roomId,
+    }).catch(() => undefined);
+    return deleted;
   }
 };

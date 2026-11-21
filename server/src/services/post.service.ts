@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { PostType, Prisma } from '@prisma/client';
 import { storageService } from './storage.service';
 import { notificationService } from './notification.service';
+import { auditService } from './audit.service';
 
 export const postService = {
   getById: async (postId: string, user?: { id: string; role: string }) => {
@@ -438,6 +439,13 @@ export const postService = {
 
     const deleted = await prisma.post.delete({ where: { id: postId } });
     await Promise.all(post.images.map((image) => storageService.deleteImage(image.imageUrl)));
+    await auditService.record({
+      userId,
+      action: 'DELETE_POST',
+      entityType: 'Post',
+      entityId: postId,
+      metadata: { role },
+    }).catch(() => undefined);
     return deleted;
   }
 };

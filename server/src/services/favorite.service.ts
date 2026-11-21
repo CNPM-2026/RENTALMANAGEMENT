@@ -12,11 +12,19 @@ export const favoriteService = {
 
     if (existing) {
       // Nếu đã lưu rồi thì bấm lần nữa là Hủy lưu
-      await prisma.favorite.delete({ where: { userId_postId: { userId, postId } } });
+      try {
+        await prisma.favorite.delete({ where: { userId_postId: { userId, postId } } });
+      } catch (err: any) {
+        if (err?.code !== 'P2025') throw err;
+      }
       return { message: 'Đã bỏ lưu bài đăng', isFavorited: false };
     } else {
       // Chưa lưu thì thêm vào
-      await prisma.favorite.create({ data: { userId, postId } });
+      try {
+        await prisma.favorite.create({ data: { userId, postId } });
+      } catch (err: any) {
+        if (err?.code !== 'P2002') throw err;
+      }
       return { message: 'Đã lưu bài đăng', isFavorited: true };
     }
   },

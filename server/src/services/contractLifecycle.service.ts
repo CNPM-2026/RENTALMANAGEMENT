@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { notificationService } from './notification.service';
 import { storageService } from './storage.service';
 import { roomDemandService } from './roomDemand.service';
+import { auditService } from './audit.service';
 import { mintContractTerminationAttachmentUrl } from './contractTerminationAttachment.service';
 import type {
   ContractTerminationReason,
@@ -383,6 +384,14 @@ export const contractLifecycleService = {
       type: 'CONTRACT_TERMINATION',
     });
 
+    await auditService.record({
+      userId: admin.id,
+      action: input.status === 'APPROVED' ? 'CONTRACT_TERMINATION_APPROVED' : 'CONTRACT_TERMINATION_REJECTED',
+      entityType: 'ContractTerminationRequest',
+      entityId: requestId,
+      metadata: { contractId: request.contract.id, refundAmount, status: input.status },
+    }).catch(() => undefined);
+
     return { ...result, attachments: mintAttachments(result.attachments, admin) };
   },
 
@@ -400,9 +409,16 @@ export const contractLifecycleService = {
       throw new AppError('Yêu cầu này không có khoản cọc đang chờ hoàn', 400);
     }
 
-    const updated = await prisma.contractTerminationRequest.update({
-      where: { id: requestId },
+    const claimed = await prisma.contractTerminationRequest.updateMany({
+      where: { id: requestId, status: 'APPROVED', refundStatus: 'PENDING' },
       data: { refundStatus: 'PAID', refundPaidAt: new Date() },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError('Yêu cầu này không có khoản cọc đang chờ hoàn hoặc đã được xử lý', 400);
+    }
+
+    const updated = await prisma.contractTerminationRequest.findUniqueOrThrow({
+      where: { id: requestId },
       include: TERMINATION_INCLUDE,
     });
 
@@ -412,6 +428,14 @@ export const contractLifecycleService = {
       referenceId: request.contract.id,
       type: 'CONTRACT_TERMINATION',
     });
+
+    await auditService.record({
+      userId: landlordId,
+      action: 'DEPOSIT_REFUNDED',
+      entityType: 'ContractTerminationRequest',
+      entityId: requestId,
+      metadata: { contractId: request.contract.id, refundAmount: request.depositRefundAmount },
+    }).catch(() => undefined);
 
     return {
       ...updated,

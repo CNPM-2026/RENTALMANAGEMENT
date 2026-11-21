@@ -9,5 +9,10 @@ export const auditService = {
     ipAddress?: string;
     userAgent?: string;
     metadata?: Record<string, unknown>;
-  }) => prisma.auditLog.create({ data: { ...data, metadata: data.metadata as object | undefined } }),
+  }) => {
+    if (typeof prisma.auditLog?.create === 'function') {
+      return prisma.auditLog.create({ data: { ...data, metadata: data.metadata as object | undefined } });
+    }
+    return null;
+  },
 };

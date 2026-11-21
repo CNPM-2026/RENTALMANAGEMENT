@@ -231,7 +231,10 @@ export const authorizeStaffOr = (permission: string, ...roles: string[]): Reques
     // role gốc, kể cả khi không có quyền tương ứng của nhân viên. Không có scope
     // này thì giữ nguyên luật cũ: thiếu quyền nhân viên ⇒ 403.
     const isTenantSelfScope =
-      !!user && user.role === 'TENANT' && req.query.scope === 'tenant' && roles.includes('TENANT');
+      !!user
+      && user.role === 'TENANT'
+      && roles.includes('TENANT')
+      && (req.query.scope === 'tenant' || !roles.includes('LANDLORD'));
     const isRegularRole = !!user && !user.landlordId && roles.includes(user.role);
     if (
       !user

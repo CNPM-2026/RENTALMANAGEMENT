@@ -2,6 +2,7 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { notificationService } from './notification.service';
 import { roomDemandService } from './roomDemand.service';
+import { auditService } from './audit.service';
 import { assertKycApproved, loadKycState, TENANT_KYC_REQUIRED } from './kycGate.service';
 
 export const rentalRequestService = {
@@ -73,6 +74,46 @@ export const rentalRequestService = {
         ? request.tenantId === userId && status === 'CANCELLED'
         : false;
     if (!allowed) throw new AppError('Bạn không có quyền cập nhật yêu cầu này', 403);
+
+    if (request.status === 'APPROVED') {
+      if (role === 'LANDLORD' && ['CANCELLED', 'REJECTED'].includes(status)) {
+        const hasActiveContract = typeof prisma.contract?.findFirst === 'function'
+          ? await prisma.contract.findFirst({
+              where: { roomId: request.roomId, tenantId: request.tenantId, status: 'ACTIVE' },
+              select: { id: true },
+            })
+          : null;
+        if (hasActiveContract) {
+          throw new AppError('Không thể hủy yêu cầu thuê khi đã có hợp đồng đang có hiệu lực', 400);
+        }
+        const updated = await prisma.$transaction(async (tx) => {
+          await tx.room.updateMany({
+            where: { id: request.roomId, status: 'RENTED' },
+            data: { status: 'AVAILABLE' },
+          });
+          return tx.rentalRequest.update({
+            where: { id },
+            data: { status },
+          });
+        });
+        await notificationService.createNotification(
+          request.tenantId,
+          'Cập nhật yêu cầu thuê phòng',
+          `Yêu cầu thuê phòng đã được chủ trọ hủy/từ chối do quá hạn hoặc bỏ dở: ${status.toLowerCase()}.`,
+          'RENTAL_REQUEST',
+          request.id
+        ).catch(() => undefined);
+        await auditService.record({
+          userId,
+          action: `RENTAL_REQUEST_${status}`,
+          entityType: 'RentalRequest',
+          entityId: id,
+        }).catch(() => undefined);
+        return updated;
+      }
+      throw new AppError('Yêu cầu đã được xử lý', 400);
+    }
+
     if (request.status !== 'SUBMITTED') throw new AppError('Yêu cầu đã được xử lý', 400);
     if (status !== 'APPROVED') {
       const updated = await prisma.rentalRequest.update({ where: { id }, data: { status } });
@@ -83,6 +124,12 @@ export const rentalRequestService = {
         'RENTAL_REQUEST',
         request.id
       );
+      await auditService.record({
+        userId,
+        action: `RENTAL_REQUEST_${status}`,
+        entityType: 'RentalRequest',
+        entityId: id,
+      }).catch(() => undefined);
       return updated;
     }
 
@@ -119,6 +166,12 @@ export const rentalRequestService = {
       'RENTAL_REQUEST',
       request.id
     );
+    await auditService.record({
+      userId,
+      action: 'RENTAL_REQUEST_APPROVED',
+      entityType: 'RentalRequest',
+      entityId: id,
+    }).catch(() => undefined);
     return result.approved;
   },
 };
