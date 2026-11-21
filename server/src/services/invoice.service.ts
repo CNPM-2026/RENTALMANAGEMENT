@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { notificationService } from './notification.service';
 import { minorToDecimalString, sumMoney, toMinorUnits } from '../utils/money';
 import { billingPeriodEnd, occupancyService } from './occupancy.service';
+import { auditService } from './audit.service';
 
 /**
  * HOÁ ĐƠN THÁNG — điện theo chỉ số, nước theo ĐẦU NGƯỜI ĐÃ XÁC MINH.
@@ -252,7 +253,10 @@ const buildComputation = async (landlordId: string, input: InvoiceInput) => {
     occupancy
   ) {
     const electricityFeeMinor = electricityUnitPriceMinor * BigInt(electricityConsumption);
-    const waterFeeMinor = waterUnitPriceMinor * BigInt(occupancy.occupants);
+    const isWaterByMeter = (room as any).waterBillingType === 'BY_METER';
+    const waterFeeMinor = isWaterByMeter && waterConsumption !== null
+      ? waterUnitPriceMinor * BigInt(waterConsumption)
+      : waterUnitPriceMinor * BigInt(occupancy.occupants);
     const totalMinor = sumMoney([
       minorToDecimalString(roomFeeMinor),
       minorToDecimalString(electricityFeeMinor),
@@ -413,6 +417,13 @@ export const invoiceService = {
       invoice.id,
       `invoice:${invoice.id}:created`,
     );
+    await auditService.record({
+      userId: landlordId,
+      action: 'INVOICE_GENERATED',
+      entityType: 'Invoice',
+      entityId: invoice.id,
+      metadata: { roomId, month, year, totalAmount: fees.totalAmount },
+    }).catch(() => undefined);
     return invoice;
   },
 
@@ -490,6 +501,13 @@ export const invoiceService = {
       'INVOICE',
       invoice.id,
     );
+    await auditService.record({
+      userId: landlordId,
+      action: 'INVOICE_PAID',
+      entityType: 'Invoice',
+      entityId: invoice.id,
+      metadata: { roomId: invoice.roomId, month: invoice.month, year: invoice.year, totalAmount: paidInvoice.totalAmount },
+    }).catch(() => undefined);
     return paidInvoice;
   },
 };

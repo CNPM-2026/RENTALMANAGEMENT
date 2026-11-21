@@ -173,7 +173,11 @@ describe('reviewService.getStaffRatingSummary', () => {
     const summary = await reviewService.getStaffRatingSummary(STAFF_ID);
 
     expect(mocks.reviewAggregate).toHaveBeenCalledWith({
-      where: { targetType: 'TASK', targetId: { in: ['t1', 't2'] } },
+      where: {
+        targetType: 'TASK',
+        targetId: { in: ['t1', 't2'] },
+        reviewerId: { not: STAFF_ID },
+      },
       _avg: { rating: true },
       _count: { _all: true },
     });

@@ -561,6 +561,12 @@ export const authService = {
   requestPasswordReset: async (email: string) => {
     const user = await findUserByEmailOrNull(email);
     if (!user || !user.isActive) return;
+    if (typeof prisma.passwordResetToken?.updateMany === 'function') {
+      await prisma.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+    }
     const token = createOpaqueToken();
     await prisma.passwordResetToken.create({
       data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
@@ -653,21 +659,6 @@ export const authService = {
       `;
       // 0 = không có challenge hợp lệ; >1 = trạng thái bất thường -> fail closed.
       if (challenges.length !== 1) {
-        const hasValidOtp = await tx.emailVerificationCode.findFirst({
-          where: {
-            userId: locked.id,
-            purpose: OTP_PURPOSE.SIGNUP_VERIFY,
-            usedAt: null,
-            expiresAt: { gt: new Date() },
-            attempts: { lt: OTP_MAX_ATTEMPTS },
-          },
-          select: { id: true },
-        });
-        if (!hasValidOtp && !locked.isEmailVerified) {
-          // Xóa tài khoản chưa kích hoạt khi OTP đã hết hạn
-          await tx.user.delete({ where: { id: locked.id } }).catch(() => undefined);
-          return { expiredDeleted: true };
-        }
         return null;
       }
       const challenge = challenges[0];

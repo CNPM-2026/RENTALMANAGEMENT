@@ -54,6 +54,7 @@ describe('userService.submitKyc — một lần duy nhất', () => {
     mocks.notifyUsers.mockResolvedValue(undefined);
     mocks.deleteImage.mockResolvedValue(undefined);
     mocks.upsert.mockResolvedValue({ id: 'kyc-1', status: 'PENDING' });
+    mocks.findFirst.mockResolvedValue(null);
   });
 
   it('chặn nộp lại khi hồ sơ đã APPROVED', async () => {

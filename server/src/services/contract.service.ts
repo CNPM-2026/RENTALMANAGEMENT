@@ -4,6 +4,7 @@ import { ContractStatus } from '@prisma/client';
 import { notificationService } from './notification.service';
 import { roomDemandService } from './roomDemand.service';
 import { assertKycApproved, loadKycState, TENANT_KYC_REQUIRED } from './kycGate.service';
+import { auditService } from './audit.service';
 
 export const contractService = {
   // 1. Chủ trọ tạo hợp đồng mới
@@ -112,6 +113,13 @@ export const contractService = {
       'CONTRACT',
       result.contract.id
     );
+    await auditService.record({
+      userId: landlordId,
+      action: 'CONTRACT_CREATED',
+      entityType: 'Contract',
+      entityId: result.contract.id,
+      metadata: { roomId, tenantId },
+    }).catch(() => undefined);
     return result.contract;
   },
 

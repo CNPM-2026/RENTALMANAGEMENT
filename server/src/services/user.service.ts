@@ -2,10 +2,30 @@ import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
 import { storageService } from './storage.service';
 import { notificationService } from './notification.service';
+import { auditService } from './audit.service';
 
 export const userService = {
   updateProfile: async (userId: string, data: any, file?: Express.Multer.File) => {
     const { fullName, phone, gender, dob, bio, occupation } = data;
+
+    if (fullName !== undefined) {
+      const existingUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true },
+      });
+      if (existingUser && existingUser.fullName !== fullName) {
+        const approvedKyc = typeof prisma.kycSubmission?.findFirst === 'function'
+          ? await prisma.kycSubmission.findFirst({
+              where: { userId, status: 'APPROVED' },
+              select: { id: true },
+            })
+          : null;
+        if (approvedKyc) {
+          throw new AppError('Không thể thay đổi họ tên sau khi tài khoản đã xác thực KYC thành công', 400);
+        }
+      }
+    }
+
     const previous = file ? await prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }) : null;
     const avatarUrl = file ? await storageService.uploadImage(file, 'rental-management/avatars') : undefined;
     try {
@@ -46,6 +66,13 @@ export const userService = {
       if (avatarUrl && previous?.avatarUrl && previous.avatarUrl !== avatarUrl) {
         await storageService.deleteImage(previous.avatarUrl);
       }
+      await auditService.record({
+        userId,
+        action: 'UPDATE_PROFILE',
+        entityType: 'User',
+        entityId: userId,
+        metadata: { changedFields: Object.keys(data) },
+      }).catch(() => undefined);
       return result;
     } catch (error) {
       if (avatarUrl) await storageService.deleteImage(avatarUrl);
@@ -89,7 +116,7 @@ export const userService = {
       throw new AppError('Số CMND/CCCD phải gồm 9 hoặc 12 chữ số hợp lệ', 400);
     }
 
-    const duplicateApprovedKyc = typeof prisma.kycSubmission.findFirst === 'function'
+    const duplicateApprovedKyc = typeof prisma.kycSubmission?.findFirst === 'function'
       ? await prisma.kycSubmission.findFirst({
           where: {
             idNumber: cleanedIdNumber,
@@ -114,6 +141,13 @@ export const userService = {
       previous?.frontIdUrl && storageService.deleteImage(previous.frontIdUrl, 'authenticated'),
       previous?.backIdUrl && storageService.deleteImage(previous.backIdUrl, 'authenticated'),
     ]);
+    await auditService.record({
+      userId,
+      action: 'SUBMIT_KYC',
+      entityType: 'KycSubmission',
+      entityId: result.id,
+      metadata: { idNumber: cleanedIdNumber },
+    }).catch(() => undefined);
     // ADMIN cần thấy hồ sơ KYC mới trong trung tâm thông báo để xử lý hàng đợi.
     // Lỗi thông báo không được làm hỏng việc nộp KYC đã commit.
     const admins = await prisma.user

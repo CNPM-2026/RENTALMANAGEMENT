@@ -794,6 +794,7 @@ model Room {
   area            Float // Diện tích (m2)
   maxOccupants    Int        @default(2) @map("max_occupants")
   floor           Int?       @map("floor") // Tầng của phòng (Ví dụ: 1, 2, 3...)
+  waterBillingType String?   @default("BY_OCCUPANT") @map("water_billing_type") // BY_OCCUPANT hoặc BY_METER
   bedType         String?    @map("bed_type") // Loại giường: Giường đơn, Giường đôi, Giường tầng, v.v.
   balconyDirection String?   @map("balcony_direction") // Hướng ban công: Đông, Tây, Nam, Bắc, Đông Nam,...
   status          RoomStatus @default(AVAILABLE)
@@ -1009,8 +1010,8 @@ model Contract {
   status      ContractStatus @default(ACTIVE)
   createdAt   DateTime       @default(now()) @map("created_at")
 
-  room                  Room                         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tenant                User                         @relation("TenantContracts", fields: [tenantId], references: [id], onDelete: Cascade)
+  room                  Room                         @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  tenant                User                         @relation("TenantContracts", fields: [tenantId], references: [id], onDelete: Restrict)
   agent                 User?                        @relation("AgentContracts", fields: [agentId], references: [id], onDelete: SetNull)
   commissions           Commission[]
   occupancyDeclarations RoomOccupancyDeclaration[] // 🆕 khai báo số người gắn hợp đồng
@@ -1176,8 +1177,8 @@ model Invoice {
   paidAt                 DateTime?     @map("paid_at")
   createdAt              DateTime      @default(now()) @map("created_at")
 
-  room                 Room                      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tenant               User                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room                 Room                      @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  tenant               User                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   occupancyDeclaration RoomOccupancyDeclaration? @relation(fields: [occupancyDeclarationId], references: [id], onDelete: SetNull)
 
   @@unique([roomId, month, year]) // 🆕 Tránh tạo trùng hóa đơn cho cùng phòng/tháng/năm

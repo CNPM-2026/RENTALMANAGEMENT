@@ -330,7 +330,7 @@ export const reportService = {
     await auditService
       .record({
         userId: adminId,
-        action: 'DISPUTE_RESOLVED',
+        action: input.status === 'RESOLVED' ? 'DISPUTE_RESOLVED' : input.status === 'REJECTED' ? 'DISPUTE_REJECTED' : 'DISPUTE_UNDER_REVIEW',
         entityType: 'Report',
         entityId: reportId,
         metadata: { from: report.status, to: input.status, category: report.category },

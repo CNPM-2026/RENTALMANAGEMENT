@@ -19,7 +19,7 @@ export const authController = {
         entityId: result.id,
         ipAddress: req.ip,
         userAgent: req.get('user-agent'),
-      });
+      }).catch(() => undefined);
 
       return res.status(201).json({
         success: true,
@@ -47,7 +47,7 @@ export const authController = {
         entityId: result.user.id,
         ipAddress: req.ip,
         userAgent: req.get('user-agent'),
-      });
+      }).catch(() => undefined);
 
       return res.status(200).json({
         success: true,
@@ -55,6 +55,14 @@ export const authController = {
         data: result,
       });
     } catch (error) {
+      await auditService.record({
+        action: 'LOGIN_FAILED',
+        entityType: 'User',
+        entityId: req.body?.email ?? 'unknown',
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+        metadata: { email: req.body?.email, reason: error instanceof Error ? error.message : 'Unknown' },
+      }).catch(() => undefined);
       return next(error);
     }
   },

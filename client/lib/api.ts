@@ -383,9 +383,6 @@ async function requestUncoalesced<T = unknown>(path: string, options: RequestOpt
   if (!response.ok) {
     const errorBody = responseData as ApiErrorResponse;
     const message = errorBody?.message || response.statusText || 'Lỗi kết nối máy chủ';
-    if (response.status === 403 && typeof window !== 'undefined' && window.location.pathname !== '/403') {
-      window.location.replace('/403');
-    }
     throw new ApiError(message, response.status, errorBody?.errors, responseData);
   }
 

@@ -8,6 +8,7 @@ import { adminService } from '../../src/services/admin.service';
 const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   findUniqueOrThrow: vi.fn(),
+  findFirst: vi.fn(),
   updateMany: vi.fn(),
   deleteImage: vi.fn(),
   recordAudit: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock('../../src/config/db', () => ({
     kycSubmission: {
       findUnique: mocks.findUnique,
       findUniqueOrThrow: mocks.findUniqueOrThrow,
+      findFirst: mocks.findFirst,
       updateMany: mocks.updateMany,
     },
   },
@@ -62,6 +64,7 @@ describe('adminService.updateKyc — xoá ảnh khi duyệt', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.findUnique.mockResolvedValue(PENDING_WITH_IMAGES);
+    mocks.findFirst.mockResolvedValue(null);
     mocks.updateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 1 });

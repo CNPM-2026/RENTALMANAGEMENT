@@ -237,7 +237,7 @@ export const adminService = {
   updateKyc: async (adminId: string, id: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
     const submission = await prisma.kycSubmission.findUnique({
       where: { id },
-      select: { id: true, userId: true, status: true, frontIdUrl: true, backIdUrl: true },
+      select: { id: true, userId: true, status: true, idNumber: true, frontIdUrl: true, backIdUrl: true },
     });
     if (!submission) throw new AppError('Không tìm thấy hồ sơ KYC', 404);
 
@@ -249,6 +249,22 @@ export const adminService = {
         409,
         'KYC_ALREADY_REVIEWED',
       );
+    }
+
+    if (status === 'APPROVED' && submission.idNumber) {
+      const duplicateApproved = typeof prisma.kycSubmission?.findFirst === 'function'
+        ? await prisma.kycSubmission.findFirst({
+            where: {
+              idNumber: submission.idNumber,
+              userId: { not: submission.userId },
+              status: 'APPROVED',
+            },
+            select: { id: true },
+          })
+        : null;
+      if (duplicateApproved) {
+        throw new AppError('Số CMND/CCCD này đã được phê duyệt cho tài khoản khác', 409, 'KYC_ID_NUMBER_DUPLICATE');
+      }
     }
 
     const claimed = await prisma.kycSubmission.updateMany({
@@ -319,51 +335,116 @@ export const adminService = {
     return updated;
   },
 
-  getAuditLogs: (query: { search?: string; limit?: number }) => prisma.auditLog.findMany({
-    where: query.search ? {
-      OR: [
+  getAuditLogs: (query: {
+    search?: string;
+    limit?: number;
+    page?: number;
+    userId?: string;
+    startDate?: string | Date;
+    endDate?: string | Date;
+  }) => {
+    const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+    const page = Math.max(query.page ?? 1, 1);
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (query.userId) {
+      where.userId = query.userId;
+    }
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
+      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
+    if (query.search) {
+      where.OR = [
         { action: { contains: query.search, mode: 'insensitive' } },
         { entityType: { contains: query.search, mode: 'insensitive' } },
         { entityId: { contains: query.search, mode: 'insensitive' } },
-      ],
-    } : undefined,
-    include: { user: { select: { fullName: true, email: true } } },
-    orderBy: { createdAt: 'desc' },
-    take: Math.min(Math.max(query.limit ?? 100, 1), 200),
-  }),
+        {
+          user: {
+            is: {
+              OR: [
+                { email: { contains: query.search, mode: 'insensitive' } },
+                { fullName: { contains: query.search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+      ];
+    }
+
+    return prisma.auditLog.findMany({
+      where: Object.keys(where).length ? where : undefined,
+      include: { user: { select: { fullName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    });
+  },
 
   getContentFilterKeywords: () => prisma.contentFilterKeyword.findMany({ orderBy: { keyword: 'asc' } }),
 
-  addContentFilterKeyword: async (keyword: string) => {
+  addContentFilterKeyword: async (keyword: string, adminId?: string) => {
     const normalized = keyword.trim().toLocaleLowerCase('vi-VN');
     if (!normalized) throw new AppError('Từ khóa không được để trống', 400);
-    return prisma.contentFilterKeyword.upsert({
+    const created = await prisma.contentFilterKeyword.upsert({
       where: { keyword: normalized },
       update: {},
       create: { keyword: normalized },
     });
+    await auditService.record({
+      userId: adminId,
+      action: 'ADD_CONTENT_FILTER_KEYWORD',
+      entityType: 'ContentFilterKeyword',
+      entityId: created.id,
+      metadata: { keyword: normalized },
+    }).catch(() => undefined);
+    return created;
   },
 
-  removeContentFilterKeyword: async (id: string) => {
+  removeContentFilterKeyword: async (id: string, adminId?: string) => {
     const existing = await prisma.contentFilterKeyword.findUnique({ where: { id } });
     if (!existing) throw new AppError('Không tìm thấy từ khóa', 404);
-    return prisma.contentFilterKeyword.delete({ where: { id } });
+    const deleted = await prisma.contentFilterKeyword.delete({ where: { id } });
+    await auditService.record({
+      userId: adminId,
+      action: 'REMOVE_CONTENT_FILTER_KEYWORD',
+      entityType: 'ContentFilterKeyword',
+      entityId: id,
+    }).catch(() => undefined);
+    return deleted;
   },
 
   getAmenities: () => prisma.amenity.findMany({ orderBy: { name: 'asc' } }),
 
-  createAmenity: async (name: string, iconUrl?: string) => {
+  createAmenity: async (name: string, iconUrl?: string, adminId?: string) => {
     const normalizedName = name.trim();
     if (!normalizedName) throw new AppError('Tên tiện ích không được để trống', 400);
-    return prisma.amenity.create({
+    const created = await prisma.amenity.create({
       data: { name: normalizedName, iconUrl: iconUrl?.trim() || null },
     });
+    await auditService.record({
+      userId: adminId,
+      action: 'CREATE_AMENITY',
+      entityType: 'Amenity',
+      entityId: created.id,
+      metadata: { name: normalizedName },
+    }).catch(() => undefined);
+    return created;
   },
 
-  deleteAmenity: async (id: string) => {
+  deleteAmenity: async (id: string, adminId?: string) => {
     const amenity = await prisma.amenity.findUnique({ where: { id } });
     if (!amenity) throw new AppError('Không tìm thấy tiện ích', 404);
-    return prisma.amenity.delete({ where: { id } });
+    const deleted = await prisma.amenity.delete({ where: { id } });
+    await auditService.record({
+      userId: adminId,
+      action: 'DELETE_AMENITY',
+      entityType: 'Amenity',
+      entityId: id,
+    }).catch(() => undefined);
+    return deleted;
   },
 
   // ---------------------------------------------------------------------------
