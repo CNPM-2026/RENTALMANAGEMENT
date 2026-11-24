@@ -185,8 +185,8 @@ export const appointmentService = {
     if (appt.status === 'PENDING' && status === 'CONFIRMED' && appt.landlordId !== userId) {
       throw new AppError('Chỉ chủ trọ mới được xác nhận lịch hẹn', 403);
     }
-    if (appt.status === 'CONFIRMED' && status === 'COMPLETED' && appt.landlordId !== userId) {
-      throw new AppError('Chỉ chủ trọ mới được hoàn tất lịch hẹn', 403);
+    if (appt.status === 'CONFIRMED' && status === 'COMPLETED' && appt.landlordId !== userId && appt.tenantId !== userId) {
+      throw new AppError('Bạn không có quyền hoàn tất lịch hẹn', 403);
     }
     const transitions: Record<AppointmentStatus, AppointmentStatus[]> = {
       PENDING: ['CONFIRMED', 'CANCELLED'],

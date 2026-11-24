@@ -1,5 +1,6 @@
 
 import { Request, Response, NextFunction } from 'express';
+import { AuthRequest } from '../middlewares/auth.middleware';
 import { authService, findUserByEmailOrNull } from '../services/auth.service';
 import { auditService } from '../services/audit.service';
 import { env } from '../config/env';
@@ -161,5 +162,21 @@ export const authController = {
       message: 'Lấy thông tin cá nhân thành công',
       data: (req as any).user,
     });
+  },
+
+  changePassword: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await authService.changePassword(
+        req.user!.id,
+        req.body.currentPassword,
+        req.body.newPassword,
+      );
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      return next(error);
+    }
   },
 };

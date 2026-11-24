@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const { spawnSync } = require('child_process');
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env.test') });
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 process.env.NODE_ENV = 'test';
 
 const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';

@@ -12,6 +12,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/auth";
+import { apiClient, ApiError } from "@/lib/api";
 
 const NOTIFICATION_SETTINGS_KEY = "5k_notification_settings";
 
@@ -29,6 +30,7 @@ export default function TenantSettingsPage() {
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [passwordFeedback, setPasswordFeedback] = React.useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = React.useState(false);
 
   // Privacy Toggles
   const [showRoommateProfile, setShowRoommateProfile] = React.useState(true);
@@ -113,8 +115,13 @@ export default function TenantSettingsPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  function handleUpdatePassword(e: React.FormEvent) {
+  async function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault();
+    setPasswordFeedback(null);
+    if (!currentPassword) {
+      setPasswordFeedback("Vui lòng nhập mật khẩu hiện tại.");
+      return;
+    }
     if (newPassword.length < 6) {
       setPasswordFeedback("Mật khẩu mới phải có ít nhất 6 ký tự.");
       return;
@@ -123,10 +130,26 @@ export default function TenantSettingsPage() {
       setPasswordFeedback("Mật khẩu xác nhận không khớp.");
       return;
     }
-    setPasswordFeedback("Cập nhật mật khẩu thành công!");
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
+
+    setIsChangingPassword(true);
+    try {
+      const response = await apiClient.auth.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      setPasswordFeedback(response.message || "Cập nhật mật khẩu thành công!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setPasswordFeedback(err.message);
+      } else {
+        setPasswordFeedback("Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại.");
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
   }
 
   function handleExportData() {
@@ -239,9 +262,10 @@ export default function TenantSettingsPage() {
 
               <button
                 type="submit"
-                className="h-[44px] px-6 rounded-[8px] bg-[#15594f] hover:bg-[#103f39] text-white text-[13px] font-semibold transition-colors cursor-pointer"
+                disabled={isChangingPassword}
+                className="h-[44px] px-6 rounded-[8px] bg-[#15594f] hover:bg-[#103f39] text-white text-[13px] font-semibold transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Cập nhật mật khẩu
+                {isChangingPassword ? "Đang xử lý..." : "Cập nhật mật khẩu"}
               </button>
             </form>
           </div>

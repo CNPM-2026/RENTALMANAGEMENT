@@ -535,7 +535,7 @@ export default function TenantProfilePage() {
             </div>
 
             <Link
-              href="/roommates"
+              href={user?.id ? `/users/${user.id}` : "/tenant/profile"}
               className="block w-full text-center h-[42px] leading-[40px] rounded-[8px] border border-[#15594f] text-[#15594f] text-[13px] font-semibold hover:bg-[#eaf2ed] transition-colors"
             >
               Xem hồ sơ công khai

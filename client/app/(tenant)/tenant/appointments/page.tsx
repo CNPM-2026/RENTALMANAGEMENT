@@ -43,8 +43,10 @@ function dateOffset(days: number) {
   return toDateInput(date);
 }
 
+type AppointmentTab = "ALL" | "UPCOMING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+
 export default function TenantAppointmentsPage() {
-  const [activeTab, setActiveTab] = React.useState<"UPCOMING" | "COMPLETED" | "CANCELLED">("UPCOMING");
+  const [activeTab, setActiveTab] = React.useState<AppointmentTab>("UPCOMING");
   const [appointments, setAppointments] = React.useState<AppointmentItem[]>([]);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [minRescheduleDate, setMinRescheduleDate] = React.useState("");
@@ -115,8 +117,12 @@ export default function TenantAppointmentsPage() {
 
   // Filtered List
   const filteredAppointments = appointments.filter((apt) => {
+    if (activeTab === "ALL") return true;
     if (activeTab === "UPCOMING") {
       return apt.status === "PENDING" || apt.status === "CONFIRMED";
+    }
+    if (activeTab === "CONFIRMED") {
+      return apt.status === "CONFIRMED";
     }
     if (activeTab === "COMPLETED") {
       return apt.status === "COMPLETED";
@@ -125,6 +131,7 @@ export default function TenantAppointmentsPage() {
   });
 
   const upcomingCount = appointments.filter((a) => a.status === "PENDING" || a.status === "CONFIRMED").length;
+  const confirmedCount = appointments.filter((a) => a.status === "CONFIRMED").length;
   const completedCount = appointments.filter((a) => a.status === "COMPLETED").length;
   const cancelledCount = appointments.filter((a) => a.status === "CANCELLED").length;
 
@@ -207,45 +214,55 @@ export default function TenantAppointmentsPage() {
       {/* =======================================================================
           2. KPI STATISTICS CARDS (Figma Node 44:64573, h 171px)
       ======================================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-[12px] bg-white border border-[#e2e7e1] shadow-xs space-y-1">
-          <p className="text-[12px] font-bold text-[#74817b] uppercase tracking-wider">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] shadow-xs space-y-1">
+          <p className="text-[11px] font-bold text-[#74817b] uppercase tracking-wider">
             Cuộc hẹn sắp tới
           </p>
-          <p className="text-3xl font-extrabold text-[#15594f]">{upcomingCount}</p>
-          <p className="text-[12px] text-[#74817b]">Cần có mặt đúng giờ hẹn</p>
+          <p className="text-2xl font-extrabold text-[#15594f]">{upcomingCount}</p>
+          <p className="text-[11px] text-[#74817b]">Cần có mặt đúng giờ</p>
         </div>
 
-        <div className="p-5 rounded-[12px] bg-white border border-[#e2e7e1] shadow-xs space-y-1">
-          <p className="text-[12px] font-bold text-[#74817b] uppercase tracking-wider">
-            Đã hoàn thành
+        <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] shadow-xs space-y-1">
+          <p className="text-[11px] font-bold text-[#74817b] uppercase tracking-wider">
+            Đã hẹn
           </p>
-          <p className="text-3xl font-extrabold text-[#203c37]">{completedCount}</p>
-          <p className="text-[12px] text-[#74817b]">Đã xem phòng trực tiếp</p>
+          <p className="text-2xl font-extrabold text-[#15594f]">{confirmedCount}</p>
+          <p className="text-[11px] text-[#74817b]">Chủ trọ đã xác nhận</p>
         </div>
 
-        <div className="p-5 rounded-[12px] bg-white border border-[#e2e7e1] shadow-xs space-y-1">
-          <p className="text-[12px] font-bold text-[#74817b] uppercase tracking-wider">
+        <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] shadow-xs space-y-1">
+          <p className="text-[11px] font-bold text-[#74817b] uppercase tracking-wider">
+            Đã xem phòng
+          </p>
+          <p className="text-2xl font-extrabold text-[#2563eb]">{completedCount}</p>
+          <p className="text-[11px] text-[#74817b]">Đã xem trực tiếp</p>
+        </div>
+
+        <div className="p-4 rounded-[12px] bg-white border border-[#e2e7e1] shadow-xs space-y-1">
+          <p className="text-[11px] font-bold text-[#74817b] uppercase tracking-wider">
             Đã hủy hẹn
           </p>
-          <p className="text-3xl font-extrabold text-[#991b1b]">{cancelledCount}</p>
-          <p className="text-[12px] text-[#74817b]">Thay đổi kế hoạch</p>
+          <p className="text-2xl font-extrabold text-[#991b1b]">{cancelledCount}</p>
+          <p className="text-[11px] text-[#74817b]">Thay đổi kế hoạch</p>
         </div>
       </div>
 
       {/* =======================================================================
           3. TABS FILTER STRIP (Figma Node 44:64586)
       ======================================================================== */}
-      <div className="flex items-center gap-2 border-b border-[#e2e7e1] pb-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#e2e7e1] pb-2">
         {[
           { id: "UPCOMING", label: `Sắp tới (${upcomingCount})` },
-          { id: "COMPLETED", label: `Đã hoàn thành (${completedCount})` },
+          { id: "CONFIRMED", label: `Đã hẹn (${confirmedCount})` },
+          { id: "COMPLETED", label: `Đã xem (${completedCount})` },
           { id: "CANCELLED", label: `Đã hủy (${cancelledCount})` },
+          { id: "ALL", label: `Tất cả (${appointments.length})` },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`px-4 py-2 rounded-[8px] text-[13px] font-semibold transition-colors cursor-pointer ${
+            onClick={() => setActiveTab(tab.id as AppointmentTab)}
+            className={`px-3.5 py-1.5 rounded-[8px] text-[13px] font-semibold transition-colors cursor-pointer ${
               activeTab === tab.id
                 ? "bg-[#15594f] text-white shadow-xs"
                 : "bg-white text-[#74817b] hover:text-[#203c37] border border-[#e2e7e1]"
@@ -305,7 +322,7 @@ export default function TenantAppointmentsPage() {
                     </h3>
                     {apt.status === "CONFIRMED" && (
                       <Badge variant="success" size="sm">
-                        ĐÃ XÁC NHẬN
+                        ĐÃ HẸN
                       </Badge>
                     )}
                     {apt.status === "PENDING" && (
@@ -314,8 +331,8 @@ export default function TenantAppointmentsPage() {
                       </Badge>
                     )}
                     {apt.status === "COMPLETED" && (
-                      <Badge variant="neutral" size="sm">
-                        ĐÃ XEM PHÒNG
+                      <Badge variant="info" size="sm">
+                        ĐÃ XEM
                       </Badge>
                     )}
                     {apt.status === "CANCELLED" && (
@@ -349,6 +366,26 @@ export default function TenantAppointmentsPage() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2.5 self-end md:self-center shrink-0">
+                {apt.status === "CONFIRMED" && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await apiClient.appointments.updateStatus(apt.id, { status: "COMPLETED" }, "tenant");
+                        setAppointments((prev) =>
+                          prev.map((a) => (a.id === apt.id ? { ...a, status: "COMPLETED" } : a))
+                        );
+                      } catch (err) {
+                        setErrorMessage(err instanceof Error ? err.message : "Không thể cập nhật trạng thái");
+                      }
+                    }}
+                    className="bg-[#2563eb] hover:bg-[#1d4ed8] font-semibold text-white"
+                  >
+                    Đã xem phòng
+                  </Button>
+                )}
+
                 {(apt.status === "CONFIRMED" || apt.status === "PENDING") && (
                   <>
                     <Button
