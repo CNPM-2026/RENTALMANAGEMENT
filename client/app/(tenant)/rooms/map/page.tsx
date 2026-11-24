@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   List,
+  Box,
   ArrowUpRight,
   ZoomIn,
   ZoomOut,
@@ -196,17 +197,31 @@ export default function RoomsMapPage() {
           </div>
         </div>
 
-        {/* Switch back to List View */}
-        <Link href="/rooms">
-          <Button
-            variant="outline"
-            size="sm"
-            className="font-semibold"
-            leftIcon={<List className="size-4" />}
-          >
-            Xem dạng danh sách
-          </Button>
-        </Link>
+        {/* Action Controls */}
+        <div className="flex items-center gap-2.5">
+          <Link href="/rooms/3d-explorer">
+            <Button
+              variant="primary"
+              size="sm"
+              className="font-semibold bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-xs"
+              leftIcon={<Box className="size-4" />}
+            >
+              Khám phá 3D
+            </Button>
+          </Link>
+
+          {/* Switch back to List View */}
+          <Link href="/rooms">
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-semibold"
+              leftIcon={<List className="size-4" />}
+            >
+              Xem dạng danh sách
+            </Button>
+          </Link>
+        </div>
       </header>
 
       {/* =======================================================================

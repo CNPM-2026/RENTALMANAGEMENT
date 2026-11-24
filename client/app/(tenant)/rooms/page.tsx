@@ -8,6 +8,7 @@ import {
   Search,
   MapPin,
   Map,
+  Box,
   SlidersHorizontal,
   Heart,
   ArrowUpRight,
@@ -225,17 +226,31 @@ function RoomsDiscoveryContent() {
               </p>
             </div>
 
-            {/* Switch to Map View Button */}
-            <Link href="/rooms/map">
-              <Button
-                variant="outline"
-                size="md"
-                className="bg-white hover:bg-[#eaf2ed] text-[#15594f] border-[#e2e7e1] font-semibold"
-                leftIcon={<Map className="size-4" />}
-              >
-                Xem trên bản đồ
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2.5">
+              {/* Switch to 3D Explorer Button */}
+              <Link href="/rooms/3d-explorer">
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-semibold shadow-sm"
+                  leftIcon={<Box className="size-4" />}
+                >
+                  Khám phá 3D
+                </Button>
+              </Link>
+
+              {/* Switch to Map View Button */}
+              <Link href="/rooms/map">
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="bg-white hover:bg-[#eaf2ed] text-[#15594f] border-[#e2e7e1] font-semibold"
+                  leftIcon={<Map className="size-4" />}
+                >
+                  Xem trên bản đồ
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 

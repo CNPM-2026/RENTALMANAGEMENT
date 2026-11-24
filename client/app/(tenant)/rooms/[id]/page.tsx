@@ -13,6 +13,7 @@ import {
   Users,
   BedDouble,
   Building,
+  Box,
   Sun,
   ShieldCheck,
   ShieldAlert,
@@ -784,6 +785,17 @@ function RoomDetailContent() {
                             </Link>
                           </div>
                         )}
+
+                        <Link href="/rooms/3d-explorer" className="block">
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            className="w-full font-bold h-[44px] border-[#15594f] text-[#15594f] hover:bg-[#eaf2ed]"
+                            leftIcon={<Box className="size-4.5" />}
+                          >
+                            Khám phá mô hình tòa nhà 3D
+                          </Button>
+                        </Link>
 
                         <Link href={`/rooms/${roomId}/book-viewing`} className="block">
                           <Button variant="primary" size="lg" className="w-full font-bold shadow-md h-[48px]" leftIcon={<CalendarDays className="size-4.5" />}>
