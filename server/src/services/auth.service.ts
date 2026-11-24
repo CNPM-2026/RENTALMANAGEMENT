@@ -813,6 +813,41 @@ export const authService = {
       entityId: reset.userId,
     }).catch(() => undefined);
   },
+
+  changePassword: async (userId: string, currentPassword: string, newPassword: string) => {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true, isActive: true },
+    });
+    if (!user || !user.isActive) {
+      throw new AppError('Tài khoản không tồn tại hoặc đã bị khóa', 404);
+    }
+    if (!user.passwordHash) {
+      throw new AppError('Tài khoản này đăng nhập bằng Google. Vui lòng sử dụng tính năng Đặt lại mật khẩu để tạo mật khẩu.', 400);
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new AppError('Mật khẩu hiện tại không chính xác', 400, 'INVALID_CURRENT_PASSWORD');
+    }
+    if (currentPassword === newPassword) {
+      throw new AppError('Mật khẩu mới không được trùng với mật khẩu hiện tại', 400, 'PASSWORD_UNCHANGED');
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        authVersion: { increment: 1 },
+      },
+    });
+    await auditService.record({
+      userId,
+      action: 'CHANGE_PASSWORD',
+      entityType: 'USER',
+      entityId: userId,
+    }).catch(() => undefined);
+    return { message: 'Đổi mật khẩu thành công' };
+  },
 };
 
 function getGoogleClient() {

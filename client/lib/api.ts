@@ -471,6 +471,8 @@ export const apiClient = {
       apiClient.post<{ message: string }>('/auth/forgot-password', payload, { skipAuth: true }),
     resetPassword: (payload: ResetPasswordPayload) =>
       apiClient.post<{ message: string }>('/auth/reset-password', payload, { skipAuth: true }),
+    changePassword: (payload: { currentPassword: string; newPassword: string }) =>
+      apiClient.post<{ message: string }>('/auth/change-password', payload),
     verifyEmail: (payload: { email: string; code: string }) =>
       apiClient.post<VerifyEmailResponse>('/auth/verify-email', payload, { skipAuth: true }),
     // H-05/Batch 2B1: đặt mật khẩu bằng grant ngắn hạn. `skipAuth` vì grant KHÔNG

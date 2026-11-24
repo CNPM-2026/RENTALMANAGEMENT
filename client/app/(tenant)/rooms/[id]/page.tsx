@@ -15,6 +15,8 @@ import {
   Building,
   Sun,
   ShieldCheck,
+  ShieldAlert,
+  Clock,
   Info,
   CalendarDays,
   FileCheck,
@@ -33,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient, ApiError } from "@/lib/api";
 import { getAuthToken, getCurrentUser } from "@/lib/auth";
-import { Post } from "@/types/models";
+import { Post, Appointment } from "@/types/models";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 
@@ -53,6 +55,8 @@ function RoomDetailContent() {
   const [newComment, setNewComment] = React.useState<string>("");
   const [submittingReview, setSubmittingReview] = React.useState(false);
   const [reviewFeedback, setReviewFeedback] = React.useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [userKycApproved, setUserKycApproved] = React.useState<boolean | null>(null);
+  const [roomAppointment, setRoomAppointment] = React.useState<Appointment | null>(null);
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +133,22 @@ function RoomDetailContent() {
         if (!(error instanceof ApiError && error.status === 403)) setIsSaved(false);
       });
   }, [roomId]);
+
+  React.useEffect(() => {
+    if (!getAuthToken()) return;
+    apiClient.users.getMyKyc()
+      .then((record) => setUserKycApproved(record?.status === "APPROVED"))
+      .catch(() => setUserKycApproved(false));
+
+    apiClient.appointments.getMyAppointments("tenant")
+      .then((appts) => {
+        const found = appts.find(
+          (a) => a.postId === roomId || (post?.roomId && a.roomId === post.roomId) || a.roomId === roomId
+        );
+        if (found) setRoomAppointment(found);
+      })
+      .catch(() => setRoomAppointment(null));
+  }, [roomId, post?.roomId]);
 
   const roomName = post?.title ?? "Tin đăng";
   const roomAddress = post?.property?.address ?? "Chưa cập nhật địa chỉ";
@@ -708,16 +728,87 @@ function RoomDetailContent() {
                   if (post?.status === "APPROVED") {
                     return (
                       <>
+                        {roomAppointment && (
+                          <div
+                            className={`p-3 rounded-[10px] text-[12px] flex items-center gap-2 border ${
+                              roomAppointment.status === "CONFIRMED"
+                                ? "bg-[#eaf2ed] border-[#d2e4d7] text-[#15594f]"
+                                : roomAppointment.status === "COMPLETED"
+                                ? "bg-[#e0e7ff] border-[#c7d2fe] text-[#3730a3]"
+                                : roomAppointment.status === "PENDING"
+                                ? "bg-[#fbf1dc] border-[#f4deb4] text-[#9a6a12]"
+                                : "bg-gray-50 border-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {roomAppointment.status === "PENDING" ? (
+                              <Clock className="size-4 shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="size-4 shrink-0" />
+                            )}
+                            <span>
+                              {roomAppointment.status === "CONFIRMED" && (
+                                <>
+                                  <strong>Đã hẹn xem phòng:</strong>{" "}
+                                  {new Date(roomAppointment.appointmentTime).toLocaleString("vi-VN")}
+                                </>
+                              )}
+                              {roomAppointment.status === "COMPLETED" && (
+                                <>
+                                  <strong>Đã xem phòng trực tiếp:</strong> Bạn đã hoàn tất xem phòng này.
+                                </>
+                              )}
+                              {roomAppointment.status === "PENDING" && (
+                                <>
+                                  <strong>Chờ xác nhận hẹn:</strong>{" "}
+                                  {new Date(roomAppointment.appointmentTime).toLocaleString("vi-VN")}
+                                </>
+                              )}
+                              {roomAppointment.status === "CANCELLED" && (
+                                <>Lịch hẹn trước đây đã bị hủy.</>
+                              )}
+                            </span>
+                          </div>
+                        )}
+
+                        {userKycApproved === false && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-[10px] text-[12px] text-amber-800 space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <ShieldAlert className="size-4 text-amber-600 shrink-0" />
+                              <span>Chưa xác minh danh tính</span>
+                            </div>
+                            <p className="text-[11px] text-amber-700 leading-relaxed">
+                              Bạn cần hoàn tất xác minh danh tính (KYC) trước khi được thuê phòng.
+                            </p>
+                            <Link href="/tenant/kyc" className="inline-block mt-0.5 font-semibold text-[#15594f] hover:underline">
+                              Xác minh danh tính ngay &rarr;
+                            </Link>
+                          </div>
+                        )}
+
                         <Link href={`/rooms/${roomId}/book-viewing`} className="block">
                           <Button variant="primary" size="lg" className="w-full font-bold shadow-md h-[48px]" leftIcon={<CalendarDays className="size-4.5" />}>
-                            Đặt lịch xem phòng
+                            {roomAppointment ? "Đặt lịch hẹn khác" : "Đặt lịch xem phòng"}
                           </Button>
                         </Link>
-                        <Link href={`/rooms/${roomId}/apply`} className="block">
-                          <Button variant="secondary" size="lg" className="w-full font-bold h-[48px] border border-[#d2e4d7]" leftIcon={<FileCheck className="size-4.5" />}>
-                            Gửi yêu cầu thuê phòng
-                          </Button>
-                        </Link>
+
+                        {userKycApproved === false ? (
+                          <Link href="/tenant/kyc" className="block">
+                            <Button
+                              variant="secondary"
+                              size="lg"
+                              className="w-full font-bold h-[48px] border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                              leftIcon={<ShieldAlert className="size-4.5 text-amber-600" />}
+                            >
+                              Xác minh KYC để thuê phòng
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link href={`/rooms/${roomId}/apply`} className="block">
+                            <Button variant="secondary" size="lg" className="w-full font-bold h-[48px] border border-[#d2e4d7]" leftIcon={<FileCheck className="size-4.5" />}>
+                              Gửi yêu cầu thuê phòng
+                            </Button>
+                          </Link>
+                        )}
                       </>
                     );
                   }

@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   appointmentUpdateMany: vi.fn(),
   transaction: vi.fn(),
   notify: vi.fn(),
+  kycFindUnique: vi.fn(),
 }));
 
 vi.mock('../../src/config/db', () => ({
@@ -31,6 +32,9 @@ vi.mock('../../src/config/db', () => ({
       findFirst: vi.fn(),
       create: vi.fn(),
       update: mocks.requestUpdate,
+    },
+    kycSubmission: {
+      findUnique: mocks.kycFindUnique,
     },
   },
 }));
@@ -54,6 +58,7 @@ const pendingRequest = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.kycFindUnique.mockResolvedValue({ status: 'APPROVED' });
   mocks.requestFindUnique.mockResolvedValue(pendingRequest());
   mocks.roomUpdateMany.mockResolvedValue({ count: 1 });
   mocks.postUpdateMany.mockResolvedValue({ count: 1 });

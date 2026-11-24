@@ -16,7 +16,6 @@ import {
   Bell,
   User,
   Settings,
-  Lock,
   LogOut,
   ShieldCheck,
   Wrench,
@@ -81,7 +80,6 @@ export function PortalSidebar({ onLogout }: PortalSidebarProps) {
       href: "/tenant/settings",
       icon: Settings,
     },
-    { label: "Đổi mật khẩu", href: "/reset-password", icon: Lock },
   ];
 
   return (

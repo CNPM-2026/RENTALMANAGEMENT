@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authController } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { registerSchema, loginSchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema, verifyEmailSchema, setPasswordSchema } from '../validations/auth.validation';
+import { registerSchema, loginSchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema, verifyEmailSchema, setPasswordSchema, changePasswordSchema } from '../validations/auth.validation';
 import { authLimiter } from '../middlewares/rateLimit.middleware';
 
 const router = Router();
@@ -21,6 +21,7 @@ router.post('/password/set', validate(setPasswordSchema), authController.setPass
 router.post('/resend-verification', authLimiter, validate(forgotPasswordSchema), authController.resendVerification);
 router.get('/google', authController.googleRedirect);
 router.get('/google/callback', authController.googleCallback);
+router.post('/change-password', authenticate, validate(changePasswordSchema), authController.changePassword);
 router.get('/me', authenticate, authController.getMe);
 
 export default router;

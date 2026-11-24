@@ -133,6 +133,11 @@ export const rentalRequestService = {
       return updated;
     }
 
+    if (typeof (prisma as any).kycSubmission?.findUnique === 'function') {
+      const tenantKyc = await loadKycState(request.tenantId);
+      assertKycApproved(tenantKyc, 'được phê duyệt thuê phòng', TENANT_KYC_REQUIRED);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const roomClaim = await tx.room.updateMany({
         where: { id: request.roomId, status: 'AVAILABLE' },
