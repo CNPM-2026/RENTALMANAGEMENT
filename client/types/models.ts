@@ -17,7 +17,7 @@ export type PostStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
 
 export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 
-export type ContractStatus = 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+export type ContractStatus = 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED' | 'SUSPENDED';
 
 export type ContractTerminationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -873,6 +873,8 @@ export interface PublicUserProfile {
   joinedAt: string;
   bio?: string | null;
   occupation?: string | null;
+  phone?: string | null;
+  address?: string | null;
   kycVerified: boolean;
   stats: {
     completedTasks?: number;

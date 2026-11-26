@@ -45,7 +45,7 @@ export const contractController = {
       // Portal khách thuê có thể gửi `?scope=tenant` để luôn nhận hợp đồng của
       // CHÍNH MÌNH, kể cả khi tài khoản đồng thời được chủ trọ cấp quyền nhân
       // viên. Không có tham số này thì giữ nguyên hành vi cũ (staff scope).
-      const tenantScope = req.query.scope === 'tenant' && req.user!.role === 'TENANT';
+      const tenantScope = req.query.scope === 'tenant';
       const result = await contractService.getMyContracts(
         tenantScope ? req.user!.id : resourceOwnerId(req),
         tenantScope ? 'TENANT' : isStaffScope(req) ? 'LANDLORD' : req.user!.role,

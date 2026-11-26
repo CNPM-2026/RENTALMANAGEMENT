@@ -13,6 +13,7 @@ import {
   Home,
   Loader2,
   MapPin,
+  Phone,
   Star,
   UserRound,
   Wallet,
@@ -133,6 +134,12 @@ function PublicUserProfileContent() {
                     <Briefcase className="size-3.5" /> {profile.occupation}
                   </span>
                 )}
+                <span className="inline-flex items-center gap-1 font-medium text-[#203c37]" title="Số điện thoại bảo mật">
+                  <Phone className="size-3.5 text-[#15594f]" /> {profile.phone || "Không có"}
+                </span>
+                <span className="inline-flex items-center gap-1" title="Khu vực lưu trú">
+                  <MapPin className="size-3.5 text-[#15594f]" /> {profile.address || "Không có"}
+                </span>
               </div>
               {profile.bio && <p className="mt-3 text-[14px] leading-7 text-[#3f4f49]">{profile.bio}</p>}
             </div>

@@ -7,6 +7,7 @@ import { apiClient, ApiError } from "@/lib/api";
 import { getCurrentUser, updateStoredUser } from "@/lib/auth";
 import { UserWithProfile } from "@/types/models";
 import { Avatar } from "@/components/ui/avatar";
+import { translateRole } from "@/lib/labels";
 
 function getLocalDateString(date: Date) {
   const year = date.getFullYear();
@@ -445,9 +446,11 @@ export default function TenantProfilePage() {
               </div>
 
               <h3 className="text-[17px] font-semibold text-[#203c37]">
-                {fullName || "Người dùng"}
+                {fullName || user?.fullName || "Người dùng"}
               </h3>
-              <p className="text-[13px] text-[#74817b] mt-0.5">{occupation || "Người thuê phòng"}</p>
+              <p className="text-[13px] text-[#74817b] mt-0.5">
+                {occupation || user?.profile?.occupation || (user?.role ? translateRole(user.role) : "Người dùng")}
+              </p>
 
               {user?.id && (
                 <Link

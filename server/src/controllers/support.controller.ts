@@ -7,6 +7,15 @@ export const supportController = {
     try { return res.status(201).json({ success: true, data: await supportService.create(req.user!.id, req.body) }); }
     catch (error) { return next(error); }
   },
+  createPublic: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      return res.status(201).json({
+        success: true,
+        message: 'Gửi yêu cầu hỗ trợ thành công. Ban quản trị sẽ phản hồi sớm nhất có thể.',
+        data: await supportService.createPublic(req.body),
+      });
+    } catch (error) { return next(error); }
+  },
   getMine: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try { return res.json({ success: true, data: await supportService.getMine(req.user!.id) }); }
     catch (error) { return next(error); }

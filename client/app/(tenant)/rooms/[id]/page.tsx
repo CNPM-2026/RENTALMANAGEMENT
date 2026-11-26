@@ -525,7 +525,7 @@ function RoomDetailContent() {
                   Vị trí & Tiện ích lân cận
                 </h2>
                 <a
-                  href="https://maps.google.com"
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(roomAddress)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#15594f] hover:underline"
@@ -534,19 +534,30 @@ function RoomDetailContent() {
                 </a>
               </div>
 
-              {/* Map Illustration Container */}
-              <div className="relative w-full h-[220px] rounded-[10px] overflow-hidden border border-[#e2e7e1] bg-[#eef1ed] flex items-center justify-center">
-                <div className="text-center space-y-2 p-4">
-                  <div className="size-10 rounded-full bg-[#15594f] text-white flex items-center justify-center mx-auto shadow-md">
-                    <MapPin className="size-5" />
+              {/* Google Maps Embed Container */}
+              <div className="relative w-full h-[260px] rounded-[10px] overflow-hidden border border-[#e2e7e1] bg-[#eef1ed]">
+                {roomAddress && roomAddress !== "Chưa cập nhật địa chỉ" ? (
+                  <iframe
+                    title="Bản đồ vị trí phòng trọ"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(roomAddress)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-center p-4">
+                    <div className="space-y-2">
+                      <div className="size-10 rounded-full bg-[#15594f] text-white flex items-center justify-center mx-auto shadow-md">
+                        <MapPin className="size-5" />
+                      </div>
+                      <p className="text-[13px] font-bold text-[#203c37]">{roomAddress}</p>
+                      <p className="text-[12px] text-[#74817b]">Vị trí chính xác sẽ được cung cấp khi đặt lịch xem phòng.</p>
+                    </div>
                   </div>
-                  <p className="text-[13px] font-bold text-[#203c37]">
-                    {roomAddress}
-                  </p>
-                  <p className="text-[12px] text-[#74817b]">
-                    500m đến ĐH Ngoại Thương • 700m đến ĐH HUTECH • 5 phút đến Landmark 81
-                  </p>
-                </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-2">
@@ -785,14 +796,14 @@ function RoomDetailContent() {
                           </div>
                         )}
 
-                        <Link href={`/rooms/${roomId}/book-viewing`} className="block">
+                        <Link href={currentUser ? `/rooms/${roomId}/book-viewing` : `/login?returnUrl=${encodeURIComponent(`/rooms/${roomId}/book-viewing`)}`} className="block">
                           <Button variant="primary" size="lg" className="w-full font-bold shadow-md h-[48px]" leftIcon={<CalendarDays className="size-4.5" />}>
                             {roomAppointment ? "Đặt lịch hẹn khác" : "Đặt lịch xem phòng"}
                           </Button>
                         </Link>
 
                         {userKycApproved === false ? (
-                          <Link href="/tenant/kyc" className="block">
+                          <Link href={currentUser ? "/tenant/kyc" : `/login?returnUrl=${encodeURIComponent("/tenant/kyc")}`} className="block">
                             <Button
                               variant="secondary"
                               size="lg"
@@ -803,7 +814,7 @@ function RoomDetailContent() {
                             </Button>
                           </Link>
                         ) : (
-                          <Link href={`/rooms/${roomId}/apply`} className="block">
+                          <Link href={currentUser ? `/rooms/${roomId}/apply` : `/login?returnUrl=${encodeURIComponent(`/rooms/${roomId}/apply`)}`} className="block">
                             <Button variant="secondary" size="lg" className="w-full font-bold h-[48px] border border-[#d2e4d7]" leftIcon={<FileCheck className="size-4.5" />}>
                               Gửi yêu cầu thuê phòng
                             </Button>

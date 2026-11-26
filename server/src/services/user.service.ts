@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { storageService } from './storage.service';
 import { notificationService } from './notification.service';
 import { auditService } from './audit.service';
+import { encryptData, decryptData, hashIdNumber } from '../utils/crypto';
 
 export const userService = {
   updateProfile: async (userId: string, data: any, file?: Express.Multer.File) => {
@@ -116,10 +117,17 @@ export const userService = {
       throw new AppError('Số CMND/CCCD phải gồm 9 hoặc 12 chữ số hợp lệ', 400);
     }
 
+    const hashedId = hashIdNumber(cleanedIdNumber);
+    const encryptedId = encryptData(cleanedIdNumber);
+    const encryptedAddress = encryptData(data.permanentAddress);
+
     const duplicateApprovedKyc = typeof prisma.kycSubmission?.findFirst === 'function'
       ? await prisma.kycSubmission.findFirst({
           where: {
-            idNumber: cleanedIdNumber,
+            OR: [
+              { idNumberHash: hashedId },
+              { idNumber: cleanedIdNumber },
+            ],
             userId: { not: userId },
             status: 'APPROVED',
           },
@@ -130,7 +138,12 @@ export const userService = {
       throw new AppError('Số CMND/CCCD này đã được xác thực cho một tài khoản khác', 409, 'KYC_ID_NUMBER_DUPLICATE');
     }
 
-    const submissionData = { ...data, idNumber: cleanedIdNumber };
+    const submissionData = {
+      ...data,
+      idNumber: encryptedId,
+      idNumberHash: hashedId,
+      permanentAddress: encryptedAddress,
+    };
 
     const result = await prisma.kycSubmission.upsert({
       where: { userId },
@@ -185,12 +198,13 @@ export const userService = {
       select: {
         id: true,
         fullName: true,
+        phone: true,
         avatarUrl: true,
         role: true,
         isActive: true,
         createdAt: true,
         profile: { select: { bio: true, occupation: true } },
-        kycSubmission: { select: { status: true } },
+        kycSubmission: { select: { status: true, permanentAddress: true } },
         staffProfile: {
           select: {
             description: true,
@@ -205,11 +219,74 @@ export const userService = {
     });
     if (!user || !user.isActive) throw new AppError('Không tìm thấy người dùng', 404);
 
+    // Che 4 số cuối điện thoại
+    const rawPhone = user.phone?.trim();
+    const maskedPhone = rawPhone
+      ? (rawPhone.length <= 4 ? '****' : rawPhone.slice(0, -4) + '****')
+      : 'Không có';
+
+    // Tìm hợp đồng của người dùng (kể cả chính chủ lẫn ở ghép / thuê chung)
+    const [primaryContracts, coTenantDeclarations] = await Promise.all([
+      prisma.contract.findMany({
+        where: { tenantId: user.id, status: 'ACTIVE' },
+        include: { room: { include: { property: true } } },
+      }),
+      prisma.roomOccupancyDeclaration.findMany({
+        where: {
+          tenantId: user.id,
+          status: { in: ['PENDING', 'VERIFIED'] },
+          supersededAt: null,
+          contract: { status: 'ACTIVE' },
+        },
+        include: {
+          contract: { include: { room: { include: { property: true } } } },
+        },
+      }),
+    ]);
+
+    const activeContractIds = new Set<string>();
+    let activeRentedPropertyAddress: string | null = null;
+
+    for (const c of primaryContracts) {
+      activeContractIds.add(c.id);
+      if (!activeRentedPropertyAddress && c.room?.property?.address) {
+        activeRentedPropertyAddress = c.room.property.address;
+      }
+    }
+    for (const d of coTenantDeclarations) {
+      if (d.contract) {
+        activeContractIds.add(d.contract.id);
+        if (!activeRentedPropertyAddress && d.contract.room?.property?.address) {
+          activeRentedPropertyAddress = d.contract.room.property.address;
+        }
+      }
+    }
+
+    // Che địa chỉ chi tiết (chỉ giữ phần Quận/Huyện, Tỉnh/TP)
+    const maskAddress = (fullAddr?: string | null): string => {
+      if (!fullAddr) return 'Không có';
+      const parts = fullAddr.split(',').map((p) => p.trim());
+      if (parts.length > 1) {
+        return `***, ${parts.slice(1).join(', ')}`;
+      }
+      return '*** (Địa chỉ đã che chi tiết)';
+    };
+
+    let displayAddress = 'Không có';
+    if (activeRentedPropertyAddress) {
+      displayAddress = maskAddress(activeRentedPropertyAddress);
+    } else if (user.kycSubmission?.permanentAddress) {
+      const decryptedPermanent = decryptData(user.kycSubmission.permanentAddress);
+      displayAddress = maskAddress(decryptedPermanent);
+    }
+
     const base = {
       id: user.id,
       fullName: user.fullName,
       avatarUrl: user.avatarUrl,
       role: user.role,
+      phone: maskedPhone,
+      address: displayAddress,
       joinedAt: user.createdAt,
       bio: user.profile?.bio ?? null,
       occupation: user.profile?.occupation ?? null,
@@ -262,18 +339,24 @@ export const userService = {
       return { ...base, stats: {} };
     }
 
-    // TENANT: chỉ thống kê không nhạy cảm.
-    const [activeContracts, completedTasks] = await Promise.all([
-      prisma.contract.count({ where: { tenantId: user.id, status: 'ACTIVE' } }),
-      prisma.maintenanceTask.count({ where: { landlordId: user.id, status: 'COMPLETED' } }),
-    ]);
-    return { ...base, stats: { activeContracts, completedTasks } };
+    // TENANT: số lượng hợp đồng bao gồm cả hợp đồng chính chủ và thuê chung / ở ghép
+    const completedTasks = await prisma.maintenanceTask.count({ where: { landlordId: user.id, status: 'COMPLETED' } });
+    return {
+      ...base,
+      stats: {
+        activeContracts: activeContractIds.size,
+        completedTasks,
+      },
+    };
   },
 
   getMyKyc: async (userId: string) => {
     const result = await prisma.kycSubmission.findUnique({ where: { userId } });
-    return result && {
+    if (!result) return null;
+    return {
       ...result,
+      idNumber: decryptData(result.idNumber),
+      permanentAddress: decryptData(result.permanentAddress),
       // Hồ sơ APPROVED đã xoá ảnh: hai cột là NULL và không được cố tạo signed URL.
       frontIdUrl: result.frontIdUrl
         ? storageService.getPrivateImageUrl(result.frontIdUrl)

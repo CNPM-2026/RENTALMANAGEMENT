@@ -23,6 +23,11 @@ export default function AdminUsersPage() {
   const [search, setSearch] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("ALL");
 
+  // Ban modal state
+  const [banningUser, setBanningUser] = React.useState<User | null>(null);
+  const [banReasonInput, setBanReasonInput] = React.useState("");
+  const [isSubmittingBan, setIsSubmittingBan] = React.useState(false);
+
   const loadUsers = React.useCallback(() => {
     setIsLoading(true);
     apiClient.adminGovernance
@@ -149,7 +154,14 @@ export default function AdminUsersPage() {
                         Hoạt động
                       </span>
                     ) : (
-                      <span className="text-[12px] text-[#a4422c]">Đã khóa</span>
+                      <div>
+                        <span className="text-[12px] text-[#a4422c] font-semibold">Đã khóa</span>
+                        {(u as any).banReason && (
+                          <p className="text-[11px] text-[#74817b] mt-0.5 max-w-[180px] truncate" title={(u as any).banReason}>
+                            Lý do: {(u as any).banReason}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="py-3.5 px-4 text-[#74817b]">
@@ -158,14 +170,22 @@ export default function AdminUsersPage() {
                   <td className="py-3.5 px-4 text-right">
                     <button
                       onClick={async () => {
-                        try {
-                          const updated = await apiClient.adminGovernance.updateUserStatus(u.id, !u.isActive);
-                          setUsers((prev) => prev.map((item) => item.id === updated.id ? updated : item));
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : "Không cập nhật được trạng thái tài khoản.");
+                        if (u.isActive) {
+                          setBanningUser(u);
+                          setBanReasonInput("Vi phạm quy chế hoạt động và an toàn phòng trọ");
+                        } else {
+                          if (!confirm(`Bạn có chắc muốn mở khóa cho tài khoản ${u.fullName}?`)) return;
+                          try {
+                            const updated = await apiClient.adminGovernance.updateUserStatus(u.id, true);
+                            setUsers((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Không mở khóa được tài khoản.");
+                          }
                         }
                       }}
-                      className="text-[12px] text-[#a4422c] hover:underline cursor-pointer"
+                      className={`text-[12px] font-medium hover:underline cursor-pointer ${
+                        u.isActive ? "text-[#a4422c]" : "text-[#15594f]"
+                      }`}
                     >
                       {u.isActive ? "Khóa tài khoản" : "Mở tài khoản"}
                     </button>
@@ -176,6 +196,83 @@ export default function AdminUsersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Ban User Modal with Reason */}
+      {banningUser && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-[16px] max-w-md w-full p-6 shadow-xl border border-[#e2e7e1] space-y-4 animate-in fade-in zoom-in-95">
+            <div>
+              <h3 className="text-[17px] font-bold text-[#a4422c]">
+                Khóa tài khoản người dùng
+              </h3>
+              <p className="text-[13px] text-[#74817b] mt-1">
+                Tài khoản: <strong>{banningUser.fullName}</strong> ({banningUser.email})
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[12px] font-bold text-[#203c37] mb-1">
+                  Lý do khóa tài khoản <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={banReasonInput}
+                  onChange={(e) => setBanReasonInput(e.target.value)}
+                  placeholder="Nhập lý do khóa tài khoản để thông báo cho người dùng và các bên liên quan..."
+                  className="w-full p-2.5 text-[13px] rounded-[8px] border border-[#e2e7e1] focus:outline-none focus:border-[#a4422c] resize-none"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-[8px] text-[11px] text-amber-800 space-y-1">
+                <p className="font-bold">Hậu quả khi khóa tài khoản:</p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>Tài khoản bị thu hồi toàn bộ phiên đăng nhập.</li>
+                  <li>Ẩn mọi bài đăng tin của người dùng.</li>
+                  <li>Hợp đồng thuê chuyển quyền cho người ở ghép hoặc tạm đình chỉ (SUSPENDED).</li>
+                  <li>Người dùng chỉ có thể gửi phản hồi kháng cáo qua trang Hỗ trợ.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setBanningUser(null)}
+                disabled={isSubmittingBan}
+                className="px-4 py-2 rounded-[8px] border border-[#e2e7e1] text-[13px] font-medium text-[#74817b] hover:bg-[#faf9f5]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingBan || !banReasonInput.trim()}
+                onClick={async () => {
+                  if (!banReasonInput.trim()) return;
+                  setIsSubmittingBan(true);
+                  try {
+                    const updated = await apiClient.adminGovernance.updateUserStatus(
+                      banningUser.id,
+                      false,
+                      banReasonInput.trim()
+                    );
+                    setUsers((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+                    setBanningUser(null);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Không thể khóa tài khoản.");
+                  } finally {
+                    setIsSubmittingBan(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-[8px] bg-[#a4422c] hover:bg-[#833220] text-white text-[13px] font-bold disabled:opacity-50"
+              >
+                {isSubmittingBan ? "Đang xử lý..." : "Xác nhận Khóa tài khoản"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

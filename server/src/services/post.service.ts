@@ -78,10 +78,12 @@ export const postService = {
     let roomPrice: number | null = null;
     let normalizedPropertyId = propertyId || null;
     let normalizedRoomId = roomId || null;
+    let targetRoom: any = null;
 
     if (propertyId || roomId) {
       const room = roomId ? await prisma.room.findUnique({ where: { id: roomId }, include: { property: true } }) : null;
       if (roomId && !room) throw new AppError('Phòng không tồn tại', 404);
+      targetRoom = room;
       if (room) {
         roomPrice = Number(room.priceMonthly);
         normalizedPropertyId = normalizedPropertyId || room.propertyId;
@@ -108,13 +110,13 @@ export const postService = {
           }
         }
 
-        // Mỗi phòng chỉ được có tối đa 1 tin đăng. Muốn đăng lại (khi phòng trống) phải xóa tin cũ trước.
+        // Mỗi phòng chỉ được có tối đa 1 tin đăng đang hoạt động.
         const existingPost = await prisma.post.findFirst({
-          where: { roomId: room.id },
+          where: { roomId: room.id, status: { in: ['PENDING', 'APPROVED'] } },
           select: { id: true, title: true },
         });
         if (existingPost) {
-          throw new AppError('Phòng này đã có tin đăng. Mỗi phòng chỉ được đăng 1 tin, nếu muốn đăng lại vui lòng xóa tin cũ trước', 400);
+          throw new AppError('Phòng này đã có tin đăng đang hoạt động. Mỗi phòng chỉ được đăng 1 tin', 400);
         }
       }
       if (roomId && propertyId && room && room.propertyId !== propertyId) {
@@ -154,11 +156,38 @@ export const postService = {
       ? (price !== undefined && price !== null && price !== '' ? Number(price) : roomPrice)
       : (roomPrice ?? (price !== undefined && price !== null && price !== '' ? Number(price) : null));
 
+    // Hiển thị mã phòng kế bên tên bài đăng nếu có phòng
+    let finalTitle = (title || '').trim();
+    if (targetRoom?.roomNumber && !finalTitle.includes(targetRoom.roomNumber)) {
+      finalTitle = `[P.${targetRoom.roomNumber}] ${finalTitle}`;
+    }
+
+    // Validate không được phép có các bài đăng cùng 1 địa chỉ cùng 1 tên
+    if (normalizedPropertyId) {
+      const prop = await prisma.property.findUnique({
+        where: { id: normalizedPropertyId },
+        select: { address: true },
+      });
+      if (prop?.address) {
+        const duplicatePost = await prisma.post.findFirst({
+          where: {
+            title: finalTitle,
+            status: { in: ['PENDING', 'APPROVED'] },
+            property: { address: prop.address },
+          },
+          select: { id: true },
+        });
+        if (duplicatePost) {
+          throw new AppError('Đã tồn tại bài đăng có cùng tiêu đề tại cùng một địa chỉ', 400, 'DUPLICATE_POST_NAME_ADDRESS');
+        }
+      }
+    }
+
     // 1. Tạo bài đăng
     const post = await prisma.post.create({
       data: {
         authorId,
-        title,
+        title: finalTitle,
         description,
         price: resolvedPrice,
         postType: postType as PostType,

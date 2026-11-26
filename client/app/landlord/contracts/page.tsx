@@ -12,6 +12,7 @@ const STATUS_MAP: Record<ContractStatus, { label: string; bg: string; text: stri
   ACTIVE: { label: "Hiệu lực", bg: "bg-[#eaf2ed]", text: "text-[#15594f]" },
   EXPIRED: { label: "Hết hạn", bg: "bg-[#f7f6f2]", text: "text-[#74817b]" },
   TERMINATED: { label: "Đã chấm dứt", bg: "bg-[#fbeae6]", text: "text-[#a4422c]" },
+  SUSPENDED: { label: "Tạm đình chỉ (User bị khóa, chờ kháng cáo)", bg: "bg-gray-200", text: "text-gray-700" },
 };
 
 function formatCurrency(val: number) {
@@ -182,10 +183,25 @@ export default function LandlordContractsPage() {
               </thead>
               <tbody className="divide-y divide-[#eef3ef] text-[#203c37]">
                 {filtered.map((item) => {
+                  const isSuspended = item.status === "SUSPENDED" || (item.tenant as any)?.isActive === false;
                   const st = STATUS_MAP[item.status] || STATUS_MAP.ACTIVE;
                   return (
-                    <tr key={item.id} className="hover:bg-[#f7f6f2]/60 transition-colors">
-                      <td className="py-3.5 px-4 font-semibold">{item.tenant?.fullName || "Khách thuê"}</td>
+                    <tr
+                      key={item.id}
+                      className={`transition-colors ${
+                        isSuspended
+                          ? "bg-gray-100/80 text-gray-400 hover:bg-gray-200/60"
+                          : "hover:bg-[#f7f6f2]/60"
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 font-semibold">
+                        {item.tenant?.fullName || "Khách thuê"}
+                        {isSuspended && (
+                          <span className="block text-[11px] text-red-600 font-normal">
+                            (Tài khoản bị khóa - Chờ kháng cáo)
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3.5 px-4 font-semibold">{item.room?.property?.name || "Chưa cập nhật"}</td>
                       <td className="py-3.5 px-4 font-medium">Phòng {item.room?.roomNumber || "---"}</td>
                       <td className="py-3.5 px-4 text-[#74817b]">{item.room?.property?.address || "Chưa cập nhật"}</td>

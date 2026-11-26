@@ -1,14 +1,21 @@
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
+import { formatVietnameseAddress } from '../utils/crypto';
 
 export const propertyService = {
   // Tạo nhà trọ mới kèm tiện ích chung (nếu có)
   createProperty: async (landlordId: string, data: any) => {
     const { name, address, province, district, ward, description, rules, latitude, longitude, amenityIds } = data;
     
+    // Tự động ghi hoa đầu các chữ cho địa chỉ
+    const formattedAddress = address ? formatVietnameseAddress(address) : address;
+    const formattedProvince = province ? formatVietnameseAddress(province) : province;
+    const formattedDistrict = district ? formatVietnameseAddress(district) : district;
+    const formattedWard = ward ? formatVietnameseAddress(ward) : ward;
+
     // Check xem chủ trọ đã tạo nhà trọ trùng tên ở cùng phường chưa
     const existing = await prisma.property.findFirst({
-      where: { landlordId, name, ward, district }
+      where: { landlordId, name, ward: formattedWard, district: formattedDistrict }
     });
     
     if (existing) {
@@ -19,10 +26,10 @@ export const propertyService = {
       data: {
         landlordId,
         name,
-        address,
-        province,
-        district,
-        ward,
+        address: formattedAddress,
+        province: formattedProvince,
+        district: formattedDistrict,
+        ward: formattedWard,
         description,
         rules,
         latitude,
@@ -47,6 +54,11 @@ export const propertyService = {
     if (!property) throw new AppError('Không tìm thấy nhà trọ hoặc bạn không có quyền sửa', 404);
 
     const { amenityIds, ...fields } = data;
+    if (fields.address) fields.address = formatVietnameseAddress(fields.address);
+    if (fields.province) fields.province = formatVietnameseAddress(fields.province);
+    if (fields.district) fields.district = formatVietnameseAddress(fields.district);
+    if (fields.ward) fields.ward = formatVietnameseAddress(fields.ward);
+
     return await prisma.$transaction(async (tx) => {
       if (Array.isArray(amenityIds)) {
         await tx.propertyAmenity.deleteMany({ where: { propertyId: id } });

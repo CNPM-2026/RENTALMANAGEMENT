@@ -362,6 +362,15 @@ export const contractLifecycleService = {
           where: { roomId: request.contract.roomId, status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
           data: { status: 'SUPERSEDED', supersededAt: new Date() },
         });
+        // Mở lại tin đăng của phòng nếu tin đăng chưa hết hạn
+        await tx.post.updateMany({
+          where: {
+            roomId: request.contract.roomId,
+            status: 'CLOSED',
+            OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
+          },
+          data: { status: 'APPROVED' },
+        });
       }
 
       return tx.contractTerminationRequest.findUniqueOrThrow({
@@ -628,5 +637,49 @@ export const contractLifecycleService = {
     });
 
     return updated;
-  }
+  },
+
+  /**
+   * Tự động quét và thông báo cho chủ trọ + người thuê trước khi hợp đồng hết hạn 1 tháng (30 ngày)
+   */
+  checkAndNotifyExpiringContracts: async () => {
+    const in30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const expiringContracts = await prisma.contract.findMany({
+      where: {
+        status: 'ACTIVE',
+        endDate: {
+          not: null,
+          lte: in30Days,
+          gte: new Date(),
+        },
+        expiryNotified: false,
+      },
+      include: {
+        room: { include: { property: { select: { landlordId: true } } } },
+        tenant: { select: { fullName: true } },
+      },
+    });
+
+    for (const contract of expiringContracts) {
+      if (!contract.endDate) continue;
+      const landlordId = contract.room.property.landlordId;
+      const dateStr = new Date(contract.endDate).toLocaleDateString('vi-VN');
+
+      await prisma.contract.update({
+        where: { id: contract.id },
+        data: { expiryNotified: true },
+      }).catch(() => undefined);
+
+      await notificationService.notifyUsers(
+        [contract.tenantId, landlordId],
+        {
+          title: 'Hợp đồng sắp hết hạn trong 1 tháng',
+          content: `Hợp đồng phòng ${contract.room.roomNumber} sẽ hết hạn vào ngày ${dateStr}. Vui lòng xem xét gia hạn hoặc kế hoạch bàn giao phòng.`,
+          type: 'CONTRACT',
+          referenceId: contract.id,
+        },
+        (recipientId) => `contract:${contract.id}:expiring:${recipientId}`
+      ).catch(() => undefined);
+    }
+  },
 };

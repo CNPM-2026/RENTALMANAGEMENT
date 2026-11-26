@@ -37,6 +37,21 @@ export const meterReadingService = {
       throw new AppError('Bạn không có quyền ghi chỉ số cho phòng này', 403);
     }
 
+    // Validate phòng phải có hợp đồng đang có hiệu lực (đang thuê) mới được nhập điện nước
+    if (typeof (prisma as any).contract?.findFirst === 'function') {
+      const activeContract = await prisma.contract.findFirst({
+        where: { roomId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!activeContract) {
+        throw new AppError(
+          'Phòng chưa có người thuê hoặc chưa có hợp đồng hiệu lực, không thể ghi chỉ số điện nước',
+          400,
+          'ROOM_NOT_RENTED'
+        );
+      }
+    }
+
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;

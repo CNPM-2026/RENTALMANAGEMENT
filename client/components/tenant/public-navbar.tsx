@@ -83,7 +83,7 @@ export function PublicNavbar({
     { label: "Tìm phòng", href: "/rooms", icon: Search },
     { label: "Tìm bạn ở ghép", href: "/roommates", icon: Users },
     { label: "Về chúng tôi", href: "/about", icon: Info },
-    { label: "Hỗ trợ", href: "/tenant/support", icon: HelpCircle },
+    { label: "Hỗ trợ", href: "/support", icon: HelpCircle },
   ];
 
   return (

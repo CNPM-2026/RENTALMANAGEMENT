@@ -58,6 +58,43 @@ export const supportService = {
     orderBy: { updatedAt: 'desc' },
   }),
 
+  createPublic: async (data: {
+    guestName: string;
+    guestEmail: string;
+    guestPhone?: string;
+    category?: string;
+    subject: string;
+    description: string;
+  }) => {
+    if (!data.guestName?.trim() || !data.guestEmail?.trim() || !data.subject?.trim() || !data.description?.trim()) {
+      throw new AppError('Vui lòng điền đầy đủ họ tên, email, tiêu đề và nội dung', 400);
+    }
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        guestName: data.guestName.trim(),
+        guestEmail: data.guestEmail.trim(),
+        guestPhone: data.guestPhone?.trim() || null,
+        category: data.category?.trim() || 'Hỗ trợ chung',
+        subject: data.subject.trim(),
+        description: data.description.trim(),
+      },
+    });
+
+    await notificationService
+      .notifyAdmins(
+        {
+          title: 'Phiếu hỗ trợ công khai mới',
+          content: `Có liên hệ từ ${data.guestName} (${data.guestEmail}): "${ticket.subject}".`,
+          type: 'SUPPORT_TICKET',
+          referenceId: ticket.id,
+        },
+        (adminId) => `support:${ticket.id}:public:${adminId}`,
+      )
+      .catch(() => undefined);
+
+    return ticket;
+  },
+
   update: async (id: string, data: { status?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'; adminReply?: string }) => {
     const ticket = await prisma.supportTicket.findUnique({ where: { id }, select: { id: true } });
     if (!ticket) throw new AppError('Không tìm thấy phiếu hỗ trợ', 404);

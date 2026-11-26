@@ -6,6 +6,7 @@ import { notificationService } from './notification.service';
 import { auditService } from './audit.service';
 import { storageService } from './storage.service';
 import { invalidateUserSockets } from '../socket/sessionInvalidation';
+import { decryptData } from '../utils/crypto';
 
 /** Giá trị hợp lệ cho bộ lọc hàng đợi KYC; giá trị lạ bị BỎ QUA (không 500). */
 const KYC_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
@@ -108,11 +109,23 @@ export const adminService = {
         ],
       }),
     },
-    select: { id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true, isActive: true, createdAt: true, updatedAt: true },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      phone: true,
+      avatarUrl: true,
+      role: true,
+      isActive: true,
+      banReason: true,
+      bannedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
     orderBy: { createdAt: 'desc' },
   }),
 
-  updateUserStatus: async (adminId: string, userId: string, isActive: boolean) => {
+  updateUserStatus: async (adminId: string, userId: string, isActive: boolean, banReason?: string) => {
     if (adminId === userId) throw new AppError('Không thể tự khóa tài khoản admin hiện tại', 400);
 
     // Đổi trạng thái và thu hồi refresh token trong CÙNG một transaction, cùng
@@ -127,20 +140,35 @@ export const adminService = {
         throw new AppError('Không thể thay đổi trạng thái của tài khoản admin khác', 400);
       }
 
+      const finalBanReason = !isActive ? (banReason?.trim() || 'Vi phạm điều khoản dịch vụ') : null;
+
       // H-05/Batch 2B1.1 (F-2): mọi thay đổi trạng thái do admin thực hiện đều tăng
       // `authVersion`, nên một "password-setup grant" đang bay bị vô hiệu vĩnh viễn —
       // kể cả trường hợp khóa rồi mở khóa lại trong TTL 10 phút của grant (khi đó
       // `establishPassword` thấy `authVersion` lệch và trả lỗi chung như mọi grant chết).
+      const updateData: any = {
+        isActive,
+        authVersion: { increment: 1 },
+      };
+      const selectFields: any = {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+      };
+
+      if (banReason !== undefined) {
+        updateData.banReason = finalBanReason;
+        updateData.bannedAt = !isActive ? new Date() : null;
+        selectFields.banReason = true;
+        selectFields.bannedAt = true;
+      }
+
       const user = await tx.user.update({
         where: { id: userId },
-        data: { isActive, authVersion: { increment: 1 } },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          isActive: true,
-        },
+        data: updateData,
+        select: selectFields,
       });
 
       if (user.role === 'ADMIN') {
@@ -148,10 +176,124 @@ export const adminService = {
       }
 
       if (!isActive) {
+        // Thu hồi toàn bộ refresh tokens
         await tx.refreshToken.updateMany({
           where: { userId, revokedAt: null },
           data: { revokedAt: new Date() },
         });
+
+        // Ẩn tất cả bài đăng của user bị ban
+        if (typeof (tx as any).post?.updateMany === 'function') {
+          await tx.post.updateMany({
+            where: { authorId: userId, status: { in: ['APPROVED', 'PENDING'] } },
+            data: { status: 'CLOSED' },
+          });
+        }
+
+        // Xử lý các hợp đồng đang hiệu lực của người thuê bị ban
+        if (typeof (tx as any).contract?.findMany === 'function') {
+          const activeContracts = await tx.contract.findMany({
+            where: { tenantId: userId, status: 'ACTIVE' },
+            include: {
+              room: { include: { property: true } },
+            },
+          });
+
+          for (const contract of activeContracts) {
+            const landlordId = contract.room.property.landlordId;
+
+            // Tìm danh sách người ở ghép trong phòng
+            const declarations = typeof (tx as any).roomOccupancyDeclaration?.findMany === 'function'
+              ? await tx.roomOccupancyDeclaration.findMany({
+                  where: {
+                    contractId: contract.id,
+                    status: { in: ['PENDING', 'VERIFIED'] },
+                    supersededAt: null,
+                    tenantId: { not: userId },
+                  },
+                  orderBy: { createdAt: 'asc' }, // Sớm nhất
+                  include: { tenant: true },
+                })
+              : [];
+
+            // Lọc người ở ghép hợp lệ (không phải chủ trọ và tài khoản không bị ban)
+            const eligibleRoommate = declarations.find(
+              (d: any) => d.tenantId !== landlordId && d.tenant.role !== 'LANDLORD' && d.tenant.isActive
+            );
+
+            if (eligibleRoommate) {
+              // Chuyển chủ thuê thành người ở ghép sớm nhất
+              await tx.contract.update({
+                where: { id: contract.id },
+                data: {
+                  originalTenantId: contract.originalTenantId || userId,
+                  tenantId: eligibleRoommate.tenantId,
+                  suspendedReason: `Tạm chuyển chủ hợp đồng sang ${eligibleRoommate.tenant.fullName} do ${user.fullName} bị khóa tài khoản (${finalBanReason})`,
+                },
+              });
+
+              await notificationService.notifyUsers(
+                [landlordId, eligibleRoommate.tenantId],
+                {
+                  title: 'Hợp đồng chuyển quyền thuê tạm thời',
+                  content: `Tài khoản người thuê ${user.fullName} đã bị khóa do: ${finalBanReason}. Quyền chủ hợp đồng phòng ${contract.room.roomNumber} tạm thời được chuyển cho ${eligibleRoommate.tenant.fullName}.`,
+                  type: 'CONTRACT',
+                  referenceId: contract.id,
+                },
+                (recipientId) => `contract:${contract.id}:transferred:${recipientId}`
+              ).catch(() => undefined);
+            } else {
+              // Không có người ở ghép hợp lệ hoặc chỉ còn chủ trọ: Tạm đình chỉ hợp đồng
+              await tx.contract.update({
+                where: { id: contract.id },
+                data: {
+                  status: 'SUSPENDED',
+                  originalTenantId: contract.originalTenantId || userId,
+                  suspendedReason: `Hợp đồng bị tạm đình chỉ do người thuê ${user.fullName} bị khóa tài khoản: ${finalBanReason}`,
+                },
+              });
+
+              await notificationService.notifyUsers(
+                [landlordId],
+                {
+                  title: 'Hợp đồng bị tạm đình chỉ',
+                  content: `Hợp đồng phòng ${contract.room.roomNumber} đã chuyển sang trạng thái TẠM ĐÌNH CHỈ do người thuê ${user.fullName} bị khóa tài khoản: ${finalBanReason}.`,
+                  type: 'CONTRACT',
+                  referenceId: contract.id,
+                },
+                (recipientId) => `contract:${contract.id}:suspended:${recipientId}`
+              ).catch(() => undefined);
+            }
+          }
+        }
+      } else {
+        // Khi User A kháng cáo thành công (Unban):
+        // 1. Nếu hợp đồng đang SUSPENDED vì A bị ban (và chưa thanh lý) -> Khôi phục ACTIVE
+        if (typeof (tx as any).contract?.updateMany === 'function') {
+          await tx.contract.updateMany({
+            where: {
+              originalTenantId: userId,
+              status: 'SUSPENDED',
+            },
+            data: {
+              status: 'ACTIVE',
+              suspendedReason: null,
+            },
+          });
+
+          // 2. Nếu trước đó đã chuyển quyền sang người ở ghép B -> Trả lại quyền chủ hợp đồng cho A
+          await tx.contract.updateMany({
+            where: {
+              originalTenantId: userId,
+              status: 'ACTIVE',
+            },
+            data: {
+              tenantId: userId,
+              originalTenantId: null,
+              suspendedReason: null,
+            },
+          });
+        }
       }
 
       return user;
@@ -195,6 +337,8 @@ export const adminService = {
     });
     return submissions.map((submission) => ({
       ...submission,
+      idNumber: decryptData(submission.idNumber),
+      permanentAddress: decryptData(submission.permanentAddress),
       frontIdUrl: submission.frontIdUrl
         ? storageService.getPrivateImageUrl(submission.frontIdUrl)
         : null,
@@ -225,6 +369,8 @@ export const adminService = {
     if (!submission) throw new AppError('Không tìm thấy hồ sơ KYC', 404);
     return {
       ...submission,
+      idNumber: decryptData(submission.idNumber),
+      permanentAddress: decryptData(submission.permanentAddress),
       frontIdUrl: submission.frontIdUrl
         ? storageService.getPrivateImageUrl(submission.frontIdUrl)
         : null,

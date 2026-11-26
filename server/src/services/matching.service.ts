@@ -548,14 +548,28 @@ export const matchingService = {
       ])
     );
 
-    // B3. Chỉ lấy các bài đăng tìm bạn ở ghép đang được duyệt
+    // B3. Kiểm tra nếu người dùng đã ở ghép chung thì không nhìn thấy tin ở ghép nữa
+    const existingCotenancy = await prisma.roomOccupancyDeclaration.findFirst({
+      where: {
+        tenantId: myId,
+        status: { in: ['PENDING', 'VERIFIED'] },
+        supersededAt: null,
+        contract: { status: 'ACTIVE' },
+      },
+      select: { id: true },
+    });
+    if (existingCotenancy) {
+      return [];
+    }
+
+    // Chỉ lấy các bài đăng tìm bạn ở ghép đang được duyệt
     const roommatePosts = await prisma.post.findMany({
       where: {
         status: 'APPROVED',
         postType: 'FIND_ROOMMATE',
         authorId: { not: myId },
         OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
-        author: { isActive: true, role: 'TENANT' },
+        author: { isActive: true },
       },
       include: {
         property: { select: { province: true, district: true, ward: true } },
