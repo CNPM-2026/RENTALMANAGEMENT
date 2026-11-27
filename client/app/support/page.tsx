@@ -51,20 +51,6 @@ function PublicSupportContent() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [openFaq, setOpenFaq] = React.useState<number | null>(isBannedParam ? 3 : 0);
 
-  React.useEffect(() => {
-    if (isBannedParam) {
-      setOpenFaq(3);
-      if (emailParam) {
-        setFormData((prev) => ({
-          ...prev,
-          guestEmail: prev.guestEmail || emailParam,
-          category: "ACCOUNT_APPEAL",
-          subject: prev.subject || "Kháng cáo tài khoản bị khóa",
-        }));
-      }
-    }
-  }, [isBannedParam, emailParam]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);

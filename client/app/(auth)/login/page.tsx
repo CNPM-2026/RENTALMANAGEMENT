@@ -114,7 +114,7 @@ function LoginForm() {
           err.status === 403 &&
           (err.message?.toLowerCase().includes("khóa") ||
             err.message?.toLowerCase().includes("bị ban") ||
-            (err.data as any)?.code === "ACCOUNT_BANNED");
+            (err.data as { code?: string } | undefined)?.code === "ACCOUNT_BANNED");
 
         if (isBanned) {
           router.push(

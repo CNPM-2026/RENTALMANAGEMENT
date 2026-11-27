@@ -185,41 +185,6 @@ export const adminService = {
             data: { status: 'CLOSED' },
           });
         }
-
-        // Xử lý các hợp đồng đang hiệu lực của người thuê bị ban
-        // Không xoá user bị ban ra khỏi hợp đồng, vẫn hiển thị trong hợp đồng
-        if (typeof (tx as any).contract?.findMany === 'function') {
-          const activeContracts = await tx.contract.findMany({
-            where: { tenantId: userId, status: 'ACTIVE' },
-            include: {
-              room: { include: { property: true } },
-            },
-          });
-
-          for (const contract of activeContracts) {
-            const landlordId = contract.room.property.landlordId;
-            await notificationService.notifyUsers(
-              [landlordId],
-              {
-                title: 'Tài khoản người thuê bị tạm khóa',
-                content: `Người thuê ${user.fullName} trong hợp đồng phòng ${contract.room.roomNumber} đã bị tạm khóa tài khoản: ${finalBanReason}.`,
-                type: 'CONTRACT',
-                referenceId: contract.id,
-              },
-              (recipientId) => `contract:${contract.id}:tenant-banned:${recipientId}`
-            ).catch(() => undefined);
-          }
-        }
-
-        // Gửi thông báo đến user bị khóa
-        await notificationService.createNotification(
-          userId,
-          'Tài khoản đã bị tạm khóa',
-          `Tài khoản của bạn đã bị khóa. Lý do: ${finalBanReason}`,
-          'SYSTEM',
-          userId,
-          `user:${userId}:banned:${Date.now()}`
-        ).catch(() => undefined);
       } else {
         // Khi User A được mở ban (Unban):
         // 1. Nếu hợp đồng đang SUSPENDED vì A bị ban (và chưa thanh lý) -> Khôi phục ACTIVE
@@ -248,16 +213,6 @@ export const adminService = {
             },
           });
         }
-
-        // Gửi thông báo đến user khi được mở ban
-        await notificationService.createNotification(
-          userId,
-          'Tài khoản đã được mở khóa',
-          'Tài khoản của bạn đã được quản trị viên mở khóa thành công. Bạn có thể tiếp tục sử dụng đầy đủ các tính năng.',
-          'SYSTEM',
-          userId,
-          `user:${userId}:unbanned:${Date.now()}`
-        ).catch(() => undefined);
       }
 
       return user;
@@ -269,6 +224,53 @@ export const adminService = {
     // audit để lỗi ghi log (không được rollback thay đổi) cũng không thể giữ lại một
     // phiên đã bị vô hiệu hóa.
     invalidateUserSockets(userId);
+
+    // Gửi thông báo SAU KHI transaction đã commit thành công để tránh connection contention và transaction timeout (5000ms)
+    const finalBanReason = !isActive ? (banReason?.trim() || 'Vi phạm điều khoản dịch vụ') : null;
+    if (!isActive) {
+      if (typeof (prisma as any).contract?.findMany === 'function') {
+        const activeContracts = await (prisma as any).contract.findMany({
+          where: { tenantId: userId, status: 'ACTIVE' },
+          include: {
+            room: { include: { property: true } },
+          },
+        }).catch(() => []);
+
+        for (const contract of (activeContracts as any[])) {
+          const landlordId = contract.room?.property?.landlordId;
+          if (landlordId) {
+            await notificationService.notifyUsers(
+              [landlordId],
+              {
+                title: 'Tài khoản người thuê bị tạm khóa',
+                content: `Người thuê ${updated.fullName} trong hợp đồng phòng ${contract.room?.roomNumber} đã bị tạm khóa tài khoản: ${finalBanReason}.`,
+                type: 'CONTRACT',
+                referenceId: contract.id,
+              },
+              (recipientId) => `contract:${contract.id}:tenant-banned:${recipientId}`
+            ).catch(() => undefined);
+          }
+        }
+      }
+
+      await notificationService.createNotification(
+        userId,
+        'Tài khoản đã bị tạm khóa',
+        `Tài khoản của bạn đã bị khóa. Lý do: ${finalBanReason}`,
+        'SYSTEM',
+        userId,
+        `user:${userId}:banned:${Date.now()}`
+      ).catch(() => undefined);
+    } else {
+      await notificationService.createNotification(
+        userId,
+        'Tài khoản đã được mở khóa',
+        'Tài khoản của bạn đã được quản trị viên mở khóa thành công. Bạn có thể tiếp tục sử dụng đầy đủ các tính năng.',
+        'SYSTEM',
+        userId,
+        `user:${userId}:unbanned:${Date.now()}`
+      ).catch(() => undefined);
+    }
 
     // Audit ghi SAU khi transaction commit: lỗi ghi log không được rollback việc
     // khóa tài khoản (giữ nguyên hành vi đã được duyệt của các luồng admin khác).

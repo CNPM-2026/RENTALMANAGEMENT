@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Search,
@@ -299,6 +300,7 @@ function getDateAfterDays(days: number) {
 }
 
 export default function RoommateDiscoveryPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [filters, setFilters] = React.useState<RoommateFilterState>(DEFAULT_FILTERS);
   const [invitedIds, setInvitedIds] = React.useState<string[]>([]);
@@ -540,7 +542,7 @@ export default function RoommateDiscoveryPage() {
   const openInviteModal = (candidate: CandidateShape) => {
     const user = getCurrentUser();
     if (!user) {
-      window.location.href = "/login";
+      router.push("/login");
       return;
     }
     setSelectedCandidate(candidate);

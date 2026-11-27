@@ -40,7 +40,12 @@ function RoommateDetailContent() {
   const router = useRouter();
   const candidateId = (params?.id as string) || "candidate-1";
 
-  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [currentUser] = React.useState<User | null>(() => {
+    if (typeof window !== "undefined") {
+      return getCurrentUser();
+    }
+    return null;
+  });
   const [myRooms, setMyRooms] = React.useState<Array<{ roomId: string; label: string; roomNumber: string; propertyName: string }>>([]);
   const [selectedRoomId, setSelectedRoomId] = React.useState<string>("");
 
@@ -54,7 +59,6 @@ function RoommateDetailContent() {
 
   React.useEffect(() => {
     const user = getCurrentUser();
-    setCurrentUser(user);
     if (user) {
       apiClient.contracts.getMyContracts("tenant")
         .then((contracts: Contract[]) => {
