@@ -156,9 +156,9 @@ export default function AdminUsersPage() {
                     ) : (
                       <div>
                         <span className="text-[12px] text-[#a4422c] font-semibold">Đã khóa</span>
-                        {(u as any).banReason && (
-                          <p className="text-[11px] text-[#74817b] mt-0.5 max-w-[180px] truncate" title={(u as any).banReason}>
-                            Lý do: {(u as any).banReason}
+                        {u.banReason && (
+                          <p className="text-[11px] text-[#74817b] mt-0.5 max-w-[180px] truncate" title={u.banReason}>
+                            Lý do: {u.banReason}
                           </p>
                         )}
                       </div>

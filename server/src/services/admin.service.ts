@@ -171,10 +171,6 @@ export const adminService = {
         select: selectFields,
       });
 
-      if (user.role === 'ADMIN') {
-        throw new AppError('Không thể thay đổi trạng thái của tài khoản admin khác', 400);
-      }
-
       if (!isActive) {
         // Thu hồi toàn bộ refresh tokens
         await tx.refreshToken.updateMany({

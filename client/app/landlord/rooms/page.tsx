@@ -55,12 +55,6 @@ function LandlordRoomsContent() {
   }, [queryPropertyId]);
 
   React.useEffect(() => {
-    if (queryPropertyId && properties.some((p) => p.id === queryPropertyId)) {
-      setSelectedPropertyId(queryPropertyId);
-    }
-  }, [queryPropertyId, properties]);
-
-  React.useEffect(() => {
     if (!selectedPropertyId) return;
     let isCancelled = false;
     apiClient.rooms

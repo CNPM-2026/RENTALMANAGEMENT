@@ -163,6 +163,7 @@ export interface User {
   avatarUrl?: string | null;
   role: Role;
   isActive: boolean;
+  banReason?: string | null;
   kycSubmission?: KycSubmission | null;
   createdAt: string;
   updatedAt: string;
@@ -397,6 +398,8 @@ export interface Contract {
   createdAt: string;
   /** Server suy ra từ `endDate`; hợp đồng quá hạn vẫn có thể đang ACTIVE. */
   isExpired?: boolean;
+  suspendedReason?: string | null;
+  terminationRequests?: ContractTerminationRequest[];
 
   // Relations
   room?: Room & { property?: Partial<Property> };
@@ -726,8 +729,11 @@ export interface AuditLog {
 
 export interface SupportTicket {
   id: string;
-  userId: string;
+  userId?: string | null;
   roomId?: string | null;
+  guestEmail?: string | null;
+  guestName?: string | null;
+  guestPhone?: string | null;
   category: string;
   subject: string;
   description: string;

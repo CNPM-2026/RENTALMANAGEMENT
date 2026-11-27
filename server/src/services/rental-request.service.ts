@@ -34,7 +34,7 @@ export const rentalRequestService = {
       const unpaidInvoicesCount = await prisma.invoice.count({
         where: {
           tenantId,
-          status: { in: ['UNPAID', 'OVERDUE'] },
+          status: 'UNPAID',
         },
       });
       if (unpaidInvoicesCount > 0) {

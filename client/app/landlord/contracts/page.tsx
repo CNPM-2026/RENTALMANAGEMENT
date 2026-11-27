@@ -183,7 +183,7 @@ export default function LandlordContractsPage() {
               </thead>
               <tbody className="divide-y divide-[#eef3ef] text-[#203c37]">
                 {filtered.map((item) => {
-                  const isSuspended = item.status === "SUSPENDED" || (item.tenant as any)?.isActive === false;
+                  const isSuspended = item.status === "SUSPENDED" || item.tenant?.isActive === false;
                   const st = STATUS_MAP[item.status] || STATUS_MAP.ACTIVE;
                   return (
                     <tr

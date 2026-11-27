@@ -57,11 +57,11 @@ function TenantContractDetailContent() {
   const isTerminated = Boolean(
     contract &&
       (contract.status === "TERMINATED" ||
-        (contract.status as any) === "CANCELLED" ||
+        (contract.status as string) === "CANCELLED" ||
         contract.status === "EXPIRED" ||
         contract.status === "SUSPENDED" ||
-        (contract as any).terminationRequests?.some(
-          (r: any) => r.status === "PENDING" || r.status === "APPROVED"
+        contract.terminationRequests?.some(
+          (r) => r.status === "PENDING" || r.status === "APPROVED"
         ))
   );
   const cannotSign = isTerminated || isAdminObserver;
@@ -165,7 +165,7 @@ function TenantContractDetailContent() {
                 <span>Hợp đồng đang tạm đình chỉ (Người thuê bị khóa tài khoản & chờ kháng cáo)</span>
               </div>
               <p className="text-[12px] text-red-700">
-                {(contract as any).suspendedReason || "Tài khoản của người thuê chính đã bị khóa. Toàn bộ thao tác và bổ sung người ở ghép bị ngưng lại cho đến khi kháng cáo thành công hoặc thanh lý hợp đồng."}
+                {contract.suspendedReason || "Tài khoản của người thuê chính đã bị khóa. Toàn bộ thao tác và bổ sung người ở ghép bị ngưng lại cho đến khi kháng cáo thành công hoặc thanh lý hợp đồng."}
               </p>
             </div>
           )}

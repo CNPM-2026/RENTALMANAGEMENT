@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
   HelpCircle,
   ShieldCheck,
@@ -15,40 +14,36 @@ import {
   User,
   ChevronDown,
   Building,
-  KeyRound,
   Lock,
 } from "lucide-react";
 import { PublicNavbar } from "@/components/tenant/public-navbar";
 import { getCurrentUser } from "@/lib/auth";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import type { User as UserModel, SupportTicket } from "@/types/models";
 
 export default function PublicSupportPage() {
-  const [currentUser, setCurrentUser] = React.useState<any>(null);
-  const [formData, setFormData] = React.useState({
-    guestName: "",
-    guestEmail: "",
-    guestPhone: "",
-    category: "GENERAL",
-    subject: "",
-    description: "",
+  const [currentUser] = React.useState<UserModel | null>(() => {
+    if (typeof window !== "undefined") {
+      return getCurrentUser();
+    }
+    return null;
+  });
+  const [formData, setFormData] = React.useState(() => {
+    const user = typeof window !== "undefined" ? getCurrentUser() : null;
+    return {
+      guestName: user?.fullName || "",
+      guestEmail: user?.email || "",
+      guestPhone: "",
+      category: "GENERAL",
+      subject: "",
+      description: "",
+    };
   });
   const [submitting, setSubmitting] = React.useState(false);
-  const [submittedTicket, setSubmittedTicket] = React.useState<any>(null);
+  const [submittedTicket, setSubmittedTicket] = React.useState<SupportTicket | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [openFaq, setOpenFaq] = React.useState<number | null>(0);
-
-  React.useEffect(() => {
-    const user = getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      setFormData((prev) => ({
-        ...prev,
-        guestName: user.fullName || "",
-        guestEmail: user.email || "",
-      }));
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,8 +74,9 @@ export default function PublicSupportPage() {
         subject: "",
         description: "",
       });
-    } catch (err: any) {
-      setErrorMessage(err?.response?.data?.message || err?.message || "Không thể gửi yêu cầu hỗ trợ. Vui lòng thử lại sau.");
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+      setErrorMessage(errorObj?.response?.data?.message || errorObj?.message || "Không thể gửi yêu cầu hỗ trợ. Vui lòng thử lại sau.");
     } finally {
       setSubmitting(false);
     }

@@ -4,7 +4,7 @@ import * as React from "react";
 import { apiClient } from "@/lib/api";
 import { Post } from "@/types/models";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, Trash2, Plus, Phone, Mail, AlertTriangle } from "lucide-react";
+import { ShieldAlert, Trash2, Plus, Phone, Mail } from "lucide-react";
 
 interface BlacklistEntry {
   id: string;
@@ -41,7 +41,7 @@ export default function AdminFraudPage() {
 
     apiClient.admin
       .getBlacklist()
-      .then((data: any) => setBlacklist(data ?? []))
+      .then((data) => setBlacklist((data as BlacklistEntry[]) ?? []))
       .catch(() => {});
   }, []);
 
@@ -84,8 +84,9 @@ export default function AdminFraudPage() {
       setAddValue("");
       setAddReason("");
       loadData();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Không thể thêm vào danh sách đen.");
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(errorObj?.response?.data?.message || errorObj?.message || "Không thể thêm vào danh sách đen.");
     } finally {
       setIsSubmitting(false);
     }
@@ -98,8 +99,9 @@ export default function AdminFraudPage() {
       await apiClient.admin.removeFromBlacklist(id);
       setBlacklist((prev) => prev.filter((item) => item.id !== id));
       setSuccess(`Đã xóa ${val} khỏi danh sách đen.`);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Không thể xóa khỏi blacklist.");
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } } };
+      setError(errorObj?.response?.data?.message || "Không thể xóa khỏi blacklist.");
     }
   };
 
