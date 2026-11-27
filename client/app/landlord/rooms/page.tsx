@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, DoorOpen, Search, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Amenity, Property, Room, RoomStatus } from "@/types/models";
@@ -17,7 +18,10 @@ function formatCurrency(val: number) {
   return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
 }
 
-export default function LandlordRoomsPage() {
+function LandlordRoomsContent() {
+  const searchParams = useSearchParams();
+  const queryPropertyId = searchParams.get("propertyId");
+
   const [properties, setProperties] = React.useState<Property[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = React.useState<string>("");
   const [rooms, setRooms] = React.useState<Room[]>([]);
@@ -36,14 +40,19 @@ export default function LandlordRoomsPage() {
     apiClient.properties
       .getMyProperties()
       .then((props) => {
-        setProperties(props ?? []);
-        if (props && props.length > 0) {
-          setSelectedPropertyId(props[0].id);
+        const list = props ?? [];
+        setProperties(list);
+        if (list.length > 0) {
+          if (queryPropertyId && list.some((p) => p.id === queryPropertyId)) {
+            setSelectedPropertyId(queryPropertyId);
+          } else {
+            setSelectedPropertyId(list[0].id);
+          }
         }
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [queryPropertyId]);
 
   React.useEffect(() => {
     if (!selectedPropertyId) return;
@@ -271,5 +280,13 @@ export default function LandlordRoomsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LandlordRoomsPage() {
+  return (
+    <React.Suspense fallback={<div className="p-8 text-center text-[#74817b]">Đang tải danh sách phòng...</div>}>
+      <LandlordRoomsContent />
+    </React.Suspense>
   );
 }

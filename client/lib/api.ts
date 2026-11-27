@@ -775,8 +775,14 @@ export const apiClient = {
       apiClient.patch<Post>(`/admin/posts/${id}/status`, payload),
     deletePost: (id: string) =>
       apiClient.delete<Post>(`/admin/posts/${id}`),
-    updateUserStatus: (id: string, isActive: boolean) =>
-      apiClient.patch<User>(`/admin/users/${id}/status`, { isActive }),
+    updateUserStatus: (id: string, isActive: boolean, banReason?: string) =>
+      apiClient.patch<User>(`/admin/users/${id}/status`, { isActive, banReason }),
+    getBlacklist: () =>
+      apiClient.get<Array<{ id: string; type: 'PHONE' | 'EMAIL'; value: string; reason: string; createdBy: { fullName: string; email: string }; createdAt: string }>>('/admin/blacklist'),
+    addToBlacklist: (payload: { type: 'PHONE' | 'EMAIL'; value: string; reason: string }) =>
+      apiClient.post('/admin/blacklist', payload),
+    removeFromBlacklist: (id: string) =>
+      apiClient.delete(`/admin/blacklist/${id}`),
     getContentFilterKeywords: () =>
       apiClient.get<Array<{ id: string; keyword: string }>>('/admin/content-filter'),
     addContentFilterKeyword: (keyword: string) =>
@@ -810,6 +816,15 @@ export const apiClient = {
   support: {
     create: (payload: CreateSupportTicketPayload) =>
       apiClient.post<SupportTicket>('/support', payload),
+    createPublic: (payload: {
+      guestName: string;
+      guestEmail: string;
+      guestPhone?: string;
+      category: string;
+      subject: string;
+      description: string;
+      priority?: string;
+    }) => apiClient.post<SupportTicket>('/support/public', payload),
     getMine: () => apiClient.get<SupportTicket[]>('/support/my'),
     getById: (id: string) => apiClient.get<SupportTicket>(`/support/${id}`),
     getAll: (status?: string) => apiClient.get<SupportTicket[]>('/support/admin', status ? { status } : undefined),
@@ -944,8 +959,14 @@ export const apiClient = {
   adminGovernance: {
     getUsers: (query?: { role?: string; search?: string }) =>
       apiClient.get<User[]>('/admin/users', query),
-    updateUserStatus: (id: string, isActive: boolean) =>
-      apiClient.patch<User>(`/admin/users/${id}/status`, { isActive }),
+    updateUserStatus: (id: string, isActive: boolean, banReason?: string) =>
+      apiClient.patch<User>(`/admin/users/${id}/status`, { isActive, banReason }),
+    getBlacklist: () =>
+      apiClient.get<Array<{ id: string; type: 'PHONE' | 'EMAIL'; value: string; reason: string; createdBy: { fullName: string; email: string }; createdAt: string }>>('/admin/blacklist'),
+    addToBlacklist: (payload: { type: 'PHONE' | 'EMAIL'; value: string; reason: string }) =>
+      apiClient.post('/admin/blacklist', payload),
+    removeFromBlacklist: (id: string) =>
+      apiClient.delete(`/admin/blacklist/${id}`),
     /** `role` lọc hàng đợi theo người nộp (`TENANT` | `LANDLORD` | `STAFF`); bỏ trống = tất cả. */
     getKyc: (status?: string, role?: KycRole) =>
       apiClient.get<KycSubmission[]>('/admin/kyc', { status, role }),

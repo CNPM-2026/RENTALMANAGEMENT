@@ -31,7 +31,7 @@ export const roommateInvitationService = {
   create: async (senderId: string, data: { recipientId: string; postId?: string; message?: string }) => {
     if (senderId === data.recipientId) throw new AppError('Không thể tự gửi lời mời cho chính mình', 400);
     const recipient = await prisma.user.findFirst({
-      where: { id: data.recipientId, isActive: true, role: 'TENANT' },
+      where: { id: data.recipientId, isActive: true },
       select: { id: true, fullName: true },
     });
     if (!recipient) throw new AppError('Người nhận không hợp lệ', 404);
@@ -257,6 +257,14 @@ export const roommateInvitationService = {
       );
     }
 
+    if (hostContract.status === 'SUSPENDED') {
+      throw new AppError(
+        'Hợp đồng phòng đang ở trạng thái TẠM ĐÌNH CHỈ. Không thể thêm người ở ghép mới cho đến khi được khôi phục hiệu lực hoặc thanh lý xong.',
+        400,
+        'CONTRACT_SUSPENDED',
+      );
+    }
+
     const room = hostContract.room;
     // Đếm số người thực tế đang ở phòng này (tránh đếm trùng roommate đang xử lý)
     const [activeDeclarations, activeContractCount] = await Promise.all([
@@ -369,15 +377,38 @@ export const roommateInvitationService = {
         select: { id: true, occupants: true },
       });
 
-      // Ẩn tin ở ghép gắn với lời mời
+      // Xử lý tin ở ghép gắn với lời mời: nếu người đăng không có trọ sẵn (roomId == null) -> xoá luôn tin
       if (invitation.postId) {
-        await tx.post.updateMany({
-          where: { id: invitation.postId, status: { in: ['PENDING', 'APPROVED'] } },
-          data: { status: 'CLOSED' },
+        const linkedPost = await tx.post.findUnique({
+          where: { id: invitation.postId },
+          select: { id: true, roomId: true },
         });
+        if (linkedPost && !linkedPost.roomId) {
+          await tx.postImage.deleteMany({ where: { postId: linkedPost.id } });
+          await tx.post.delete({ where: { id: linkedPost.id } }).catch(() => undefined);
+        } else {
+          await tx.post.updateMany({
+            where: { id: invitation.postId, status: { in: ['PENDING', 'APPROVED'] } },
+            data: { status: 'CLOSED' },
+          });
+        }
       }
 
-      // Ẩn tin tìm ở ghép của người được chấp nhận ở ghép (roommateUserId)
+      // Xóa các tin tìm ở ghép của người được chấp nhận nếu không có trọ sẵn
+      const roommatePostsWithoutRoom = await tx.post.findMany({
+        where: {
+          authorId: roommateUserId,
+          postType: 'FIND_ROOMMATE',
+          roomId: null,
+        },
+        select: { id: true },
+      });
+      for (const p of roommatePostsWithoutRoom) {
+        await tx.postImage.deleteMany({ where: { postId: p.id } });
+        await tx.post.delete({ where: { id: p.id } }).catch(() => undefined);
+      }
+
+      // Ẩn các tin tìm ở ghép còn lại của người được chấp nhận ở ghép (roommateUserId)
       await tx.post.updateMany({
         where: {
           authorId: roommateUserId,

@@ -30,4 +30,8 @@ router.post('/lifestyle-questions', validate(lifestyleQuestionCreateSchema), adm
 router.patch('/lifestyle-questions/:id', validate(lifestyleQuestionUpdateSchema), adminController.updateLifestyleQuestion);
 router.delete('/lifestyle-questions/:id', adminController.deleteLifestyleQuestion);
 
+router.get('/blacklist', adminController.getBlacklist);
+router.post('/blacklist', adminController.addToBlacklist);
+router.delete('/blacklist/:id', adminController.removeFromBlacklist);
+
 export default router;

@@ -71,6 +71,7 @@ enum ContractStatus {
   ACTIVE
   EXPIRED
   TERMINATED
+  SUSPENDED
 }
 
 // 🆕 Yêu cầu chấm dứt hợp đồng phải qua Admin duyệt. Tách khỏi
@@ -138,6 +139,11 @@ enum MaintenanceTriageStatus {
   REVIEWED
   NEEDS_INFO
   REJECTED
+}
+
+enum BlacklistType {
+  PHONE
+  EMAIL
 }
 
 // 🆕 Batch 2 — trạng thái CÔNG VIỆC của marketplace thợ.
@@ -349,6 +355,8 @@ model User {
   avatarUrl       String? @map("avatar_url")
   role            Role    @default(TENANT)
   isActive        Boolean @default(true) @map("is_active")
+  banReason       String? @map("ban_reason")
+  bannedAt        DateTime? @map("banned_at")
   isEmailVerified Boolean @default(false) @map("is_email_verified")
 
   // H-05: credential provenance.
@@ -416,6 +424,7 @@ model User {
   occupancyDeclarations         RoomOccupancyDeclaration[]   @relation("TenantOccupancyDeclarations")
   occupancyDeclarationsMade     RoomOccupancyDeclaration[]   @relation("DeclaredOccupancyDeclarations")
   occupancyDeclarationsVerified RoomOccupancyDeclaration[]   @relation("VerifiedOccupancyDeclarations")
+  blacklistedEntries            Blacklist[]
 
   @@index([role])
   @@map("users")
@@ -511,6 +520,7 @@ model KycSubmission {
   id               String    @id @default(uuid())
   userId           String    @unique @map("user_id")
   idNumber         String    @map("id_number")
+  idNumberHash     String?   @unique @map("id_number_hash")
   permanentAddress String    @map("permanent_address")
   // Ảnh CCCD chỉ cần trong lúc chờ duyệt. Khi hồ sơ được APPROVED, ảnh được xoá
   // khỏi Cloudinary và hai cột này được đặt NULL (giữ lại idNumber/địa chỉ để
@@ -533,8 +543,11 @@ model KycSubmission {
 
 model SupportTicket {
   id          String              @id @default(uuid())
-  userId      String              @map("user_id")
+  userId      String?             @map("user_id")
   roomId      String?             @map("room_id")
+  guestEmail  String?             @map("guest_email")
+  guestName   String?             @map("guest_name")
+  guestPhone  String?             @map("guest_phone")
   category    String
   subject     String
   description String
@@ -545,12 +558,27 @@ model SupportTicket {
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
   @@index([status, createdAt])
   @@map("support_tickets")
+}
+
+model Blacklist {
+  id          String        @id @default(uuid())
+  type        BlacklistType
+  value       String        @unique
+  reason      String?
+  createdById String?       @map("created_by_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  createdBy   User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([type, value])
+  @@map("blacklists")
 }
 
 model MaintenanceRequest {
@@ -1008,6 +1036,9 @@ model Contract {
   monthlyRent Decimal        @map("monthly_rent") @db.Decimal(10, 2) // Giá chốt thuê hàng tháng
   terms       String? // Điều khoản hợp đồng
   status      ContractStatus @default(ACTIVE)
+  originalTenantId String?   @map("original_tenant_id") // Lưu lại tenant gốc khi tạm chuyển quyền do bị ban
+  suspendedReason  String?   @map("suspended_reason")  // Lý do tạm đình chỉ (VD: user bị ban)
+  expiryNotified   Boolean   @default(false) @map("expiry_notified") // Đã thông báo sắp hết hạn 1 tháng
   createdAt   DateTime       @default(now()) @map("created_at")
 
   room                  Room                         @relation(fields: [roomId], references: [id], onDelete: Restrict)

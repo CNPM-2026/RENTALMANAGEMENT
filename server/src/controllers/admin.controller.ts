@@ -1,5 +1,6 @@
 import { NextFunction, Response } from 'express';
 import { adminService } from '../services/admin.service';
+import { blacklistService } from '../services/blacklist.service';
 import { PostStatus } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
@@ -54,7 +55,10 @@ export const adminController = {
       if (typeof req.body.isActive !== 'boolean') {
         return res.status(400).json({ success: false, message: 'Trạng thái isActive phải là giá trị boolean' });
       }
-      return res.json({ success: true, data: await adminService.updateUserStatus(req.user!.id, String(req.params.id), req.body.isActive) });
+      return res.json({
+        success: true,
+        data: await adminService.updateUserStatus(req.user!.id, String(req.params.id), req.body.isActive, req.body.banReason),
+      });
     } catch (error) { return next(error); }
   },
 
@@ -166,6 +170,30 @@ export const adminController = {
         message: 'Đã xóa câu hỏi sinh hoạt',
         data: await adminService.deleteLifestyleQuestion(String(req.params.id)),
       });
+    } catch (error) { return next(error); }
+  },
+
+  getBlacklist: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const data = await blacklistService.getAll({
+        search: req.query.search as string,
+        type: req.query.type as string,
+      });
+      return res.json({ success: true, data });
+    } catch (error) { return next(error); }
+  },
+
+  addToBlacklist: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const data = await blacklistService.create(req.user!.id, req.body);
+      return res.status(201).json({ success: true, message: 'Đã thêm vào danh sách đen', data });
+    } catch (error) { return next(error); }
+  },
+
+  removeFromBlacklist: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const data = await blacklistService.delete(req.user!.id, String(req.params.id));
+      return res.json({ success: true, message: 'Đã xóa khỏi danh sách đen', data });
     } catch (error) { return next(error); }
   },
 };

@@ -12,6 +12,7 @@ const labels: Record<ContractStatus, string> = {
   ACTIVE: "Đang hiệu lực",
   EXPIRED: "Hết hạn",
   TERMINATED: "Đã chấm dứt",
+  SUSPENDED: "Tạm đình chỉ",
 };
 
 export default function TenantContractsPage() {

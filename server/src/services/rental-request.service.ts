@@ -28,6 +28,24 @@ export const rentalRequestService = {
     if (room.status !== 'AVAILABLE' || room.contracts.length > 0) {
       throw new AppError('Phòng không tồn tại hoặc không còn trống', 400);
     }
+
+    // Kiểm tra hóa đơn chưa thanh toán: phải hoàn tất thanh toán trước khi thuê phòng mới
+    if (typeof (prisma as any).invoice?.count === 'function') {
+      const unpaidInvoicesCount = await prisma.invoice.count({
+        where: {
+          tenantId,
+          status: 'UNPAID',
+        },
+      });
+      if (unpaidInvoicesCount > 0) {
+        throw new AppError(
+          'Bạn còn khoản hóa đơn chưa thanh toán. Vui lòng thanh toán hết các hóa đơn trước khi thuê phòng mới.',
+          400,
+          'UNPAID_INVOICES_EXIST'
+        );
+      }
+    }
+
     const duplicate = await prisma.rentalRequest.findFirst({
       where: { tenantId, roomId: data.roomId, status: 'SUBMITTED' },
       select: { id: true },
@@ -47,7 +65,9 @@ export const rentalRequestService = {
     return request;
   },
   getMine: (userId: string, role: string) => prisma.rentalRequest.findMany({
-    where: role === 'LANDLORD' ? { landlordId: userId } : { tenantId: userId },
+    where: role === 'LANDLORD'
+      ? { OR: [{ landlordId: userId }, { tenantId: userId }] }
+      : { tenantId: userId },
     include: { room: { include: { property: true } }, tenant: { select: { fullName: true, phone: true, email: true } } },
     orderBy: { updatedAt: 'desc' },
   }),
@@ -57,8 +77,12 @@ export const rentalRequestService = {
       include: { room: { select: { roomNumber: true } } },
     });
     if (!request) throw new AppError('Không tìm thấy yêu cầu thuê phòng', 404);
-    if (role === 'TENANT' && status === 'SIGNED') {
-      if (request.tenantId !== userId || !['APPROVED', 'CONTRACT_READY'].includes(request.status)) {
+
+    const isLandlord = request.landlordId === userId;
+    const isTenant = request.tenantId === userId;
+
+    if (isTenant && status === 'SIGNED') {
+      if (!['APPROVED', 'CONTRACT_READY'].includes(request.status)) {
         throw new AppError('Yêu cầu chưa đủ điều kiện xác nhận bàn giao', 400);
       }
       const contract = await prisma.contract.findFirst({
@@ -68,11 +92,7 @@ export const rentalRequestService = {
       if (!contract) throw new AppError('Bạn cần có hợp đồng đang hiệu lực trước khi xác nhận bàn giao', 400);
       return prisma.rentalRequest.update({ where: { id }, data: { status: 'SIGNED' } });
     }
-    const allowed = role === 'LANDLORD'
-      ? request.landlordId === userId
-      : role === 'TENANT'
-        ? request.tenantId === userId && status === 'CANCELLED'
-        : false;
+    const allowed = isLandlord ? true : isTenant ? status === 'CANCELLED' : false;
     if (!allowed) throw new AppError('Bạn không có quyền cập nhật yêu cầu này', 403);
 
     if (request.status === 'APPROVED') {

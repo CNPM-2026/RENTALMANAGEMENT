@@ -9,6 +9,7 @@ import {
   Printer,
   FileCheck,
   ShieldCheck,
+  AlertTriangle,
   Info,
   Users,
   ExternalLink,
@@ -52,6 +53,18 @@ function TenantContractDetailContent() {
 
   const isPrimaryTenant = Boolean(contract && currentUser && contract.tenantId === currentUser.id);
   const isRoommate = Boolean(contract && currentUser && contract.tenantId !== currentUser.id);
+  const isAdminObserver = Boolean(currentUser?.role === "ADMIN" && contract && contract.tenantId !== currentUser.id);
+  const isTerminated = Boolean(
+    contract &&
+      (contract.status === "TERMINATED" ||
+        (contract.status as string) === "CANCELLED" ||
+        contract.status === "EXPIRED" ||
+        contract.status === "SUSPENDED" ||
+        contract.terminationRequests?.some(
+          (r) => r.status === "PENDING" || r.status === "APPROVED"
+        ))
+  );
+  const cannotSign = isTerminated || isAdminObserver;
 
   React.useEffect(() => {
     apiClient.contracts.getMyContracts("tenant")
@@ -103,6 +116,14 @@ function TenantContractDetailContent() {
   return (
     <div className="space-y-6">
       {loadError && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loadError}</p>}
+      {isAdminObserver && (
+        <div className="p-3.5 rounded-[12px] bg-amber-50 border border-amber-200 flex items-center gap-2.5 text-[13px] text-amber-900 font-medium shadow-xs">
+          <ShieldCheck className="size-5 text-amber-600 shrink-0" />
+          <span>
+            <strong>Chế độ Quản trị viên (Chỉ xem):</strong> Bạn đang xem hợp đồng của người dùng với quyền Quản trị viên. Toàn bộ thao tác ký số, chỉnh sửa hoặc gửi yêu cầu đều bị vô hiệu hóa.
+          </span>
+        </div>
+      )}
       {/* =======================================================================
           1. HEADER & ACTION TOOLBAR (Figma Node 44:65135)
       ======================================================================== */}
@@ -123,7 +144,11 @@ function TenantContractDetailContent() {
             <h1 className="text-2xl font-bold text-[#203c37] tracking-tight">
               Hợp đồng thuê phòng điện tử
             </h1>
-            {isSigned ? (
+            {contract?.status === "SUSPENDED" ? (
+              <Badge variant="error" size="md">
+                TẠM ĐÌNH CHỈ (CHỜ KHÁNG CÁO)
+              </Badge>
+            ) : isSigned ? (
               <Badge variant="success" size="md">
                 ĐANG CÓ HIỆU LỰC
               </Badge>
@@ -133,6 +158,17 @@ function TenantContractDetailContent() {
               </Badge>
             )}
           </div>
+          {contract?.status === "SUSPENDED" && (
+            <div className="mt-2 p-3.5 rounded-[10px] bg-red-50 border border-red-200 text-red-900 space-y-1">
+              <div className="flex items-center gap-2 font-bold text-[13px]">
+                <AlertTriangle className="size-4 text-red-600" />
+                <span>Hợp đồng đang tạm đình chỉ (Người thuê bị khóa tài khoản & chờ kháng cáo)</span>
+              </div>
+              <p className="text-[12px] text-red-700">
+                {contract.suspendedReason || "Tài khoản của người thuê chính đã bị khóa. Toàn bộ thao tác và bổ sung người ở ghép bị ngưng lại cho đến khi kháng cáo thành công hoặc thanh lý hợp đồng."}
+              </p>
+            </div>
+          )}
           <p className="text-[13px] text-[#74817b]">
             Văn bản pháp lý điện tử có giá trị ràng buộc quyền và nghĩa vụ hai bên theo quy định pháp luật
           </p>
@@ -281,14 +317,23 @@ function TenantContractDetailContent() {
 
             {!isSigned && isPrimaryTenant && (
               <Button
-                variant="primary"
+                variant={cannotSign ? "outline" : "primary"}
                 size="md"
-                onClick={handleSignContract}
+                disabled={cannotSign}
+                onClick={cannotSign ? undefined : handleSignContract}
                 loading={signing}
-                className="w-full font-bold shadow-md mt-3"
+                className={`w-full font-bold shadow-md mt-3 ${
+                  cannotSign
+                    ? "opacity-60 cursor-not-allowed bg-gray-100 text-gray-500 border-gray-300 pointer-events-none"
+                    : ""
+                }`}
                 leftIcon={<FileCheck className="size-4" />}
               >
-                Ký số hợp đồng ngay
+                {isTerminated
+                  ? "Hợp đồng đã chấm dứt (Không thể ký)"
+                  : isAdminObserver
+                    ? "Chế độ Quản trị viên (Chỉ xem)"
+                    : "Ký số hợp đồng ngay"}
               </Button>
             )}
 
@@ -579,14 +624,23 @@ function TenantContractDetailContent() {
                     </div>
                   ) : (
                     <Button
-                      variant="primary"
+                      variant={cannotSign ? "outline" : "primary"}
                       size="sm"
-                      onClick={handleSignContract}
+                      disabled={cannotSign}
+                      onClick={cannotSign ? undefined : handleSignContract}
                       loading={signing}
-                      className="font-bold shadow-xs"
+                      className={`font-bold shadow-xs ${
+                        cannotSign
+                          ? "opacity-60 cursor-not-allowed bg-gray-100 text-gray-500 border-gray-300 pointer-events-none"
+                          : ""
+                      }`}
                       leftIcon={<FileCheck className="size-4" />}
                     >
-                      Bấm để ký số điện tử
+                      {isTerminated
+                        ? "Hợp đồng đã chấm dứt"
+                        : isAdminObserver
+                          ? "Chế độ chỉ xem"
+                          : "Bấm để ký số điện tử"}
                     </Button>
                   )}
                 </div>

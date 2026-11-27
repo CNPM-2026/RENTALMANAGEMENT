@@ -5,6 +5,7 @@ import { notificationService } from './notification.service';
 import { roomDemandService } from './roomDemand.service';
 import { assertKycApproved, loadKycState, TENANT_KYC_REQUIRED } from './kycGate.service';
 import { auditService } from './audit.service';
+import { contractLifecycleService } from './contractLifecycle.service';
 
 export const contractService = {
   // 1. Chủ trọ tạo hợp đồng mới
@@ -46,7 +47,7 @@ export const contractService = {
       throw new AppError('Phòng này hiện không ở trạng thái sẵn sàng cho thuê', 400);
     }
     const tenant = await prisma.user.findUnique({ where: { id: tenantId }, select: { id: true, role: true, isActive: true } });
-    if (!tenant || tenant.role !== 'TENANT' || !tenant.isActive) {
+    if (!tenant || !tenant.isActive) {
       throw new AppError('Người thuê không hợp lệ', 400);
     }
 
@@ -125,6 +126,7 @@ export const contractService = {
 
   // 2. Lấy danh sách hợp đồng (Dành cho cả Chủ trọ và Người thuê)
   getMyContracts: async (userId: string, role: string) => {
+    void contractLifecycleService.checkAndNotifyExpiringContracts().catch(() => undefined);
     const whereClause: any = {};
     
     if (role === 'LANDLORD') {
@@ -241,9 +243,10 @@ export const contractService = {
     }
     const allowedTransitions: Record<ContractStatus, ContractStatus[]> = {
       PENDING: ['ACTIVE', 'TERMINATED'],
-      ACTIVE: ['EXPIRED', 'TERMINATED'],
+      ACTIVE: ['EXPIRED', 'TERMINATED', 'SUSPENDED'],
       EXPIRED: [],
       TERMINATED: [],
+      SUSPENDED: ['ACTIVE', 'TERMINATED'],
     };
     if (!allowedTransitions[contract.status].includes(status)) {
       throw new AppError(`Không thể chuyển hợp đồng từ ${contract.status} sang ${status}`, 400);
@@ -285,6 +288,15 @@ export const contractService = {
         await tx.roomOccupancyDeclaration.updateMany({
           where: { roomId: contract.roomId, status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
           data: { status: 'SUPERSEDED', supersededAt: new Date() },
+        });
+        // Mở lại tin đăng của phòng nếu tin đăng chưa hết hạn
+        await tx.post.updateMany({
+          where: {
+            roomId: contract.roomId,
+            status: 'CLOSED',
+            OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
+          },
+          data: { status: 'APPROVED' },
         });
       }
 

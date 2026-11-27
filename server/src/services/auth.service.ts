@@ -14,6 +14,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { env } from '../config/env';
 import { invalidateSocketsForRefreshToken, invalidateUserSockets } from '../socket/sessionInvalidation';
 import { auditService } from './audit.service';
+import { blacklistService } from './blacklist.service';
 
 // `users.email` là unique index phân biệt hoa/thường, nên tra cứu phải không
 // phân biệt casing để vẫn thấy các row cũ được `register` lưu nguyên văn.
@@ -109,7 +110,10 @@ const claimUnverifiedAccount = async (user: User, identity: GoogleIdentity): Pro
     if (!(await lockUserRow(tx, user.id))) throw new AppError('Tài khoản không tồn tại', 401);
     const locked = await tx.user.findUniqueOrThrow({ where: { id: user.id } });
 
-    if (!locked.isActive) throw new AppError('Tài khoản đã bị khóa', 403);
+    if (!locked.isActive) {
+      const msg = locked.banReason ? `Tài khoản đã bị khóa. Lý do: ${locked.banReason}` : 'Tài khoản đã bị khóa';
+      throw new AppError(msg, 403, 'ACCOUNT_BANNED');
+    }
     // Request khác đã claim trước: không thu hồi token, không ghi audit.
     if (locked.isEmailVerified) return { claimed: false, user: locked };
 
@@ -182,8 +186,13 @@ const resolveGoogleAccount = async (identity: GoogleIdentity, attempt = 1): Prom
     }
   }
 
+  await blacklistService.checkBlacklist(existing.phone, identity.email);
+
   // Tài khoản đã bị khóa (ban) thì không được đăng nhập, cũng không được tự mở khóa.
-  if (!existing.isActive) throw new AppError('Tài khoản đã bị khóa', 403);
+  if (!existing.isActive) {
+    const msg = existing.banReason ? `Tài khoản đã bị khóa. Lý do: ${existing.banReason}` : 'Tài khoản đã bị khóa';
+    throw new AppError(msg, 403, 'ACCOUNT_BANNED');
+  }
 
   if (!existing.isEmailVerified) return claimUnverifiedAccount(existing, identity);
 
@@ -242,7 +251,10 @@ const issueSession = async (userId: string, verify?: (locked: User) => void) => 
     if (!(await lockUserRow(tx, userId))) throw new AppError('Tài khoản không tồn tại', 401);
     const locked = await tx.user.findUniqueOrThrow({ where: { id: userId } });
 
-    if (!locked.isActive) throw new AppError('Tài khoản đã bị khóa', 403);
+    if (!locked.isActive) {
+      const msg = locked.banReason ? `Tài khoản đã bị khóa. Lý do: ${locked.banReason}` : 'Tài khoản đã bị khóa';
+      throw new AppError(msg, 403, 'ACCOUNT_BANNED');
+    }
     if (!locked.isEmailVerified) throw new AppError('Vui lòng xác minh email trước khi đăng nhập', 403);
     verify?.(locked);
 
@@ -367,6 +379,7 @@ export const authService = {
   // 1. Đăng ký
   register: async (data: any) => {
     const { email, password, fullName, phone, role } = data;
+    await blacklistService.checkBlacklist(phone, email);
     const normalizedEmail = normalizeEmail(email);
 
     // Tự động dọn dẹp các tài khoản chưa xác minh mà OTP đã hết hạn
@@ -472,11 +485,12 @@ export const authService = {
     if (!user || !user.isActive) {
       throw new AppError('Email hoặc mật khẩu không đúng', 401);
     }
-    if (!user.isEmailVerified) {
-      throw new AppError('Vui lòng xác minh email trước khi đăng nhập', 403);
-    }
     if (!isMatch) {
       throw new AppError('Email hoặc mật khẩu không đúng', 401);
+    }
+    await blacklistService.checkBlacklist(user.phone, user.email);
+    if (!user.isEmailVerified) {
+      throw new AppError('Vui lòng xác minh email trước khi đăng nhập', 403);
     }
 
     // Cấp phiên: refresh token chỉ được ghi sau khi khóa row users và kiểm tra

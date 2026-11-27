@@ -44,8 +44,20 @@ export const chatAccessService = {
     if (actorId === targetUserId) throw new AppError('Không thể tự nhắn tin với chính mình', 400);
 
     const [actor, target] = await loadAccounts(actorId, targetUserId);
-    if (!actor?.isActive) throw new AppError('Tài khoản của bạn không còn hoạt động', 403);
-    if (!target || !target.isActive) throw new AppError('Người dùng không tồn tại hoặc đã bị khóa', 404);
+    if (!actor) throw new AppError('Người dùng không tồn tại', 404);
+    if (!target) throw new AppError('Người dùng không tồn tại hoặc đã bị khóa', 404);
+
+    // Người dùng bị ban chỉ có thể chat với Quản trị viên (ADMIN)
+    if (!actor.isActive) {
+      if (target.role !== 'ADMIN') {
+        throw new AppError('Tài khoản của bạn đã bị khóa và chỉ có thể nhắn tin với Quản trị viên', 403, 'ACCOUNT_BANNED');
+      }
+    }
+    if (!target.isActive) {
+      if (actor.role !== 'ADMIN') {
+        throw new AppError('Người dùng này đã bị khóa tài khoản', 403, 'TARGET_USER_BANNED');
+      }
+    }
 
     if (actor.role === 'ADMIN' || target.role === 'ADMIN') return { taskId: null };
     if (actor.role === 'TENANT' && target.role === 'LANDLORD') return { taskId: null };
@@ -87,9 +99,24 @@ export const chatAccessService = {
   assertMember: async (userId: string, conversationId: string) => {
     const member = await prisma.conversationMember.findUnique({
       where: { conversationId_userId: { conversationId, userId } },
-      select: { conversationId: true },
+      select: { conversationId: true, user: { select: { id: true, role: true, isActive: true } } },
     });
     if (!member) throw new AppError('Bạn không có quyền xem cuộc trò chuyện này', 403, 'CHAT_NOT_MEMBER');
+
+    const otherMembers = await prisma.conversationMember.findMany({
+      where: { conversationId, userId: { not: userId } },
+      select: { user: { select: { id: true, role: true, isActive: true } } },
+    });
+
+    if (!member.user.isActive) {
+      const hasAdmin = otherMembers.some((m) => m.user.role === 'ADMIN');
+      if (!hasAdmin) {
+        throw new AppError('Tài khoản của bạn đã bị khóa và chỉ có thể nhắn tin với Quản trị viên', 403, 'ACCOUNT_BANNED');
+      }
+    } else if (member.user.role !== 'ADMIN' && otherMembers.some((m) => !m.user.isActive)) {
+      throw new AppError('Người dùng trong cuộc trò chuyện này đã bị khóa tài khoản', 403, 'USER_BANNED');
+    }
+
     return member;
   },
 
