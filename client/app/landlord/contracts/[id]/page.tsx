@@ -229,51 +229,63 @@ export default function LandlordContractDetailPage() {
 
             <div className="space-y-3">
               {(contract.coTenants && contract.coTenants.length > 0) ? (
-                contract.coTenants.map((person) => (
-                  <div
-                    key={person.id}
-                    className={`p-3.5 rounded-[10px] border flex items-start gap-3.5 transition-colors ${
-                      person.isPrimary
-                        ? "bg-[#f4f8f5] border-[#b8dbc6]"
-                        : "bg-white border-[#e2e7e1] hover:border-[#15594f]/40"
-                    }`}
-                  >
-                    <div className="size-11 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#d2e4d7]">
-                      <Avatar
-                        src={person.avatarUrl ?? "/images/default-avatar.svg"}
-                        alt={person.fullName}
-                        className="size-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="font-bold text-[14px] text-[#203c37] truncate">{person.fullName}</span>
-                        {person.isPrimary ? (
-                          <Badge variant="success" size="sm">Người thuê chính (Chủ HĐ)</Badge>
-                        ) : (
-                          <Badge variant="neutral" size="sm">Bạn ở ghép</Badge>
-                        )}
+                contract.coTenants.map((person) => {
+                  const isBanned = person.isActive === false;
+                  return (
+                    <div
+                      key={person.id}
+                      className={`p-3.5 rounded-[10px] border flex items-start gap-3.5 transition-colors ${
+                        isBanned
+                          ? "bg-[#ecefeLink/bg-neutral-100] bg-neutral-100/90 border-neutral-300 opacity-80"
+                          : person.isPrimary
+                            ? "bg-[#f4f8f5] border-[#b8dbc6]"
+                            : "bg-white border-[#e2e7e1] hover:border-[#15594f]/40"
+                      }`}
+                    >
+                      <div className="size-11 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#d2e4d7]">
+                        <Avatar
+                          src={person.avatarUrl ?? "/images/default-avatar.svg"}
+                          alt={person.fullName}
+                          className={`size-full object-cover ${isBanned ? "grayscale" : ""}`}
+                        />
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[12px] text-[#74817b]">
-                        <p className="flex items-center gap-1.5 truncate">
-                          <Phone className="size-3 text-[#15594f] shrink-0" />
-                          <span>{person.phone || "Chưa có SĐT"}</span>
-                        </p>
-                        {person.email && (
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold text-[14px] truncate ${isBanned ? "text-neutral-500 line-through/none" : "text-[#203c37]"}`}>
+                              {person.fullName}
+                            </span>
+                            {isBanned && (
+                              <Badge variant="error" size="sm">Bị ban</Badge>
+                            )}
+                          </div>
+                          {person.isPrimary ? (
+                            <Badge variant={isBanned ? "neutral" : "success"} size="sm">Người thuê chính (Chủ HĐ)</Badge>
+                          ) : (
+                            <Badge variant="neutral" size="sm">Bạn ở ghép</Badge>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[12px] text-[#74817b]">
                           <p className="flex items-center gap-1.5 truncate">
-                            <Mail className="size-3 text-[#15594f] shrink-0" />
-                            <span>{person.email}</span>
+                            <Phone className="size-3 text-[#15594f] shrink-0" />
+                            <span>{person.phone || "Chưa có SĐT"}</span>
+                          </p>
+                          {person.email && (
+                            <p className="flex items-center gap-1.5 truncate">
+                              <Mail className="size-3 text-[#15594f] shrink-0" />
+                              <span>{person.email}</span>
+                            </p>
+                          )}
+                        </div>
+                        {person.joinedAt && (
+                          <p className="text-[11px] text-[#74817b]">
+                            Ngày vào ở: {new Date(person.joinedAt).toLocaleDateString("vi-VN")}
                           </p>
                         )}
                       </div>
-                      {person.joinedAt && (
-                        <p className="text-[11px] text-[#74817b]">
-                          Ngày vào ở: {new Date(person.joinedAt).toLocaleDateString("vi-VN")}
-                        </p>
-                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-4 rounded-[8px] bg-[#f7f6f2] text-center text-[13px] text-[#74817b]">
                   Chưa có bạn ở ghép nào được thêm vào phòng này.

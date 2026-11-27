@@ -110,6 +110,18 @@ function LoginForm() {
       router.replace("/");
     } catch (err: unknown) {
       if (err instanceof ApiError) {
+        const isBanned =
+          err.status === 403 &&
+          (err.message?.toLowerCase().includes("khóa") ||
+            err.message?.toLowerCase().includes("bị ban") ||
+            (err.data as any)?.code === "ACCOUNT_BANNED");
+
+        if (isBanned) {
+          router.push(
+            `/support?banned=1&email=${encodeURIComponent(emailOrPhone.trim())}&reason=${encodeURIComponent(err.message || "")}`
+          );
+          return;
+        }
         setErrorMessage(err.message || "Tài khoản hoặc mật khẩu không chính xác.");
       } else {
         setErrorMessage("Không thể kết nối đến máy chủ. Vui lòng thử lại sau.");
@@ -320,7 +332,7 @@ export default function LoginPage() {
         <div className="flex justify-end text-[13px] text-[#74817b]">
           <span>Cần giúp đỡ? </span>
           <Link
-            href="/tenant/support"
+            href="/support"
             className="ml-1 text-[#15594f] font-semibold hover:underline"
           >
             Liên hệ 5K-Rental Manager ↗

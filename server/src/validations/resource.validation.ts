@@ -411,6 +411,7 @@ export const rentalRequestStatusSchema = z.object({
 export const roommateInvitationCreateSchema = z.object({
   recipientId: uuid,
   postId: uuid.optional(),
+  roomId: uuid.optional(),
   message: z.string().trim().max(2000).optional(),
 });
 

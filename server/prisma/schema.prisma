@@ -663,6 +663,7 @@ model RoommateInvitation {
   senderId    String           @map("sender_id")
   recipientId String           @map("recipient_id")
   postId      String?          @map("post_id")
+  roomId      String?          @map("room_id")
   message     String?
   status      InvitationStatus @default(PENDING)
   createdAt   DateTime         @default(now()) @map("created_at")
@@ -671,6 +672,7 @@ model RoommateInvitation {
   sender    User  @relation("SentRoommateInvitations", fields: [senderId], references: [id], onDelete: Cascade)
   recipient User  @relation("ReceivedRoommateInvitations", fields: [recipientId], references: [id], onDelete: Cascade)
   post      Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+  room      Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
 
   @@unique([senderId, recipientId])
   @@index([recipientId, status])
@@ -840,6 +842,7 @@ model Room {
   rentalRequests        RentalRequest[]
   maintenanceTasks      MaintenanceTask[] // 🆕 Batch 2 — công việc bảo trì gắn với phòng
   occupancyDeclarations RoomOccupancyDeclaration[] // 🆕 số người ở do tenant khai
+  roommateInvitations   RoommateInvitation[]
 
   @@index([status])
   @@map("rooms")

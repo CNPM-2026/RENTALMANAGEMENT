@@ -431,47 +431,61 @@ function TenantContractDetailContent() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               {(contract?.coTenants && contract.coTenants.length > 0) ? (
-                contract.coTenants.map((member) => (
-                  <div
-                    key={member.id}
-                    className={`p-3.5 rounded-[10px] border flex items-start gap-3 transition-colors ${
-                      member.isPrimary
-                        ? "bg-[#f4f8f5] border-[#b8dbc6]"
-                        : "bg-white border-[#e2e7e1] hover:border-[#15594f]/40"
-                    }`}
-                  >
-                    <div className="size-11 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#d2e4d7]">
-                      <Avatar src={member.avatarUrl ?? "/images/default-avatar.svg"} alt={member.fullName} className="size-full object-cover" />
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-[14px] text-[#203c37] truncate">{member.fullName}</span>
-                        {member.isPrimary ? (
-                          <Badge variant="success" size="sm">Người thuê chính</Badge>
-                        ) : (
-                          <Badge variant="neutral" size="sm">Bạn ở ghép</Badge>
-                        )}
+                contract.coTenants.map((member) => {
+                  const isBanned = member.isActive === false;
+                  return (
+                    <div
+                      key={member.id}
+                      className={`p-3.5 rounded-[10px] border flex items-start gap-3 transition-colors ${
+                        isBanned
+                          ? "bg-neutral-100/90 border-neutral-300 opacity-80"
+                          : member.isPrimary
+                            ? "bg-[#f4f8f5] border-[#b8dbc6]"
+                            : "bg-white border-[#e2e7e1] hover:border-[#15594f]/40"
+                      }`}
+                    >
+                      <div className="size-11 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#d2e4d7]">
+                        <Avatar
+                          src={member.avatarUrl ?? "/images/default-avatar.svg"}
+                          alt={member.fullName}
+                          className={`size-full object-cover ${isBanned ? "grayscale" : ""}`}
+                        />
                       </div>
-                      <div className="text-[12px] text-[#74817b] space-y-0.5">
-                        <p className="flex items-center gap-1.5 truncate">
-                          <Phone className="size-3 text-[#15594f] shrink-0" />
-                          <span>{member.phone || "Chưa có SĐT"}</span>
-                        </p>
-                        {member.email && (
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`font-bold text-[14px] truncate ${isBanned ? "text-neutral-500" : "text-[#203c37]"}`}>
+                            {member.fullName}
+                          </span>
+                          {isBanned && (
+                            <Badge variant="error" size="sm">Bị ban</Badge>
+                          )}
+                          {member.isPrimary ? (
+                            <Badge variant={isBanned ? "neutral" : "success"} size="sm">Người thuê chính</Badge>
+                          ) : (
+                            <Badge variant="neutral" size="sm">Bạn ở ghép</Badge>
+                          )}
+                        </div>
+                        <div className="text-[12px] text-[#74817b] space-y-0.5">
                           <p className="flex items-center gap-1.5 truncate">
-                            <Mail className="size-3 text-[#15594f] shrink-0" />
-                            <span>{member.email}</span>
+                            <Phone className="size-3 text-[#15594f] shrink-0" />
+                            <span>{member.phone || "Chưa có SĐT"}</span>
                           </p>
-                        )}
-                        {member.joinedAt && (
-                          <p className="text-[11px] text-[#74817b]">
-                            Vào ở từ: {new Date(member.joinedAt).toLocaleDateString("vi-VN")}
-                          </p>
-                        )}
+                          {member.email && (
+                            <p className="flex items-center gap-1.5 truncate">
+                              <Mail className="size-3 text-[#15594f] shrink-0" />
+                              <span>{member.email}</span>
+                            </p>
+                          )}
+                          {member.joinedAt && (
+                            <p className="text-[11px] text-[#74817b]">
+                              Vào ở từ: {new Date(member.joinedAt).toLocaleDateString("vi-VN")}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-4 rounded-[10px] border border-[#e2e7e1] bg-[#f7f6f2] col-span-2 text-center text-[13px] text-[#74817b]">
                   Chưa có bạn ở ghép nào được thêm vào phòng này.

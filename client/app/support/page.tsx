@@ -16,13 +16,19 @@ import {
   Building,
   Lock,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { PublicNavbar } from "@/components/tenant/public-navbar";
 import { getCurrentUser } from "@/lib/auth";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import type { User as UserModel, SupportTicket } from "@/types/models";
 
-export default function PublicSupportPage() {
+function PublicSupportContent() {
+  const searchParams = useSearchParams();
+  const isBannedParam = searchParams.get("banned") === "1";
+  const emailParam = searchParams.get("email") || "";
+  const reasonParam = searchParams.get("reason") || "";
+
   const [currentUser] = React.useState<UserModel | null>(() => {
     if (typeof window !== "undefined") {
       return getCurrentUser();
@@ -33,17 +39,31 @@ export default function PublicSupportPage() {
     const user = typeof window !== "undefined" ? getCurrentUser() : null;
     return {
       guestName: user?.fullName || "",
-      guestEmail: user?.email || "",
+      guestEmail: emailParam || user?.email || "",
       guestPhone: "",
-      category: "GENERAL",
-      subject: "",
-      description: "",
+      category: isBannedParam ? "ACCOUNT_APPEAL" : "GENERAL",
+      subject: isBannedParam ? "Kháng cáo tài khoản bị khóa" : "",
+      description: isBannedParam && reasonParam ? `Lý do hệ thống thông báo: ${reasonParam}\n\nNội dung giải trình / kháng cáo: ` : "",
     };
   });
   const [submitting, setSubmitting] = React.useState(false);
   const [submittedTicket, setSubmittedTicket] = React.useState<SupportTicket | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [openFaq, setOpenFaq] = React.useState<number | null>(0);
+  const [openFaq, setOpenFaq] = React.useState<number | null>(isBannedParam ? 3 : 0);
+
+  React.useEffect(() => {
+    if (isBannedParam) {
+      setOpenFaq(3);
+      if (emailParam) {
+        setFormData((prev) => ({
+          ...prev,
+          guestEmail: prev.guestEmail || emailParam,
+          category: "ACCOUNT_APPEAL",
+          subject: prev.subject || "Kháng cáo tài khoản bị khóa",
+        }));
+      }
+    }
+  }, [isBannedParam, emailParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +223,19 @@ export default function PublicSupportPage() {
               </p>
             </div>
 
+            {isBannedParam && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-[10px] space-y-1.5 animate-in fade-in">
+                <div className="flex items-center gap-2 text-red-800 font-bold text-[14px]">
+                  <Lock className="size-4.5 text-red-600 shrink-0" />
+                  <span>Tài khoản của bạn hiện đang bị tạm khóa</span>
+                </div>
+                <p className="text-[12px] text-red-700 leading-relaxed">
+                  {reasonParam ? `${reasonParam}. ` : ""}
+                  Bạn có thể gửi giải trình hoặc yêu cầu kháng cáo qua biểu mẫu bên dưới. Ban quản trị sẽ tiếp nhận và phản hồi qua email của bạn.
+                </p>
+              </div>
+            )}
+
             {submittedTicket && (
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-[10px] space-y-2 animate-in fade-in">
                 <div className="flex items-center gap-2 text-emerald-800 font-bold text-[14px]">
@@ -343,5 +376,13 @@ export default function PublicSupportPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function PublicSupportPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-[#f7f6f2] flex items-center justify-center text-sm text-[#74817b]">Đang tải...</div>}>
+      <PublicSupportContent />
+    </React.Suspense>
   );
 }

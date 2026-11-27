@@ -273,7 +273,7 @@ export default function VerifyOtpPage() {
         <div className="flex justify-end text-[13px] text-[#74817b]">
           <span>Cần hỗ trợ? </span>
           <Link
-            href="/tenant/support"
+            href="/support"
             className="ml-1 text-[#15594f] font-semibold hover:underline"
           >
             Liên hệ hỗ trợ ↗

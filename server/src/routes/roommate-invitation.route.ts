@@ -6,10 +6,9 @@ import { roommateInvitationCreateSchema, roommateInvitationStatusSchema } from '
 
 const router = Router();
 router.use(authenticate);
-// Trang `/tenant/roommate-invitations` là route dùng chung trong portal khách
-// thuê: mọi role được ĐỌC lời mời của chính mình (thường rỗng với role khác).
-// Tạo / phản hồi lời mời vẫn chỉ TENANT.
+// Mọi role (TENANT, ADMIN, STAFF, LANDLORD) đều có thể sử dụng tính năng ở ghép.
+// Ngoại lệ: LANDLORD không được phép đứng làm chủ hợp đồng đại diện (kiểm tra ở service).
 router.get('/my', roommateInvitationController.getMine);
-router.post('/', authorize('TENANT'), validate(roommateInvitationCreateSchema), roommateInvitationController.create);
-router.patch('/:id/status', authorize('TENANT'), validate(roommateInvitationStatusSchema), roommateInvitationController.updateStatus);
+router.post('/', authorize('TENANT', 'ADMIN', 'STAFF', 'LANDLORD'), validate(roommateInvitationCreateSchema), roommateInvitationController.create);
+router.patch('/:id/status', authorize('TENANT', 'ADMIN', 'STAFF', 'LANDLORD'), validate(roommateInvitationStatusSchema), roommateInvitationController.updateStatus);
 export default router;

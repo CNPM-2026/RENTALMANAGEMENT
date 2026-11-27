@@ -165,10 +165,7 @@ function resolveForPortal(
       return null;
 
     case 'ROOMMATE_INVITATION':
-      if (portal === 'tenant') {
-        return id ? withFocus('/tenant/roommate-invitations', 'invitation', id) : '/tenant/roommate-invitations';
-      }
-      return null;
+      return id ? withFocus('/tenant/roommate-invitations', 'invitation', id) : '/tenant/roommate-invitations';
 
     case 'KYC':
       if (portal === 'admin') return id ? `/admin/landlords/kyc/${id}` : '/admin/landlords/kyc';

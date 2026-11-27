@@ -18,10 +18,12 @@ import {
   CalendarDays,
   Building2,
   FileText,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
 import { apiClient } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import { Contract, Post, RoommatePostFilters, RoommatePostItem, User } from "@/types/models";
@@ -326,6 +328,12 @@ export default function RoommateDiscoveryPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [candidates, setCandidates] = React.useState<CandidateShape[]>([]);
+  const [inviteModalOpen, setInviteModalOpen] = React.useState(false);
+  const [selectedCandidate, setSelectedCandidate] = React.useState<CandidateShape | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = React.useState<string>("");
+  const [inviteMessage, setInviteMessage] = React.useState<string>("");
+  const [isSendingInvite, setIsSendingInvite] = React.useState(false);
+  const [inviteError, setInviteError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     // Chỉ lấy danh tính từ localStorage — thao tác này không đọc thời gian hệ
@@ -453,7 +461,7 @@ export default function RoommateDiscoveryPage() {
         description: postForm.description.trim(),
         postType: "FIND_ROOMMATE",
         ...(postForm.price ? { price: Number(postForm.price) } : {}),
-        ...(postForm.roomId ? { roomId: postForm.roomId } : {}),
+        ...(postForm.roomId && currentUser?.role !== "LANDLORD" ? { roomId: postForm.roomId } : {}),
         ...(postForm.expiredAt
           ? { expiredAt: new Date(`${postForm.expiredAt}T23:59:59`).toISOString() }
           : {}),
@@ -529,15 +537,59 @@ export default function RoommateDiscoveryPage() {
     setIsPostFormOpen((open) => !open);
   };
 
-  const handleSendInvite = async (id: string, name: string, postId: string) => {
-    if (invitedIds.includes(id)) return;
+  const openInviteModal = (candidate: CandidateShape) => {
+    const user = getCurrentUser();
+    if (!user) {
+      window.location.href = "/login";
+      return;
+    }
+    setSelectedCandidate(candidate);
+    setSelectedRoomId(myRooms[0]?.roomId || "");
+    setInviteMessage("");
+    setInviteError(null);
+    setInviteModalOpen(true);
+  };
+
+  const handleConfirmSendInvite = async () => {
+    if (!selectedCandidate) return;
+    const isPostWithoutRoom = !selectedCandidate.roomId;
+
+    if (isPostWithoutRoom) {
+      if (currentUser?.role === "LANDLORD") {
+        setInviteError(
+          "Tài khoản chủ trọ không được phép đứng tên chủ hợp đồng trong hợp đồng ở ghép. Bạn chỉ có thể gửi lời mời kết nối với các tin đăng đã có phòng sẵn."
+        );
+        return;
+      }
+      if (myRooms.length === 0) {
+        setInviteError(
+          "Tin đăng này chưa có phòng. Bạn bắt buộc phải có hợp đồng thuê phòng đang hiệu lực và chọn phòng để gửi lời mời."
+        );
+        return;
+      }
+      if (!selectedRoomId) {
+        setInviteError("Vui lòng chọn phòng đang thuê của bạn.");
+        return;
+      }
+    }
+
+    setIsSendingInvite(true);
+    setInviteError(null);
     try {
-      await apiClient.roommateInvitations.create({ recipientId: id, postId });
-      setInvitedIds((prev) => [...prev, id]);
-      setFeedbackMessage(`Đã gửi lời mời kết nối thành công tới ${name}!`);
+      await apiClient.roommateInvitations.create({
+        recipientId: selectedCandidate.id,
+        postId: selectedCandidate.postId,
+        roomId: isPostWithoutRoom ? selectedRoomId : selectedCandidate.roomId || undefined,
+        message: inviteMessage.trim() || undefined,
+      });
+      setInvitedIds((prev) => [...prev, selectedCandidate.id]);
+      setFeedbackMessage(`Đã gửi lời mời kết nối thành công tới ${selectedCandidate.fullName}!`);
+      setInviteModalOpen(false);
       setTimeout(() => setFeedbackMessage(null), 4000);
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : "Không thể gửi lời mời.");
+      setInviteError(error instanceof Error ? error.message : "Không thể gửi lời mời.");
+    } finally {
+      setIsSendingInvite(false);
     }
   };
 
@@ -621,19 +673,26 @@ export default function RoommateDiscoveryPage() {
                   className="min-h-28 w-full rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] p-3 text-sm outline-none focus:border-[#15594f]"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-[#74817b]">
-                    Phòng đang thuê (dùng để kiểm tra sức chứa)
-                    <select
-                      value={postForm.roomId}
-                      onChange={(event) => setPostForm((form) => ({ ...form, roomId: event.target.value }))}
-                      className="mt-1 w-full h-11 rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] px-3 text-sm font-normal text-[#203c37] outline-none focus:border-[#15594f]"
-                    >
-                      <option value="">Không gắn phòng cụ thể</option>
-                      {myRooms.map((room) => (
-                        <option key={room.roomId} value={room.roomId}>{room.label}</option>
-                      ))}
-                    </select>
-                  </label>
+                  {currentUser?.role === "LANDLORD" ? (
+                    <div className="text-xs text-[#74817b] p-3 rounded-[8px] bg-[#f7f6f2] border border-[#e2e7e1]">
+                      <span className="font-semibold block text-[#203c37] mb-1">Tin đăng không gắn phòng</span>
+                      Chủ trọ đăng tin tìm bạn để ghép vào phòng của người khác (chủ trọ không đứng làm chủ hợp đồng đại diện).
+                    </div>
+                  ) : (
+                    <label className="text-xs font-semibold text-[#74817b]">
+                      Phòng đang thuê (dùng để kiểm tra sức chứa)
+                      <select
+                        value={postForm.roomId}
+                        onChange={(event) => setPostForm((form) => ({ ...form, roomId: event.target.value }))}
+                        className="mt-1 w-full h-11 rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] px-3 text-sm font-normal text-[#203c37] outline-none focus:border-[#15594f]"
+                      >
+                        <option value="">Không gắn phòng cụ thể</option>
+                        {myRooms.map((room) => (
+                          <option key={room.roomId} value={room.roomId}>{room.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <label className="text-xs font-semibold text-[#74817b]">
                     Hạn đăng tin
                     <input
@@ -646,9 +705,9 @@ export default function RoommateDiscoveryPage() {
                     />
                   </label>
                 </div>
-                {myRooms.length === 0 && (
+                {currentUser?.role !== "LANDLORD" && myRooms.length === 0 && (
                   <p className="rounded-[8px] border border-[#f0d9a8] bg-[#fff4e5] px-3 py-2 text-xs text-[#8a5700]">
-                    Bạn chưa có hợp đồng thuê đang hiệu lực. Tin vẫn có thể đăng, nhưng hệ thống chưa thể tự kiểm tra sức chứa khi có người nhận ở ghép.
+                    Bạn chưa có hợp đồng thuê đang hiệu lực. Tin vẫn có thể đăng (không gắn phòng), và người gửi lời mời cho bạn sẽ chọn phòng của họ.
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row sm:items-end gap-3">
@@ -1149,7 +1208,7 @@ export default function RoommateDiscoveryPage() {
                       size="md"
                       className="w-full"
                       disabled={isInvited}
-                      onClick={() => handleSendInvite(candidate.id, candidate.fullName, candidate.postId)}
+                      onClick={() => openInviteModal(candidate)}
                       leftIcon={isInvited ? <Check className="size-4" /> : <UserPlus className="size-4" />}
                     >
                       {isInvited ? "Đã gửi lời mời kết nối" : "Gửi lời mời kết nối"}
@@ -1160,6 +1219,101 @@ export default function RoommateDiscoveryPage() {
             })}
           </div>
         )}
+
+        {/* Modal Gửi lời mời kết nối */}
+        <Modal
+          isOpen={inviteModalOpen}
+          onClose={() => setInviteModalOpen(false)}
+          title="Gửi lời mời kết nối ở ghép"
+          description={
+            selectedCandidate
+              ? `Gửi lời mời kết nối tới ${selectedCandidate.fullName}.`
+              : "Gửi lời mời kết nối ở ghép"
+          }
+          size="md"
+          footer={
+            <>
+              <Button variant="outline" size="sm" onClick={() => setInviteModalOpen(false)}>
+                Hủy bỏ
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={isSendingInvite}
+                disabled={Boolean(
+                  !selectedCandidate?.roomId && (currentUser?.role === "LANDLORD" || myRooms.length === 0 || !selectedRoomId)
+                )}
+                onClick={handleConfirmSendInvite}
+              >
+                Gửi lời mời ngay
+              </Button>
+            </>
+          }
+        >
+          {selectedCandidate && (
+            <div className="space-y-4">
+              {inviteError && (
+                <div className="rounded-[8px] border border-[#f1c9bf] bg-[#fbeae6] px-3.5 py-2.5 text-sm text-[#a4422c] flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{inviteError}</span>
+                </div>
+              )}
+
+              {!selectedCandidate.roomId ? (
+                // Tin đăng chưa có phòng: Bắt buộc người gửi phải có phòng và chọn phòng
+                <div className="space-y-3">
+                  <div className="p-3 bg-[#fff4e5] border border-[#f0d9a8] rounded-[8px] text-[12px] text-[#8a5700]">
+                    <strong>Tin đăng chưa có phòng:</strong> Người đăng đang tìm phòng để ở ghép. Bạn bắt buộc phải chọn một phòng đang thuê của mình để mời họ vào ở cùng.
+                  </div>
+
+                  {currentUser?.role === "LANDLORD" ? (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-[8px] text-[13px] text-red-700">
+                      Chủ trọ không được phép đứng tên làm chủ hợp đồng đại diện trong hợp đồng ở ghép. Bạn không thể gửi lời mời cho tin đăng chưa có phòng.
+                    </div>
+                  ) : myRooms.length === 0 ? (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-[8px] text-[13px] text-red-700">
+                      Bạn hiện chưa có hợp đồng thuê phòng nào đang có hiệu lực. Bạn cần có phòng đang thuê để mời người này ở ghép.
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[13px] font-semibold text-[#203c37] mb-1.5">
+                        Chọn phòng của bạn để mời ở ghép <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={selectedRoomId}
+                        onChange={(e) => setSelectedRoomId(e.target.value)}
+                        className="w-full h-11 rounded-[8px] border border-[#e2e7e1] bg-[#f7f6f2] px-3 text-sm font-medium text-[#203c37] outline-none focus:border-[#15594f]"
+                      >
+                        <option value="">-- Chọn phòng --</option>
+                        {myRooms.map((room) => (
+                          <option key={room.roomId} value={room.roomId}>
+                            {room.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Tin đăng đã có sẵn phòng
+                <div className="p-3 bg-[#eaf2ed] border border-[#b2d3c2] rounded-[8px] text-[12px] text-[#15594f]">
+                  <strong>Tin đăng đã có phòng:</strong> Bạn đang gửi lời mời xin ở ghép vào phòng của {selectedCandidate.fullName} ({selectedCandidate.propertyName || "Nhà trọ"} · Phòng {selectedCandidate.roomNumber}).
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-medium text-[#203c37]">Lời nhắn gửi kèm (Tùy chọn)</label>
+                <textarea
+                  rows={3}
+                  placeholder="Ví dụ: Chào bạn, mình thấy lối sống và ngân sách của chúng mình rất hợp nhau..."
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
+                  className="w-full p-3 bg-white border border-[#e2e7e1] rounded-[8px] text-[14px] text-[#203c37] focus:border-[#15594f] outline-none resize-none"
+                />
+              </div>
+            </div>
+          )}
+        </Modal>
 
         {/* 6. Security Note Banner (Figma 44:63634) */}
         <div className="bg-[#eaf2ed] border border-[#15594f]/20 rounded-[12px] p-5 flex items-start gap-3.5">

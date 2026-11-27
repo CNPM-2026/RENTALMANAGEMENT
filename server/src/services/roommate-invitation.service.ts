@@ -12,7 +12,7 @@ const findActiveRoommatePost = (authorId: string) =>
   prisma.post.findFirst({
     where: { authorId, ...activeRoommatePostWhere() },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, title: true, roomId: true },
+    select: { id: true, title: true, roomId: true, authorId: true },
   });
 
 /**
@@ -28,27 +28,85 @@ const findActiveRoommatePost = (authorId: string) =>
  *  - Nếu còn chỗ, một khai báo số người PENDING được tạo để chủ trọ xác minh.
  */
 export const roommateInvitationService = {
-  create: async (senderId: string, data: { recipientId: string; postId?: string; message?: string }) => {
+  create: async (senderId: string, data: { recipientId: string; postId?: string; message?: string; roomId?: string }) => {
     if (senderId === data.recipientId) throw new AppError('Không thể tự gửi lời mời cho chính mình', 400);
-    const recipient = await prisma.user.findFirst({
-      where: { id: data.recipientId, isActive: true },
-      select: { id: true, fullName: true },
-    });
+
+    const [recipient, sender] = await Promise.all([
+      prisma.user.findFirst({
+        where: { id: data.recipientId, isActive: true },
+        select: { id: true, fullName: true, role: true },
+      }),
+      prisma.user.findFirst({
+        where: { id: senderId, isActive: true },
+        select: { id: true, fullName: true, role: true },
+      }),
+    ]);
     if (!recipient) throw new AppError('Người nhận không hợp lệ', 404);
+    if (!sender) throw new AppError('Người gửi không hợp lệ', 404);
 
     let postId = data.postId ?? null;
+    let post: { id: string; roomId: string | null; authorId: string } | null = null;
     if (postId) {
-      const post = await prisma.post.findFirst({
+      post = await prisma.post.findFirst({
         where: { id: postId, authorId: data.recipientId, ...activeRoommatePostWhere() },
-        select: { id: true },
+        select: { id: true, roomId: true, authorId: true },
       });
       if (!post) {
         throw new AppError('Bài đăng ở ghép không còn hiệu lực hoặc không thuộc người nhận', 400);
       }
     } else {
-      // Client cũ chỉ gửi recipientId. Tự gắn với tin ở ghép đang hiệu lực gần nhất
-      // để luồng chấp nhận có đủ dữ liệu phòng/sức chứa.
-      postId = (await findActiveRoommatePost(data.recipientId))?.id ?? null;
+      post = await findActiveRoommatePost(data.recipientId);
+      postId = post?.id ?? null;
+    }
+
+    // Nghiệp vụ chọn phòng & validate:
+    // Trường hợp 1: Tin đăng chưa có phòng (post.roomId == null)
+    // -> Bắt buộc người gửi lời mời phải có phòng, chọn phòng của mình, validate FE + BE.
+    // -> Role LANDLORD không được phép đứng chủ hợp đồng đại diện.
+    // Trường hợp 2: Tin đăng đã có phòng sẵn
+    // -> Không bắt buộc người gửi phải có phòng.
+    let targetRoomId = data.roomId ?? null;
+
+    if (!post?.roomId) {
+      if (sender.role === 'LANDLORD') {
+        throw new AppError(
+          'Chủ trọ không được phép đứng làm chủ hợp đồng đại diện trong hợp đồng ở ghép. Bạn chỉ có thể kết nối với tin đăng đã có phòng sẵn.',
+          403,
+        );
+      }
+
+      if (!targetRoomId) {
+        const senderContracts = await prisma.contract.findMany({
+          where: { tenantId: senderId, status: 'ACTIVE' },
+          select: { roomId: true },
+        });
+        if (senderContracts.length === 0) {
+          throw new AppError(
+            'Tin đăng này chưa có phòng. Bạn cần có hợp đồng thuê phòng đang hiệu lực và chọn phòng để gửi lời mời kết nối.',
+            400,
+          );
+        }
+        if (senderContracts.length === 1) {
+          targetRoomId = senderContracts[0].roomId;
+        } else {
+          throw new AppError('Vui lòng chọn phòng đang thuê của bạn để gửi lời mời cho tin đăng này.', 400);
+        }
+      }
+
+      // Xác minh phòng được chọn thuộc hợp đồng ACTIVE của sender
+      const validContract = await prisma.contract.findFirst({
+        where: { tenantId: senderId, roomId: targetRoomId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!validContract) {
+        throw new AppError('Bạn không có hợp đồng thuê đang hiệu lực cho phòng đã chọn.', 403);
+      }
+    } else {
+      // Tin đăng đã có phòng sẵn
+      if (recipient.role === 'LANDLORD') {
+        throw new AppError('Chủ trọ không được phép đứng làm chủ hợp đồng đại diện trong hợp đồng ở ghép', 403);
+      }
+      targetRoomId = post.roomId;
     }
 
     const existing = await prisma.roommateInvitation.findUnique({
@@ -59,7 +117,12 @@ export const roommateInvitationService = {
       if (existing.status === 'DECLINED' || existing.status === 'CANCELLED') {
         const reinvitation = await prisma.roommateInvitation.update({
           where: { id: existing.id },
-          data: { status: 'PENDING', message: data.message, postId: postId ?? existing.postId },
+          data: {
+            status: 'PENDING',
+            message: data.message,
+            postId: postId ?? existing.postId,
+            roomId: targetRoomId ?? existing.roomId,
+          },
         });
         await notificationService.createNotification(
           data.recipientId,
@@ -76,10 +139,20 @@ export const roommateInvitationService = {
     const invitation = existing
       ? await prisma.roommateInvitation.update({
           where: { id: existing.id },
-          data: { message: data.message, postId: postId ?? existing.postId },
+          data: {
+            message: data.message,
+            postId: postId ?? existing.postId,
+            roomId: targetRoomId ?? existing.roomId,
+          },
         })
       : await prisma.roommateInvitation.create({
-          data: { senderId, recipientId: data.recipientId, postId, message: data.message },
+          data: {
+            senderId,
+            recipientId: data.recipientId,
+            postId,
+            roomId: targetRoomId,
+            message: data.message,
+          },
         });
     if (!existing) {
       await notificationService.createNotification(
@@ -101,6 +174,7 @@ export const roommateInvitationService = {
           id: true,
           fullName: true,
           avatarUrl: true,
+          role: true,
           profile: { select: { id: true, gender: true, bio: true, occupation: true } },
         },
       },
@@ -109,7 +183,15 @@ export const roommateInvitationService = {
           id: true,
           fullName: true,
           avatarUrl: true,
+          role: true,
           profile: { select: { id: true, gender: true, bio: true, occupation: true } },
+        },
+      },
+      room: {
+        select: {
+          id: true,
+          roomNumber: true,
+          property: { select: { id: true, name: true, address: true } },
         },
       },
       post: {
@@ -133,8 +215,8 @@ export const roommateInvitationService = {
     const invitation = await prisma.roommateInvitation.findUnique({
       where: { id },
       include: {
-        sender: { select: { id: true, fullName: true } },
-        recipient: { select: { id: true, fullName: true } },
+        sender: { select: { id: true, fullName: true, role: true } },
+        recipient: { select: { id: true, fullName: true, role: true } },
         post: { select: { id: true, title: true, roomId: true } },
       },
     });
@@ -149,7 +231,7 @@ export const roommateInvitationService = {
 
     const updated = await prisma.roommateInvitation.update({ where: { id }, data: { status } });
     if (status === 'DECLINED' || status === 'CANCELLED') {
-      const roomId = invitation.post?.roomId;
+      const roomId = invitation.roomId || invitation.post?.roomId;
       if (roomId) {
         await prisma.roomOccupancyDeclaration.updateMany({
           where: {
@@ -190,48 +272,54 @@ export const roommateInvitationService = {
       senderId: string;
       recipientId: string;
       postId: string | null;
-      sender: { id: string; fullName: string };
-      recipient: { id: string; fullName: string };
+      roomId?: string | null;
+      sender: { id: string; fullName: string; role?: string };
+      recipient: { id: string; fullName: string; role?: string };
       post: { id: string; title: string; roomId: string | null } | null;
     },
   ) => {
     const post = invitation.post ?? (await findActiveRoommatePost(invitation.recipientId));
+    const effectiveRoomId = invitation.roomId || post?.roomId || null;
 
     // 1. Tìm hợp đồng của người nhận (recipient) hoặc người gửi (sender)
-    let hostContract = await prisma.contract.findFirst({
-      where: {
-        tenantId: invitation.recipientId,
-        status: 'ACTIVE',
-        ...(post?.roomId ? { roomId: post.roomId } : {}),
-      },
-      orderBy: { startDate: 'desc' },
-      include: {
-        tenant: { select: { id: true, fullName: true } },
-        room: {
-          select: {
-            id: true,
-            roomNumber: true,
-            maxOccupants: true,
-            property: { select: { id: true, name: true, landlordId: true } },
-          },
-        },
-      },
-    });
-
+    // Quy tắc: Role LANDLORD không được phép đứng làm chủ hợp đồng đại diện
+    let hostContract = null;
     let hostUserId = invitation.recipientId;
     let roommateUserId = invitation.senderId;
 
-    if (!hostContract) {
-      // Nếu bên nhận chưa có phòng/hợp đồng, kiểm tra xem bên gửi có phòng/hợp đồng không
+    if (invitation.recipient.role !== 'LANDLORD') {
+      hostContract = await prisma.contract.findFirst({
+        where: {
+          tenantId: invitation.recipientId,
+          status: 'ACTIVE',
+          ...(effectiveRoomId ? { roomId: effectiveRoomId } : {}),
+        },
+        orderBy: { startDate: 'desc' },
+        include: {
+          tenant: { select: { id: true, fullName: true, role: true } },
+          room: {
+            select: {
+              id: true,
+              roomNumber: true,
+              maxOccupants: true,
+              property: { select: { id: true, name: true, landlordId: true } },
+            },
+          },
+        },
+      });
+    }
+
+    if (!hostContract && invitation.sender.role !== 'LANDLORD') {
+      // Nếu bên nhận chưa có phòng hoặc là LANDLORD, kiểm tra bên gửi
       hostContract = await prisma.contract.findFirst({
         where: {
           tenantId: invitation.senderId,
           status: 'ACTIVE',
-          ...(post?.roomId ? { roomId: post.roomId } : {}),
+          ...(effectiveRoomId ? { roomId: effectiveRoomId } : {}),
         },
         orderBy: { startDate: 'desc' },
         include: {
-          tenant: { select: { id: true, fullName: true } },
+          tenant: { select: { id: true, fullName: true, role: true } },
           room: {
             select: {
               id: true,
@@ -250,6 +338,12 @@ export const roommateInvitationService = {
     }
 
     if (!hostContract) {
+      if (invitation.recipient.role === 'LANDLORD' || invitation.sender.role === 'LANDLORD') {
+        throw new AppError(
+          'Chủ trọ không được phép đứng làm chủ hợp đồng đại diện trong hợp đồng ở ghép. Cần một bên là khách thuê/admin/staff có hợp đồng đang hiệu lực.',
+          403,
+        );
+      }
       throw new AppError(
         'Cần ít nhất một người (người mời hoặc người được mời) có hợp đồng thuê phòng đang hiệu lực để liên kết ở ghép.',
         400,
