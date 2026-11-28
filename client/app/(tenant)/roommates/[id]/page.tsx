@@ -17,8 +17,16 @@ import {
   FileText,
   CalendarDays,
   AlertCircle,
+  Building2,
+  Users,
+  Home,
+  ClipboardList,
+  BedDouble,
+  Layers,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { apiClient } from "@/lib/api";
@@ -27,13 +35,36 @@ import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth";
 import { SuggestedRoommate, User, Contract } from "@/types/models";
 
-interface CompatibilityCriterion {
-  name: string;
-  score: number;
-  explanation: string;
-  myHabit: string;
-  candidateHabit: string;
+function formatSystemRoleLabel(role?: string | null) {
+  switch (role) {
+    case "ADMIN":
+      return "Quản trị viên";
+    case "LANDLORD":
+      return "Chủ trọ";
+    case "STAFF":
+      return "Nhân viên";
+    case "TENANT":
+      return "Người thuê";
+    default:
+      return role || "Thành viên";
+  }
 }
+
+function formatGenderLabel(value?: string | null) {
+  if (!value) return "Chưa cập nhật";
+  const norm = value.toUpperCase();
+  if (norm === "MALE" || norm === "NAM") return "Nam";
+  if (norm === "FEMALE" || norm === "NỮ") return "Nữ";
+  if (norm === "OTHER" || norm === "KHÁC") return "Khác";
+  return value;
+}
+
+const SLEEP_SCHEDULE_LABELS: Record<string, string> = {
+  "22:00": "Ngủ trước 22:00",
+  "22:30": "Ngủ 22:00 - 23:00",
+  "23:30": "Ngủ 23:00 - 00:00",
+  "01:00": "Ngủ sau 00:00",
+};
 
 function RoommateDetailContent() {
   const params = useParams();
@@ -98,8 +129,9 @@ function RoommateDetailContent() {
   const candidate = suggestion ? {
     id: suggestion.user.id,
     fullName: suggestion.user.fullName,
+    role: suggestion.user.role,
     age: suggestion.user.age ?? 0,
-    gender: suggestion.user.gender === "MALE" ? "Nam" : suggestion.user.gender === "FEMALE" ? "Nữ" : suggestion.user.gender ?? "Chưa cập nhật",
+    gender: formatGenderLabel(suggestion.user.gender),
     occupation: suggestion.user.occupation ?? "Chưa cập nhật",
     avatarUrl: suggestion.user.avatarUrl ?? "/images/default-avatar.svg",
     matchScore: suggestion.compatibilityPercent,
@@ -109,8 +141,16 @@ function RoommateDetailContent() {
     postPropertyName: suggestion.post.property?.name ?? null,
     postTitle: suggestion.post.title,
     postDescription: suggestion.post.description,
+    postCreatedAt: suggestion.post.createdAt,
     postMaxOccupants: suggestion.post.room?.maxOccupants ?? null,
     postExpiredAt: suggestion.post.expiredAt ?? null,
+    hasRoom: Boolean(suggestion.post.room?.id),
+    roomDetail: suggestion.post.room ?? null,
+    propertyDetail: suggestion.post.property ?? null,
+    postImages: suggestion.post.images ?? [],
+    occupants: suggestion.post.room?.occupants ?? [],
+    lifestyleAnswers: suggestion.lifestyleAnswers ?? [],
+    preference: suggestion.preference ?? null,
     statusNote: suggestion.post.title,
     budgetMonthly: suggestion.post.price ? `${formatCurrency(suggestion.post.price, { showUnit: false })} đ/tháng` : "Thương lượng",
     targetLocation: suggestion.location?.district
@@ -123,15 +163,25 @@ function RoommateDetailContent() {
       : "Chưa cập nhật",
     bio: suggestion.user.bio || "Người dùng chưa cập nhật giới thiệu.",
   } : {
-    id: candidateId, fullName: "Đang tải hồ sơ", age: 0, gender: "Chưa cập nhật",
+    id: candidateId, fullName: "Đang tải hồ sơ", role: "TENANT", age: 0, gender: "Chưa cập nhật",
     occupation: "Chưa cập nhật", avatarUrl: "/images/default-avatar.svg", matchScore: 0,
     postId: "", postRoomId: null, postRoomNumber: null, postPropertyName: null, postTitle: "Chưa có dữ liệu bài đăng", postDescription: "",
-    postMaxOccupants: null, postExpiredAt: null,
+    postCreatedAt: null, postMaxOccupants: null, postExpiredAt: null, hasRoom: false,
+    roomDetail: null, propertyDetail: null, postImages: [], occupants: [], lifestyleAnswers: [], preference: null,
     statusNote: "Chưa có dữ liệu hồ sơ", budgetMonthly: "Chưa cập nhật",
     targetLocation: "Chưa cập nhật", moveInDate: "Chưa cập nhật", bio: "",
   };
 
-  const compatibilityCriteria: CompatibilityCriterion[] = [];
+  const fullRoomAddress = [
+    candidate.propertyDetail?.address ?? candidate.preference?.currentAddress,
+    candidate.propertyDetail?.ward ?? candidate.preference?.currentWard,
+    candidate.propertyDetail?.district ?? candidate.preference?.currentDistrict,
+    candidate.propertyDetail?.province ?? candidate.preference?.currentProvince,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const isOwnPost = Boolean(currentUser && currentUser.id === candidate.id);
 
   const handleSendInvitation = async () => {
     const isPostWithoutRoom = !candidate.postRoomId;
@@ -200,22 +250,42 @@ function RoommateDetailContent() {
                   />
                 </div>
                 <div>
-                  <h2 className="text-[22px] font-bold text-[#203c37] leading-tight">{candidate.fullName}</h2>
-                  <p className="text-[14px] text-[#74817b] mt-1">{candidate.age} tuổi • Giới tính: {candidate.gender}</p>
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <h2 className="text-[22px] font-bold text-[#203c37] leading-tight">{candidate.fullName}</h2>
+                    <Badge variant="neutral" size="sm">{formatSystemRoleLabel(candidate.role)}</Badge>
+                  </div>
+                  <p className="text-[14px] text-[#74817b] mt-1">
+                    {candidate.age > 0 ? `${candidate.age} tuổi • ` : ""}Giới tính: {candidate.gender}
+                  </p>
                   <p className="text-[13px] font-medium text-[#15594f] mt-0.5">{candidate.occupation}</p>
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#eaf2ed] text-[#15594f] text-[12px] font-semibold">
-                  <ShieldCheck className="size-4" />
-                  Đã xác minh qua 5K-Rental Manager
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#eaf2ed] text-[#15594f] text-[12px] font-semibold">
+                    <ShieldCheck className="size-4" />
+                    Đã xác minh qua 5K-Rental
+                  </div>
+                  <Link
+                    href={`/users/${candidate.id}`}
+                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#15594f] hover:underline"
+                  >
+                    Hồ sơ công khai <ExternalLink className="size-3" />
+                  </Link>
                 </div>
               </div>
 
               {/* Bài đăng của người này */}
-              <div className="space-y-2 rounded-[10px] border border-[#d2e4d7] bg-[#f7faf8] p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#15594f]">
-                    <FileText className="size-3.5" /> Bài đăng ở ghép
-                  </span>
+              <div className="space-y-2.5 rounded-[10px] border border-[#d2e4d7] bg-[#f7faf8] p-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#15594f]">
+                      <FileText className="size-3.5" /> Bài đăng ở ghép
+                    </span>
+                    {candidate.hasRoom ? (
+                      <Badge variant="success" size="sm">Đã có phòng</Badge>
+                    ) : (
+                      <Badge variant="warning" size="sm">Chưa có phòng</Badge>
+                    )}
+                  </div>
                   {candidate.postExpiredAt && (
                     <span className="flex items-center gap-1 text-[10px] text-[#74817b]">
                       <CalendarDays className="size-3" />
@@ -224,22 +294,11 @@ function RoommateDetailContent() {
                   )}
                 </div>
                 <p className="text-[14px] font-bold leading-snug text-[#203c37]">{candidate.postTitle}</p>
-                <p className="text-[13px] leading-relaxed text-[#5d6b65]">{candidate.postDescription}</p>
-                {candidate.postRoomNumber && (
-                  <p className="text-[11px] font-medium text-[#15594f]">
-                    Phòng {candidate.postRoomNumber}
-                    {candidate.postMaxOccupants ? ` · tối đa ${candidate.postMaxOccupants} người` : ""}
+                <p className="text-[13px] leading-relaxed text-[#5d6b65] whitespace-pre-line">{candidate.postDescription}</p>
+                {candidate.postCreatedAt && (
+                  <p className="text-[11px] text-[#74817b]">
+                    Đăng ngày: {new Date(candidate.postCreatedAt).toLocaleDateString("vi-VN")}
                   </p>
-                )}
-                {(candidate.postRoomId || candidate.postId) && (
-                  <div className="pt-1">
-                    <Link
-                      href={`/rooms/${candidate.postRoomId || candidate.postId}`}
-                      className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#15594f] hover:underline"
-                    >
-                      Xem chi tiết phòng trọ này &rarr;
-                    </Link>
-                  </div>
                 )}
               </div>
 
@@ -255,7 +314,7 @@ function RoommateDetailContent() {
                   <span className="text-[#74817b] flex items-center gap-2">
                     <MapPin className="size-4 text-[#15594f]" /> Khu vực ưu tiên
                   </span>
-                  <span className="font-semibold text-[#203c37]">{candidate.targetLocation}</span>
+                  <span className="font-semibold text-[#203c37] text-right">{candidate.targetLocation}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[#74817b] flex items-center gap-2">
@@ -263,6 +322,20 @@ function RoommateDetailContent() {
                   </span>
                   <span className="font-semibold text-[#203c37]">{candidate.moveInDate}</span>
                 </div>
+                {candidate.preference?.sleepSchedule && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#74817b]">Giờ giấc sinh hoạt</span>
+                    <span className="font-semibold text-[#203c37]">
+                      {SLEEP_SCHEDULE_LABELS[candidate.preference.sleepSchedule] ?? candidate.preference.sleepSchedule}
+                    </span>
+                  </div>
+                )}
+                {candidate.preference?.roommateSlots && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#74817b]">Số bạn ghép cần tìm</span>
+                    <span className="font-semibold text-[#203c37]">{candidate.preference.roommateSlots} người</span>
+                  </div>
+                )}
               </div>
 
               {/* Bio */}
@@ -274,40 +347,42 @@ function RoommateDetailContent() {
               </div>
 
               {/* Action Buttons (Figma 44:63849, 44:63852, 44:63854) */}
-              <div className="space-y-2.5 pt-2">
-                <Button
-                  variant={isSent ? "secondary" : "primary"}
-                  size="md"
-                  className="w-full"
-                  disabled={isSent}
-                  onClick={() => setInviteModalOpen(true)}
-                  leftIcon={isSent ? <Check className="size-4" /> : <UserPlus className="size-4" />}
-                >
-                  {isSent ? "Đã gửi lời mời kết nối" : "Gửi lời mời kết nối"}
-                </Button>
+              {!isOwnPost && (
+                <div className="space-y-2.5 pt-2">
+                  <Button
+                    variant={isSent ? "secondary" : "primary"}
+                    size="md"
+                    className="w-full"
+                    disabled={isSent}
+                    onClick={() => setInviteModalOpen(true)}
+                    leftIcon={isSent ? <Check className="size-4" /> : <UserPlus className="size-4" />}
+                  >
+                    {isSent ? "Đã gửi lời mời kết nối" : "Gửi lời mời kết nối"}
+                  </Button>
 
-                <Button
-                  variant="outline"
-                  size="md"
-                  className="w-full"
-                  onClick={async () => {
-                    const conversation = await apiClient.chats.getOrCreateConversationWithUser(candidate.id);
-                    router.push(`/tenant/messages?conversation=${conversation.id}`);
-                  }}
-                  leftIcon={<MessageCircle className="size-4" />}
-                >
-                  Nhắn tin trao đổi
-                </Button>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    className="w-full"
+                    onClick={async () => {
+                      const conversation = await apiClient.chats.getOrCreateConversationWithUser(candidate.id);
+                      router.push(`/tenant/messages?conversation=${conversation.id}`);
+                    }}
+                    leftIcon={<MessageCircle className="size-4" />}
+                  >
+                    Nhắn tin trao đổi
+                  </Button>
 
-                <Link
-                  href={`/tenant/safety/report?targetType=USER&targetId=${candidate.id}`}
-                  className="block w-full text-center text-[12px] text-[#74817b] hover:text-[#991b1b] transition-colors pt-2"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Flag className="size-3.5" /> Báo cáo hồ sơ không phù hợp
-                  </span>
-                </Link>
-              </div>
+                  <Link
+                    href={`/tenant/safety/report?targetType=USER&targetId=${candidate.id}`}
+                    className="block w-full text-center text-[12px] text-[#74817b] hover:text-[#991b1b] transition-colors pt-2"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Flag className="size-3.5" /> Báo cáo hồ sơ không phù hợp
+                    </span>
+                  </Link>
+                </div>
+              )}
             </Card>
 
             {/* Safety Tip Box (Figma 44:63857) */}
@@ -319,12 +394,11 @@ function RoommateDetailContent() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Compatibility Breakdown (Figma 44:63860 - 783px) */}
+          {/* RIGHT COLUMN: Room Info, Current Occupants, Survey Answers */}
           <div className="lg:col-span-8 space-y-6">
-            {/* 1. Overall Score Banner (Figma 44:63861) */}
+            {/* 1. Overall Score Banner */}
             <Card className="border border-[#e2e7e1] bg-gradient-to-r from-[#eaf2ed] to-white rounded-[12px] p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                {/* Score Gauge Circle */}
                 <div className="relative size-[120px] flex items-center justify-center shrink-0">
                   <svg className="size-full -rotate-90" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="42" fill="none" stroke="#d2e4d7" strokeWidth="8" />
@@ -346,62 +420,284 @@ function RoommateDetailContent() {
                   </div>
                 </div>
 
-                {/* Score Commentary (Figma 44:63867) */}
                 <div className="space-y-1.5 text-center sm:text-left">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#15594f] text-white text-[11px] font-semibold uppercase">
                     Điểm tương thích
                   </span>
                   <h3 className="text-[20px] font-bold text-[#203c37]">Mức độ phù hợp được tính từ dữ liệu hiện có</h3>
                   <p className="text-[14px] text-[#74817b] leading-relaxed">
-                    Điểm số và thông tin bên dưới được lấy từ hồ sơ, bài đăng và tiêu chí tìm kiếm đã lưu.
+                    Điểm số và thông tin bên dưới được tổng hợp từ hồ sơ cá nhân, phòng trọ gắn kèm và bài khảo sát lối sống.
                   </p>
                 </div>
               </div>
             </Card>
 
-            {/* 2. Breakdown Criteria List (Figma 44:63870) */}
-            <Card className="border border-[#e2e7e1] bg-white rounded-[12px] p-6 shadow-sm space-y-6">
-              <div>
-                <h3 className="text-[18px] font-bold text-[#203c37]">Chi tiết điểm tương đồng theo từng tiêu chí</h3>
-                <p className="text-[13px] text-[#74817b] mt-0.5">
-                  Đối chiếu giữa dữ liệu tìm kiếm của bạn và hồ sơ ứng viên.
-                </p>
+            {/* 2. Thông tin phòng trọ (nếu đã gắn phòng) */}
+            <Card className="border border-[#e2e7e1] bg-white rounded-[12px] p-6 shadow-sm space-y-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-9 rounded-[8px] bg-[#eaf2ed] flex items-center justify-center text-[#15594f]">
+                    <Home className="size-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-[18px] font-bold text-[#203c37]">Thông tin phòng trọ</h3>
+                    <p className="text-[12px] text-[#74817b]">
+                      Chi tiết phòng trọ gắn với bài đăng tìm người ở ghép
+                    </p>
+                  </div>
+                </div>
+                {candidate.hasRoom ? (
+                  <Badge variant="success" size="md">Đã có phòng</Badge>
+                ) : (
+                  <Badge variant="warning" size="md">Chưa có phòng</Badge>
+                )}
               </div>
 
-              <div className="space-y-6">
-                {compatibilityCriteria.length === 0 ? (
-                  <p className="text-sm text-[#74817b]">Chưa có dữ liệu chi tiết theo từng tiêu chí.</p>
-                ) : compatibilityCriteria.map((criterion, idx) => (
-                  <div key={idx} className="space-y-2 border-b border-[#e2e7e1]/60 pb-5 last:border-0 last:pb-0">
-                    <div className="flex items-center justify-between text-[14px]">
-                      <span className="font-semibold text-[#203c37]">{criterion.name}</span>
-                      <span className="font-bold text-[#15594f]">{criterion.score}%</span>
+              {candidate.hasRoom ? (
+                <div className="space-y-4">
+                  <div className="rounded-[10px] border border-[#d2e4d7] bg-[#f7faf8] p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <h4 className="text-[16px] font-bold text-[#203c37] flex items-center gap-2">
+                          <Building2 className="size-4 text-[#15594f]" />
+                          {candidate.propertyDetail?.name || "Phòng trọ"}
+                          {candidate.roomDetail?.roomNumber ? ` · Phòng ${candidate.roomDetail.roomNumber}` : ""}
+                        </h4>
+                        {fullRoomAddress && (
+                          <p className="text-[13px] text-[#5d6b65] mt-1 flex items-start gap-1.5">
+                            <MapPin className="size-4 text-[#15594f] shrink-0 mt-0.5" />
+                            <span>{fullRoomAddress}</span>
+                          </p>
+                        )}
+                      </div>
+                      {candidate.postRoomId && (
+                        <Link href={`/rooms/${candidate.postRoomId}`} target="_blank">
+                          <Button variant="outline" size="sm" rightIcon={<ExternalLink className="size-3.5" />}>
+                            Xem chi tiết phòng
+                          </Button>
+                        </Link>
+                      )}
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="w-full bg-[#f7f6f2] h-2 rounded-full overflow-hidden border border-[#e2e7e1]">
-                      <div
-                        className="bg-[#15594f] h-full rounded-full transition-all duration-500"
-                        style={{ width: `${criterion.score}%` }}
-                      />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t border-[#d2e4d7]/70 text-[13px]">
+                      {candidate.propertyDetail?.landlord?.fullName && (
+                        <div className="bg-white rounded-[8px] p-2.5 border border-[#e2e7e1]">
+                          <span className="text-[11px] text-[#74817b] block">Người cho thuê / Chủ trọ</span>
+                          <strong className="text-[#203c37]">{candidate.propertyDetail.landlord.fullName}</strong>
+                        </div>
+                      )}
+                      {(candidate.roomDetail?.priceMonthly ?? candidate.preference?.currentRent) != null && (
+                        <div className="bg-white rounded-[8px] p-2.5 border border-[#e2e7e1]">
+                          <span className="text-[11px] text-[#74817b] block">Giá thuê phòng</span>
+                          <strong className="text-[#15594f]">
+                            {formatCurrency(candidate.roomDetail?.priceMonthly ?? candidate.preference?.currentRent ?? 0)}/tháng
+                          </strong>
+                        </div>
+                      )}
+                      {candidate.roomDetail?.depositAmount != null && candidate.roomDetail.depositAmount > 0 && (
+                        <div className="bg-white rounded-[8px] p-2.5 border border-[#e2e7e1]">
+                          <span className="text-[11px] text-[#74817b] block">Tiền cọc</span>
+                          <strong className="text-[#203c37]">{formatCurrency(candidate.roomDetail.depositAmount)}</strong>
+                        </div>
+                      )}
+                      {(candidate.roomDetail?.area ?? candidate.preference?.currentArea) != null && (
+                        <div className="bg-white rounded-[8px] p-2.5 border border-[#e2e7e1]">
+                          <span className="text-[11px] text-[#74817b] block">Diện tích</span>
+                          <strong className="text-[#203c37]">{candidate.roomDetail?.area ?? candidate.preference?.currentArea} m²</strong>
+                        </div>
+                      )}
+                      <div className="bg-white rounded-[8px] p-2.5 border border-[#e2e7e1]">
+                        <span className="text-[11px] text-[#74817b] block">Số người ở</span>
+                        <strong className="text-[#203c37]">
+                          {candidate.roomDetail
+                            ? `${candidate.roomDetail.currentOccupants ?? candidate.occupants.length}/${candidate.roomDetail.maxOccupants} người`
+                            : candidate.preference?.currentOccupants
+                              ? `Hiện có ${candidate.preference.currentOccupants} người`
+                              : "Đang cập nhật"}
+                        </strong>
+                      </div>
+                      {candidate.roomDetail?.floor != null && (
+                        <div className="bg-white rounded-[8px] p-2.5 border border-[#e2e7e1]">
+                          <span className="text-[11px] text-[#74817b] block flex items-center gap-1">
+                            <Layers className="size-3" /> Tầng
+                          </span>
+                          <strong className="text-[#203c37]">Tầng {candidate.roomDetail.floor}</strong>
+                        </div>
+                      )}
+                      {candidate.roomDetail?.bedType && (
+                        <div className="bg-white rounded-[8px] p-2.5 border border-[#e2e7e1]">
+                          <span className="text-[11px] text-[#74817b] block flex items-center gap-1">
+                            <BedDouble className="size-3" /> Loại giường
+                          </span>
+                          <strong className="text-[#203c37]">{candidate.roomDetail.bedType}</strong>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Explanation */}
-                    <p className="text-[13px] text-[#74817b] leading-relaxed">{criterion.explanation}</p>
+                    {candidate.roomDetail?.amenities && candidate.roomDetail.amenities.length > 0 && (
+                      <div className="pt-2 border-t border-[#d2e4d7]/70">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#74817b] block mb-2">
+                          Tiện ích phòng
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {candidate.roomDetail.amenities.map((am) => (
+                            <span
+                              key={am.id}
+                              className="px-2.5 py-1 rounded-[6px] bg-white border border-[#e2e7e1] text-[12px] text-[#203c37]"
+                            >
+                              {am.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                    {/* Side-by-Side Comparison Pills */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[12px]">
-                      <div className="bg-[#f7f6f2] px-3 py-2 rounded-[6px] border border-[#e2e7e1]">
-                        <span className="text-[#74817b] block font-medium">Thói quen của bạn:</span>
-                        <strong className="text-[#203c37]">{criterion.myHabit}</strong>
-                      </div>
-                      <div className="bg-[#eaf2ed] px-3 py-2 rounded-[6px] border border-[#d2e4d7]">
-                        <span className="text-[#15594f] block font-medium">Thói quen của ứng viên:</span>
-                        <strong className="text-[#15594f]">{criterion.candidateHabit}</strong>
-                      </div>
+                  {candidate.postImages.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {candidate.postImages.slice(0, 6).map((img) => (
+                        <div key={img.id} className="aspect-[4/3] rounded-[8px] overflow-hidden border border-[#e2e7e1] bg-[#f7f6f2]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img.imageUrl} alt="Ảnh phòng trọ" className="size-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-[10px] border border-[#f0d9a8] bg-[#fffaf0] p-4 text-[13px] text-[#8a5700]">
+                  Người đăng hiện <strong>chưa có phòng trọ sẵn</strong> và đang tìm bạn đồng hành để cùng thuê phòng mới hoặc ghép vào phòng phù hợp.
+                </div>
+              )}
+            </Card>
+
+            {/* 3. Danh sách người đang ở / người ở ghép trong phòng (nếu có) */}
+            {candidate.postRoomId && (
+              <Card className="border border-[#e2e7e1] bg-white rounded-[12px] p-6 shadow-sm space-y-5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="size-9 rounded-[8px] bg-[#eaf2ed] flex items-center justify-center text-[#15594f]">
+                      <Users className="size-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-[18px] font-bold text-[#203c37]">Người đang ở trong phòng</h3>
+                      <p className="text-[12px] text-[#74817b]">
+                        Danh sách thành viên hiện tại và vai trò trong phòng trọ
+                      </p>
                     </div>
                   </div>
-                ))}
+                  <Badge variant="neutral" size="sm">
+                    {candidate.occupants.length} thành viên
+                  </Badge>
+                </div>
+
+                {candidate.occupants.length === 0 ? (
+                  <p className="text-[13px] text-[#74817b]">
+                    Chưa ghi nhận danh sách người ở ghép công khai trong phòng này.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {candidate.occupants.map((occ) => (
+                      <div
+                        key={occ.id}
+                        className="flex items-start gap-3 p-3.5 rounded-[10px] border border-[#e2e7e1] bg-[#f7faf8]"
+                      >
+                        <div className="size-12 rounded-full overflow-hidden bg-[#eaf2ed] shrink-0 border border-[#d2e4d7]">
+                          <Avatar
+                            src={occ.avatarUrl || "/images/default-avatar.svg"}
+                            alt={occ.fullName}
+                            className="size-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <Link
+                              href={`/users/${occ.id}`}
+                              className="text-[14px] font-bold text-[#203c37] hover:text-[#15594f] hover:underline truncate"
+                            >
+                              {occ.fullName}
+                            </Link>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            <Badge variant={occ.isPrimary ? "success" : "info"} size="sm">
+                              {occ.isPrimary ? "Chủ hợp đồng" : "Người ở ghép"}
+                            </Badge>
+                            <Badge variant="neutral" size="sm">
+                              {formatSystemRoleLabel(occ.systemRole)}
+                            </Badge>
+                          </div>
+                          <p className="text-[12px] text-[#5d6b65]">
+                            {[
+                              occ.age && occ.age > 0 ? `${occ.age} tuổi` : null,
+                              occ.gender ? formatGenderLabel(occ.gender) : null,
+                              occ.occupation || null,
+                            ]
+                              .filter(Boolean)
+                              .join(" • ") || "Thành viên phòng"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* 4. Đáp án bài khảo sát lối sống của người đăng */}
+            <Card className="border border-[#e2e7e1] bg-white rounded-[12px] p-6 shadow-sm space-y-5">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-[8px] bg-[#eaf2ed] flex items-center justify-center text-[#15594f]">
+                  <ClipboardList className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-[18px] font-bold text-[#203c37]">Đáp án khảo sát lối sống của người đăng</h3>
+                  <p className="text-[13px] text-[#74817b] mt-0.5">
+                    Các thói quen sinh hoạt được {candidate.fullName} lựa chọn khi làm khảo sát.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {candidate.lifestyleAnswers.length === 0 ? (
+                  <p className="text-sm text-[#74817b]">Người đăng chưa hoàn thành bài khảo sát lối sống.</p>
+                ) : (
+                  candidate.lifestyleAnswers.map((ans) => {
+                    const hasMyAnswer = ans.myScoreValue !== null && ans.myScoreValue !== undefined;
+                    const diff = hasMyAnswer ? Math.abs((ans.myScoreValue ?? 0) - ans.scoreValue) : null;
+                    const itemScore = diff === 0 ? 100 : diff === 1 ? 50 : diff !== null ? 0 : null;
+
+                    return (
+                      <div key={ans.questionId} className="space-y-2.5 border-b border-[#e2e7e1]/60 pb-4 last:border-0 last:pb-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#f7f6f2] text-[#74817b] border border-[#e2e7e1]">
+                              {ans.category}
+                            </span>
+                            <p className="text-[14px] font-semibold text-[#203c37]">{ans.questionText}</p>
+                          </div>
+                          {itemScore !== null && (
+                            <span className="text-[13px] font-bold text-[#15594f] shrink-0">
+                              Hợp {itemScore}%
+                            </span>
+                          )}
+                        </div>
+
+                        <div className={`grid grid-cols-1 ${ans.myOptionText ? "sm:grid-cols-2" : ""} gap-2 text-[12px]`}>
+                          <div className="bg-[#eaf2ed] px-3 py-2 rounded-[6px] border border-[#d2e4d7]">
+                            <span className="text-[#15594f] block font-medium">Lựa chọn của {candidate.fullName}:</span>
+                            <strong className="text-[#203c37]">{ans.optionText}</strong>
+                          </div>
+                          {ans.myOptionText && (
+                            <div className="bg-[#f7f6f2] px-3 py-2 rounded-[6px] border border-[#e2e7e1]">
+                              <span className="text-[#74817b] block font-medium">Lựa chọn của bạn:</span>
+                              <strong className="text-[#203c37]">{ans.myOptionText}</strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </Card>
           </div>

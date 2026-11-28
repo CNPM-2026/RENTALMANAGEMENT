@@ -132,9 +132,14 @@ type CandidateShape = {
   postCreatedAt: string;
   postExpiredAt: string | null;
   propertyName: string | null;
+  propertyAddress: string | null;
+  landlordName: string | null;
   roomId?: string | null;
   roomNumber: string | null;
   maxOccupants: number | null;
+  currentOccupants: number | null;
+  roomArea: number | null;
+  roomPriceMonthly: number | null;
   sleepSchedule: string;
   petAllowed: boolean | null;
   smokingAllowed: boolean | null;
@@ -237,12 +242,21 @@ function mapRoommatePost(item: RoommatePostItem): CandidateShape {
   const budgetMax = hasFullPreferenceBudget ? preferenceBudgetMax : price;
   const locationParts = [item.location?.district, item.location?.province].filter(Boolean);
   const tags: string[] = [];
-  if (preference?.hasRoom) tags.push("Đã có phòng");
   if (preference?.sleepSchedule) tags.push(formatSleepSchedule(preference.sleepSchedule));
   if (preference?.smokingAllowed === false) tags.push("Không hút thuốc");
   if (preference?.petAllowed) tags.push("Cho phép thú cưng");
   if (preference?.cleanlinessLevel) tags.push(`Sạch sẽ ${preference.cleanlinessLevel}★`);
   if (preference?.roommateSlots) tags.push(`Cần ${preference.roommateSlots} người`);
+
+  const prop = item.post.property;
+  const fullAddress = [
+    prop?.address ?? preference?.currentAddress,
+    prop?.ward ?? preference?.currentWard,
+    prop?.district ?? preference?.currentDistrict,
+    prop?.province ?? preference?.currentProvince,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return {
     id: item.user.id,
@@ -263,15 +277,20 @@ function mapRoommatePost(item: RoommatePostItem): CandidateShape {
     postDescription: item.post.description,
     postCreatedAt: item.post.createdAt,
     postExpiredAt: item.post.expiredAt ?? null,
-    propertyName: item.post.property?.name ?? null,
+    propertyName: prop?.name ?? null,
+    propertyAddress: fullAddress || null,
+    landlordName: prop?.landlord?.fullName ?? null,
     roomId: item.post.room?.id ?? null,
     roomNumber: item.post.room?.roomNumber ?? null,
     maxOccupants: item.post.room?.maxOccupants ?? null,
+    currentOccupants: item.post.room?.currentOccupants ?? preference?.currentOccupants ?? null,
+    roomArea: item.post.room?.area ?? preference?.currentArea ?? null,
+    roomPriceMonthly: item.post.room?.priceMonthly ?? preference?.currentRent ?? null,
     sleepSchedule: formatSleepSchedule(preference?.sleepSchedule),
     petAllowed: preference?.petAllowed ?? null,
     smokingAllowed: preference?.smokingAllowed ?? null,
     cleanliness: preference?.cleanlinessLevel ?? 0,
-    hasRoom: Boolean(preference?.hasRoom || item.post.room),
+    hasRoom: Boolean(item.post.room?.id),
     bio: item.user.bio || "Người đăng chưa cập nhật giới thiệu.",
     tags,
     createdAt: item.post.createdAt,
@@ -1112,11 +1131,18 @@ export default function RoommateDiscoveryPage() {
                     </div>
 
                     {/* Bài đăng + thông tin phòng */}
-                    <div className="rounded-[10px] border border-[#d2e4d7] bg-[#f7faf8] p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#15594f]">
-                          <FileText className="size-3.5" /> Bài đăng
-                        </span>
+                    <div className="rounded-[10px] border border-[#d2e4d7] bg-[#f7faf8] p-4 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#15594f]">
+                            <FileText className="size-3.5" /> Bài đăng
+                          </span>
+                          {candidate.hasRoom ? (
+                            <Badge variant="success" size="sm">Đã có phòng</Badge>
+                          ) : (
+                            <Badge variant="warning" size="sm">Chưa có phòng</Badge>
+                          )}
+                        </div>
                         <span className="flex items-center gap-1 text-[11px] text-[#74817b]">
                           <CalendarDays className="size-3.5" />
                           {formatPostedDate(candidate.postCreatedAt)}
@@ -1128,30 +1154,68 @@ export default function RoommateDiscoveryPage() {
                       <p className="text-[13px] leading-relaxed text-[#5d6b65] line-clamp-3">
                         {candidate.postDescription}
                       </p>
-                      {(candidate.propertyName || candidate.roomNumber || candidate.postExpiredAt) && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {candidate.propertyName && (
-                            <span className="inline-flex items-center gap-1 rounded-[6px] bg-white px-2 py-1 text-[11px] text-[#203c37] border border-[#e2e7e1]">
-                              <Building2 className="size-3" /> {candidate.propertyName}
+
+                      {candidate.hasRoom && (candidate.propertyName || candidate.roomNumber || candidate.propertyAddress || candidate.landlordName) && (
+                        <div className="rounded-[8px] border border-[#d2e4d7] bg-white p-3 space-y-1.5 text-[12px] text-[#203c37]">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold flex items-center gap-1.5 text-[#15594f]">
+                              <Building2 className="size-3.5 shrink-0" />
+                              {candidate.propertyName || "Phòng trọ"}
+                              {candidate.roomNumber ? ` · Phòng ${candidate.roomNumber}` : ""}
                             </span>
+                            {candidate.roomId && (
+                              <Link
+                                href={`/rooms/${candidate.roomId}`}
+                                className="text-[11px] font-semibold text-[#15594f] hover:underline shrink-0"
+                                target="_blank"
+                              >
+                                Xem phòng &rarr;
+                              </Link>
+                            )}
+                          </div>
+                          {candidate.propertyAddress && (
+                            <p className="text-[11px] text-[#5d6b65] flex items-start gap-1.5">
+                              <MapPin className="size-3.5 shrink-0 text-[#74817b] mt-0.5" />
+                              <span className="line-clamp-2">{candidate.propertyAddress}</span>
+                            </p>
                           )}
-                          {candidate.roomNumber && (
-                            <Link
-                              href={`/rooms/${candidate.roomId || candidate.postId}`}
-                              className="inline-flex items-center gap-1 rounded-[6px] bg-[#eaf2ed] px-2 py-1 text-[11px] font-semibold text-[#15594f] border border-[#d2e4d7] hover:underline"
-                              target="_blank"
-                              title="Xem chi tiết phòng"
-                            >
-                              Phòng {candidate.roomNumber}
-                              {candidate.maxOccupants ? ` · tối đa ${candidate.maxOccupants} người` : ""}
-                              <span className="text-[10px] ml-0.5">&rarr;</span>
-                            </Link>
-                          )}
-                          {candidate.postExpiredAt && (
-                            <span className="rounded-[6px] bg-white px-2 py-1 text-[11px] text-[#74817b] border border-[#e2e7e1]">
-                              Hạn tin: {formatPostedDate(candidate.postExpiredAt)}
-                            </span>
-                          )}
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[#5d6b65] pt-0.5">
+                            {candidate.landlordName && (
+                              <span>
+                                Chủ trọ: <strong className="text-[#203c37]">{candidate.landlordName}</strong>
+                              </span>
+                            )}
+                            {(candidate.currentOccupants !== null || candidate.maxOccupants !== null) && (
+                              <span>
+                                Số người:{" "}
+                                <strong className="text-[#203c37]">
+                                  {candidate.currentOccupants !== null && candidate.maxOccupants !== null
+                                    ? `${candidate.currentOccupants}/${candidate.maxOccupants} người`
+                                    : candidate.maxOccupants !== null
+                                      ? `Tối đa ${candidate.maxOccupants} người`
+                                      : `${candidate.currentOccupants} người`}
+                                </strong>
+                              </span>
+                            )}
+                            {candidate.roomArea && (
+                              <span>
+                                Diện tích: <strong className="text-[#203c37]">{candidate.roomArea} m²</strong>
+                              </span>
+                            )}
+                            {candidate.roomPriceMonthly && (
+                              <span>
+                                Giá phòng: <strong className="text-[#15594f]">{candidate.roomPriceMonthly.toLocaleString("vi-VN")} đ/tháng</strong>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {candidate.postExpiredAt && (
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          <span className="rounded-[6px] bg-white px-2 py-1 text-[11px] text-[#74817b] border border-[#e2e7e1]">
+                            Hạn tin: {formatPostedDate(candidate.postExpiredAt)}
+                          </span>
                         </div>
                       )}
                     </div>

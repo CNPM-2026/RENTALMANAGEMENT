@@ -274,8 +274,8 @@ export const matchingService = {
     const where: Prisma.PostWhereInput = {
       status: 'APPROVED',
       postType: 'FIND_ROOMMATE',
-      ...(viewerId ? { authorId: { not: viewerId } } : {}),
-      ...(query.authorId ? { authorId: query.authorId } : {}),
+      ...(viewerId && !query.authorId ? { authorId: { not: viewerId } } : {}),
+      ...(query.authorId ? { OR: [{ authorId: query.authorId }, { id: query.authorId }] } : {}),
       author: authorWhere,
       AND: andConditions,
     };
@@ -287,19 +287,79 @@ export const matchingService = {
           ? { price: 'desc' }
           : { createdAt: 'desc' };
 
+    const propertySelect = {
+      id: true,
+      name: true,
+      address: true,
+      province: true,
+      district: true,
+      ward: true,
+      landlord: {
+        select: {
+          id: true,
+          fullName: true,
+          avatarUrl: true,
+        },
+      },
+    } satisfies Prisma.PropertySelect;
+
     const posts = await prisma.post.findMany({
       where,
       include: {
         images: { orderBy: { isPrimary: 'desc' } },
-        property: { select: { name: true, province: true, district: true, ward: true } },
+        property: { select: propertySelect },
         room: {
           select: {
             id: true,
             roomNumber: true,
+            priceMonthly: true,
+            depositAmount: true,
             maxOccupants: true,
             area: true,
+            floor: true,
+            bedType: true,
             status: true,
-            property: { select: { name: true, province: true, district: true, ward: true } },
+            property: { select: propertySelect },
+            roomAmenities: {
+              include: {
+                amenity: { select: { id: true, name: true } },
+              },
+            },
+            contracts: {
+              where: { status: 'ACTIVE' },
+              take: 1,
+              select: {
+                id: true,
+                tenantId: true,
+                startDate: true,
+                tenant: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true,
+                    role: true,
+                    profile: { select: { gender: true, occupation: true, dob: true } },
+                  },
+                },
+              },
+            },
+            occupancyDeclarations: {
+              where: { status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
+              select: {
+                id: true,
+                status: true,
+                declaredAt: true,
+                tenant: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true,
+                    role: true,
+                    profile: { select: { gender: true, occupation: true, dob: true } },
+                  },
+                },
+              },
+            },
           },
         },
         author: {
@@ -313,7 +373,14 @@ export const matchingService = {
             lifestyleAnswers: {
               include: {
                 option: {
-                  include: { question: { select: { id: true, weight: true } } },
+                  select: {
+                    id: true,
+                    optionText: true,
+                    scoreValue: true,
+                    question: {
+                      select: { id: true, questionText: true, category: true, weight: true },
+                    },
+                  },
                 },
               },
             },
@@ -333,7 +400,12 @@ export const matchingService = {
             lifestyleAnswers: {
               include: {
                 option: {
-                  include: { question: { select: { id: true, weight: true } } },
+                  select: {
+                    id: true,
+                    optionText: true,
+                    scoreValue: true,
+                    question: { select: { id: true, weight: true } },
+                  },
                 },
               },
             },
@@ -348,6 +420,7 @@ export const matchingService = {
         {
           score: answer.option.scoreValue,
           weight: answer.option.question.weight,
+          optionText: answer.option.optionText,
         },
       ]),
     );
@@ -433,6 +506,59 @@ export const matchingService = {
         compatibilityPercent = Math.round(compatibilityPercent * 0.7 + preferencePercent * 0.3);
       }
 
+      const activeContract = post.room?.contracts?.[0] ?? null;
+      const primaryTenantId = activeContract?.tenantId ?? null;
+      const occupantMap = new Map<
+        string,
+        {
+          id: string;
+          fullName: string;
+          avatarUrl: string | null;
+          systemRole: string;
+          roomRole: 'PRIMARY_TENANT' | 'ROOMMATE';
+          isPrimary: boolean;
+          status: string;
+          gender: string | null;
+          occupation: string | null;
+          age: number;
+        }
+      >();
+
+      if (activeContract?.tenant) {
+        const t = activeContract.tenant;
+        occupantMap.set(t.id, {
+          id: t.id,
+          fullName: t.fullName,
+          avatarUrl: t.avatarUrl,
+          systemRole: t.role,
+          roomRole: 'PRIMARY_TENANT',
+          isPrimary: true,
+          status: 'ACTIVE',
+          gender: t.profile?.gender ?? null,
+          occupation: t.profile?.occupation ?? null,
+          age: calculateAge(t.profile?.dob ?? null),
+        });
+      }
+
+      (post.room?.occupancyDeclarations ?? []).forEach((dec) => {
+        if (!dec.tenant || dec.tenant.id === primaryTenantId || occupantMap.has(dec.tenant.id)) return;
+        const t = dec.tenant;
+        occupantMap.set(t.id, {
+          id: t.id,
+          fullName: t.fullName,
+          avatarUrl: t.avatarUrl,
+          systemRole: t.role,
+          roomRole: 'ROOMMATE',
+          isPrimary: false,
+          status: dec.status,
+          gender: t.profile?.gender ?? null,
+          occupation: t.profile?.occupation ?? null,
+          age: calculateAge(t.profile?.dob ?? null),
+        });
+      });
+
+      const roomOccupants = Array.from(occupantMap.values());
+
       return {
         post: {
           id: post.id,
@@ -442,14 +568,21 @@ export const matchingService = {
           createdAt: post.createdAt,
           expiredAt: post.expiredAt,
           images: post.images,
-          property: post.property ?? post.room?.property ?? null,
+          property: post.room?.property ?? post.property ?? null,
           room: post.room
             ? {
                 id: post.room.id,
                 roomNumber: post.room.roomNumber,
+                priceMonthly: toNumberOrNull(post.room.priceMonthly),
+                depositAmount: toNumberOrNull(post.room.depositAmount),
                 maxOccupants: post.room.maxOccupants,
+                currentOccupants: roomOccupants.length,
                 area: post.room.area,
+                floor: post.room.floor,
+                bedType: post.room.bedType,
                 status: post.room.status,
+                amenities: (post.room.roomAmenities ?? []).map((ra) => ra.amenity),
+                occupants: roomOccupants,
               }
             : null,
         },
@@ -463,6 +596,19 @@ export const matchingService = {
           bio: candidate.profile?.bio ?? null,
           age: calculateAge(candidate.profile?.dob ?? null),
         },
+        lifestyleAnswers: candidate.lifestyleAnswers.map((answer) => {
+          const myAns = myAnswerMap.get(answer.questionId);
+          return {
+            questionId: answer.questionId,
+            questionText: answer.option.question.questionText,
+            category: answer.option.question.category,
+            optionId: answer.optionId,
+            optionText: answer.option.optionText,
+            scoreValue: answer.option.scoreValue,
+            myOptionText: myAns?.optionText ?? null,
+            myScoreValue: myAns?.score ?? null,
+          };
+        }),
         preference: preference
           ? {
               budgetMin: toNumberOrNull(preference.budgetMin),
@@ -475,6 +621,10 @@ export const matchingService = {
               currentProvince: preference.currentProvince,
               currentDistrict: preference.currentDistrict,
               currentWard: preference.currentWard,
+              currentAddress: preference.currentAddress,
+              currentRent: toNumberOrNull(preference.currentRent),
+              currentArea: preference.currentArea,
+              currentOccupants: preference.currentOccupants,
               roommateSlots: preference.roommateSlots,
               moveInDate: preference.moveInDate,
               smokingAllowed: preference.smokingAllowed,
