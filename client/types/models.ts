@@ -1551,6 +1551,30 @@ export interface UpdatePreferencesPayload {
   note?: string;
 }
 
+export interface RoommateRoomOccupant {
+  id: string;
+  fullName: string;
+  avatarUrl?: string | null;
+  systemRole: string;
+  roomRole: 'PRIMARY_TENANT' | 'ROOMMATE';
+  isPrimary: boolean;
+  status: string;
+  gender?: string | null;
+  occupation?: string | null;
+  age?: number;
+}
+
+export interface RoommateLifestyleAnswer {
+  questionId: string;
+  questionText: string;
+  category: string;
+  optionId: string;
+  optionText: string;
+  scoreValue: number;
+  myOptionText?: string | null;
+  myScoreValue?: number | null;
+}
+
 export interface SuggestedRoommate {
   post: {
     id: string;
@@ -1560,18 +1584,32 @@ export interface SuggestedRoommate {
     createdAt: string;
     expiredAt?: string | null;
     property?: {
+      id?: string;
       name?: string | null;
+      address?: string | null;
       province: string;
       district: string;
       ward: string;
+      landlord?: {
+        id: string;
+        fullName: string;
+        avatarUrl?: string | null;
+      } | null;
     } | null;
     /** Phòng đang thuê mà chủ tin gắn vào bài ở ghép (nếu có). */
     room?: {
       id: string;
       roomNumber: string;
+      priceMonthly?: number | null;
+      depositAmount?: number | null;
       maxOccupants: number;
+      currentOccupants?: number;
       area: number;
+      floor?: number | null;
+      bedType?: string | null;
       status: RoomStatus;
+      amenities?: Array<{ id: string; name: string }>;
+      occupants?: RoommateRoomOccupant[];
     } | null;
     images?: Array<{ id: string; imageUrl: string; isPrimary?: boolean }>;
   };
@@ -1585,6 +1623,7 @@ export interface SuggestedRoommate {
     bio?: string | null;
     age?: number;
   };
+  lifestyleAnswers?: RoommateLifestyleAnswer[];
   preference?: {
     budgetMin?: number | null;
     budgetMax?: number | null;
@@ -1596,6 +1635,10 @@ export interface SuggestedRoommate {
     currentProvince?: string | null;
     currentDistrict?: string | null;
     currentWard?: string | null;
+    currentAddress?: string | null;
+    currentRent?: number | null;
+    currentArea?: number | null;
+    currentOccupants?: number | null;
     roommateSlots?: number | null;
     moveInDate?: string | null;
     smokingAllowed?: boolean | null;
