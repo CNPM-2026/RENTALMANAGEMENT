@@ -290,7 +290,7 @@ function mapRoommatePost(item: RoommatePostItem): CandidateShape {
     petAllowed: preference?.petAllowed ?? null,
     smokingAllowed: preference?.smokingAllowed ?? null,
     cleanliness: preference?.cleanlinessLevel ?? 0,
-    hasRoom: Boolean(item.post.room || preference?.hasRoom),
+    hasRoom: Boolean(item.post.room?.id),
     bio: item.user.bio || "Người đăng chưa cập nhật giới thiệu.",
     tags,
     createdAt: item.post.createdAt,

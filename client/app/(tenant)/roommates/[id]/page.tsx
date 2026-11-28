@@ -144,7 +144,7 @@ function RoommateDetailContent() {
     postCreatedAt: suggestion.post.createdAt,
     postMaxOccupants: suggestion.post.room?.maxOccupants ?? null,
     postExpiredAt: suggestion.post.expiredAt ?? null,
-    hasRoom: Boolean(suggestion.post.room || suggestion.preference?.hasRoom),
+    hasRoom: Boolean(suggestion.post.room?.id),
     roomDetail: suggestion.post.room ?? null,
     propertyDetail: suggestion.post.property ?? null,
     postImages: suggestion.post.images ?? [],
