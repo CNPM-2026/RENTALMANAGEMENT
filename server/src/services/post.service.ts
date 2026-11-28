@@ -89,6 +89,9 @@ export const postService = {
         normalizedPropertyId = normalizedPropertyId || room.propertyId;
 
         const isRoomOwner = room.property.landlordId === authorId;
+        if (postType === 'FIND_ROOMMATE' && isRoomOwner) {
+          throw new AppError('Chủ trọ không được phép đứng làm chủ hợp đồng đại diện trong hợp đồng ở ghép', 403);
+        }
         if (!isRoomOwner) {
           if (postType === 'FIND_ROOMMATE') {
             // Khách thuê được gắn tin ở ghép với chính phòng mình đang thuê. Đây là

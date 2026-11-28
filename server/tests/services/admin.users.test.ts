@@ -23,7 +23,7 @@ vi.mock('../../src/config/db', () => ({
 }));
 
 vi.mock('../../src/services/audit.service', () => ({ auditService: { record: mocks.auditRecord } }));
-vi.mock('../../src/services/notification.service', () => ({ notificationService: { createNotification: vi.fn() } }));
+vi.mock('../../src/services/notification.service', () => ({ notificationService: { createNotification: vi.fn(), notifyUsers: vi.fn() } }));
 vi.mock('../../src/services/storage.service', () => ({ storageService: { deleteImage: vi.fn(), getPrivateImageUrl: vi.fn() } }));
 
 const sqlOf = (call: unknown[]) => String((call[0] as string[]).join('?'));

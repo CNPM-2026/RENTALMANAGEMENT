@@ -185,85 +185,8 @@ export const adminService = {
             data: { status: 'CLOSED' },
           });
         }
-
-        // Xử lý các hợp đồng đang hiệu lực của người thuê bị ban
-        if (typeof (tx as any).contract?.findMany === 'function') {
-          const activeContracts = await tx.contract.findMany({
-            where: { tenantId: userId, status: 'ACTIVE' },
-            include: {
-              room: { include: { property: true } },
-            },
-          });
-
-          for (const contract of activeContracts) {
-            const landlordId = contract.room.property.landlordId;
-
-            // Tìm danh sách người ở ghép trong phòng
-            const declarations = typeof (tx as any).roomOccupancyDeclaration?.findMany === 'function'
-              ? await tx.roomOccupancyDeclaration.findMany({
-                  where: {
-                    contractId: contract.id,
-                    status: { in: ['PENDING', 'VERIFIED'] },
-                    supersededAt: null,
-                    tenantId: { not: userId },
-                  },
-                  orderBy: { createdAt: 'asc' }, // Sớm nhất
-                  include: { tenant: true },
-                })
-              : [];
-
-            // Lọc người ở ghép hợp lệ (không phải chủ trọ và tài khoản không bị ban)
-            const eligibleRoommate = declarations.find(
-              (d: any) => d.tenantId !== landlordId && d.tenant.role !== 'LANDLORD' && d.tenant.isActive
-            );
-
-            if (eligibleRoommate) {
-              // Chuyển chủ thuê thành người ở ghép sớm nhất
-              await tx.contract.update({
-                where: { id: contract.id },
-                data: {
-                  originalTenantId: contract.originalTenantId || userId,
-                  tenantId: eligibleRoommate.tenantId,
-                  suspendedReason: `Tạm chuyển chủ hợp đồng sang ${eligibleRoommate.tenant.fullName} do ${user.fullName} bị khóa tài khoản (${finalBanReason})`,
-                },
-              });
-
-              await notificationService.notifyUsers(
-                [landlordId, eligibleRoommate.tenantId],
-                {
-                  title: 'Hợp đồng chuyển quyền thuê tạm thời',
-                  content: `Tài khoản người thuê ${user.fullName} đã bị khóa do: ${finalBanReason}. Quyền chủ hợp đồng phòng ${contract.room.roomNumber} tạm thời được chuyển cho ${eligibleRoommate.tenant.fullName}.`,
-                  type: 'CONTRACT',
-                  referenceId: contract.id,
-                },
-                (recipientId) => `contract:${contract.id}:transferred:${recipientId}`
-              ).catch(() => undefined);
-            } else {
-              // Không có người ở ghép hợp lệ hoặc chỉ còn chủ trọ: Tạm đình chỉ hợp đồng
-              await tx.contract.update({
-                where: { id: contract.id },
-                data: {
-                  status: 'SUSPENDED',
-                  originalTenantId: contract.originalTenantId || userId,
-                  suspendedReason: `Hợp đồng bị tạm đình chỉ do người thuê ${user.fullName} bị khóa tài khoản: ${finalBanReason}`,
-                },
-              });
-
-              await notificationService.notifyUsers(
-                [landlordId],
-                {
-                  title: 'Hợp đồng bị tạm đình chỉ',
-                  content: `Hợp đồng phòng ${contract.room.roomNumber} đã chuyển sang trạng thái TẠM ĐÌNH CHỈ do người thuê ${user.fullName} bị khóa tài khoản: ${finalBanReason}.`,
-                  type: 'CONTRACT',
-                  referenceId: contract.id,
-                },
-                (recipientId) => `contract:${contract.id}:suspended:${recipientId}`
-              ).catch(() => undefined);
-            }
-          }
-        }
       } else {
-        // Khi User A kháng cáo thành công (Unban):
+        // Khi User A được mở ban (Unban):
         // 1. Nếu hợp đồng đang SUSPENDED vì A bị ban (và chưa thanh lý) -> Khôi phục ACTIVE
         if (typeof (tx as any).contract?.updateMany === 'function') {
           await tx.contract.updateMany({
@@ -301,6 +224,61 @@ export const adminService = {
     // audit để lỗi ghi log (không được rollback thay đổi) cũng không thể giữ lại một
     // phiên đã bị vô hiệu hóa.
     invalidateUserSockets(userId);
+
+    // Gửi thông báo SAU KHI transaction đã commit thành công để tránh connection contention và transaction timeout (5000ms)
+    const finalBanReason = !isActive ? (banReason?.trim() || 'Vi phạm điều khoản dịch vụ') : null;
+    try {
+      if (!isActive) {
+        if (typeof (prisma as any).contract?.findMany === 'function') {
+          const activeContracts = await (prisma as any).contract.findMany({
+            where: { tenantId: userId, status: 'ACTIVE' },
+            include: {
+              room: { include: { property: true } },
+            },
+          }).catch(() => []);
+
+          for (const contract of (activeContracts as any[])) {
+            const landlordId = contract.room?.property?.landlordId;
+            if (landlordId && typeof notificationService?.notifyUsers === 'function') {
+              await notificationService.notifyUsers(
+                [landlordId],
+                {
+                  title: 'Tài khoản người thuê bị tạm khóa',
+                  content: `Người thuê ${updated.fullName} trong hợp đồng phòng ${contract.room?.roomNumber} đã bị tạm khóa tài khoản: ${finalBanReason}.`,
+                  type: 'CONTRACT',
+                  referenceId: contract.id,
+                },
+                (recipientId) => `contract:${contract.id}:tenant-banned:${recipientId}`
+              );
+            }
+          }
+        }
+
+        if (typeof notificationService?.createNotification === 'function') {
+          await notificationService.createNotification(
+            userId,
+            'Tài khoản đã bị tạm khóa',
+            `Tài khoản của bạn đã bị khóa. Lý do: ${finalBanReason}`,
+            'SYSTEM',
+            userId,
+            `user:${userId}:banned:${Date.now()}`
+          );
+        }
+      } else {
+        if (typeof notificationService?.createNotification === 'function') {
+          await notificationService.createNotification(
+            userId,
+            'Tài khoản đã được mở khóa',
+            'Tài khoản của bạn đã được quản trị viên mở khóa thành công. Bạn có thể tiếp tục sử dụng đầy đủ các tính năng.',
+            'SYSTEM',
+            userId,
+            `user:${userId}:unbanned:${Date.now()}`
+          );
+        }
+      }
+    } catch {
+      // Bỏ qua lỗi gửi thông báo để không gián đoạn luồng admin
+    }
 
     // Audit ghi SAU khi transaction commit: lỗi ghi log không được rollback việc
     // khóa tài khoản (giữ nguyên hành vi đã được duyệt của các luồng admin khác).

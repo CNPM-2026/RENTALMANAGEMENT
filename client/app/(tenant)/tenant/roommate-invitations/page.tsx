@@ -62,7 +62,7 @@ export default function TenantRoommateInvitationsPage() {
         const user = type === "RECEIVED" ? item.sender : item.recipient;
         const counterpartId = type === "RECEIVED" ? item.senderId : item.recipientId;
         const post = item.post;
-        const room = item.post?.room;
+        const room = item.room || item.post?.room;
         const property = room?.property;
         return {
           id: item.id,
@@ -77,7 +77,7 @@ export default function TenantRoommateInvitationsPage() {
           createdAt: new Date(item.createdAt).toLocaleString("vi-VN"),
           status: item.status === "CANCELLED" ? "DECLINED" : item.status,
           postId: item.postId || post?.id || null,
-          roomId: post?.roomId || room?.id || null,
+          roomId: item.roomId || post?.roomId || room?.id || null,
           roomNumber: room?.roomNumber || null,
           propertyName: property?.name || null,
           propertyAddress: property?.address || null,

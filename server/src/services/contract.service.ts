@@ -171,12 +171,12 @@ export const contractService = {
             occupancyDeclarations: {
               where: { status: { in: ['PENDING', 'VERIFIED'] }, supersededAt: null },
               include: {
-                tenant: { select: { id: true, fullName: true, phone: true, email: true, avatarUrl: true } },
+                tenant: { select: { id: true, fullName: true, phone: true, email: true, avatarUrl: true, isActive: true, banReason: true } },
               },
             },
           }
         },
-        tenant: { select: { id: true, fullName: true, phone: true, email: true, avatarUrl: true } }
+        tenant: { select: { id: true, fullName: true, phone: true, email: true, avatarUrl: true, isActive: true, banReason: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -202,6 +202,8 @@ export const contractService = {
                 role: 'PRIMARY_TENANT',
                 isPrimary: true,
                 status: 'ACTIVE',
+                isActive: (contract.tenant as any).isActive !== false,
+                banReason: (contract.tenant as any).banReason || null,
                 joinedAt: contract.startDate,
               },
             ]
@@ -218,6 +220,8 @@ export const contractService = {
             role: 'ROOMMATE',
             isPrimary: false,
             status: dec.status,
+            isActive: (dec.tenant as any).isActive !== false,
+            banReason: (dec.tenant as any).banReason || null,
             joinedAt: dec.declaredAt,
           })),
       ];

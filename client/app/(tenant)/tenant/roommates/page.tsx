@@ -270,14 +270,17 @@ export default function TenantRoommatesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {coTenants.map((occupant) => {
             const isMe = currentUser && occupant.id === currentUser.id;
+            const isBanned = occupant.isActive === false;
 
             return (
               <div
                 key={occupant.id}
-                className={`rounded-[12px] border p-5 bg-white shadow-xs flex flex-col justify-between transition-all ${
-                  occupant.isPrimary
-                    ? "border-[#b8dbc6] ring-1 ring-[#15594f]/10"
-                    : "border-[#e2e7e1] hover:border-[#15594f]/30"
+                className={`rounded-[12px] border p-5 shadow-xs flex flex-col justify-between transition-all ${
+                  isBanned
+                    ? "bg-neutral-100/90 border-neutral-300 opacity-80"
+                    : occupant.isPrimary
+                      ? "bg-white border-[#b8dbc6] ring-1 ring-[#15594f]/10"
+                      : "bg-white border-[#e2e7e1] hover:border-[#15594f]/30"
                 }`}
               >
                 <div className="space-y-3">
@@ -287,16 +290,21 @@ export default function TenantRoommatesPage() {
                         <Avatar
                           src={occupant.avatarUrl ?? "/images/default-avatar.svg"}
                           alt={occupant.fullName}
-                          className="size-full object-cover"
+                          className={`size-full object-cover ${isBanned ? "grayscale" : ""}`}
                         />
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-[16px] font-bold text-[#203c37]">
+                          <h4 className={`text-[16px] font-bold ${isBanned ? "text-neutral-500" : "text-[#203c37]"}`}>
                             <Link href={`/users/${occupant.id}`} className="hover:text-[#15594f] hover:underline">
                               {occupant.fullName}
                             </Link>
                           </h4>
+                          {isBanned && (
+                            <Badge variant="error" size="sm">
+                              Bị ban
+                            </Badge>
+                          )}
                           {isMe && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#eaf2ed] text-[#15594f]">
                               Bạn
@@ -305,7 +313,7 @@ export default function TenantRoommatesPage() {
                         </div>
                         <div className="mt-1">
                           {occupant.isPrimary ? (
-                            <Badge variant="success" size="sm">
+                            <Badge variant={isBanned ? "neutral" : "success"} size="sm">
                               Người thuê chính (Chủ HĐ)
                             </Badge>
                           ) : (

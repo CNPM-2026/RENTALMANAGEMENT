@@ -415,6 +415,8 @@ export interface Contract {
     isPrimary: boolean;
     status?: string;
     joinedAt?: string;
+    isActive?: boolean;
+    banReason?: string | null;
   }>;
 }
 
@@ -808,6 +810,7 @@ export interface RoommateInvitation {
   senderId: string;
   recipientId: string;
   postId?: string | null;
+  roomId?: string | null;
   message?: string | null;
   status: InvitationStatus;
   createdAt: string;
@@ -1688,6 +1691,7 @@ export interface CreateRentalRequestPayload {
 export interface CreateRoommateInvitationPayload {
   recipientId: string;
   postId?: string;
+  roomId?: string;
   message?: string;
 }
 
