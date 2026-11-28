@@ -227,49 +227,57 @@ export const adminService = {
 
     // Gửi thông báo SAU KHI transaction đã commit thành công để tránh connection contention và transaction timeout (5000ms)
     const finalBanReason = !isActive ? (banReason?.trim() || 'Vi phạm điều khoản dịch vụ') : null;
-    if (!isActive) {
-      if (typeof (prisma as any).contract?.findMany === 'function') {
-        const activeContracts = await (prisma as any).contract.findMany({
-          where: { tenantId: userId, status: 'ACTIVE' },
-          include: {
-            room: { include: { property: true } },
-          },
-        }).catch(() => []);
+    try {
+      if (!isActive) {
+        if (typeof (prisma as any).contract?.findMany === 'function') {
+          const activeContracts = await (prisma as any).contract.findMany({
+            where: { tenantId: userId, status: 'ACTIVE' },
+            include: {
+              room: { include: { property: true } },
+            },
+          }).catch(() => []);
 
-        for (const contract of (activeContracts as any[])) {
-          const landlordId = contract.room?.property?.landlordId;
-          if (landlordId) {
-            await notificationService.notifyUsers(
-              [landlordId],
-              {
-                title: 'Tài khoản người thuê bị tạm khóa',
-                content: `Người thuê ${updated.fullName} trong hợp đồng phòng ${contract.room?.roomNumber} đã bị tạm khóa tài khoản: ${finalBanReason}.`,
-                type: 'CONTRACT',
-                referenceId: contract.id,
-              },
-              (recipientId) => `contract:${contract.id}:tenant-banned:${recipientId}`
-            ).catch(() => undefined);
+          for (const contract of (activeContracts as any[])) {
+            const landlordId = contract.room?.property?.landlordId;
+            if (landlordId && typeof notificationService?.notifyUsers === 'function') {
+              await notificationService.notifyUsers(
+                [landlordId],
+                {
+                  title: 'Tài khoản người thuê bị tạm khóa',
+                  content: `Người thuê ${updated.fullName} trong hợp đồng phòng ${contract.room?.roomNumber} đã bị tạm khóa tài khoản: ${finalBanReason}.`,
+                  type: 'CONTRACT',
+                  referenceId: contract.id,
+                },
+                (recipientId) => `contract:${contract.id}:tenant-banned:${recipientId}`
+              );
+            }
           }
         }
-      }
 
-      await notificationService.createNotification(
-        userId,
-        'Tài khoản đã bị tạm khóa',
-        `Tài khoản của bạn đã bị khóa. Lý do: ${finalBanReason}`,
-        'SYSTEM',
-        userId,
-        `user:${userId}:banned:${Date.now()}`
-      ).catch(() => undefined);
-    } else {
-      await notificationService.createNotification(
-        userId,
-        'Tài khoản đã được mở khóa',
-        'Tài khoản của bạn đã được quản trị viên mở khóa thành công. Bạn có thể tiếp tục sử dụng đầy đủ các tính năng.',
-        'SYSTEM',
-        userId,
-        `user:${userId}:unbanned:${Date.now()}`
-      ).catch(() => undefined);
+        if (typeof notificationService?.createNotification === 'function') {
+          await notificationService.createNotification(
+            userId,
+            'Tài khoản đã bị tạm khóa',
+            `Tài khoản của bạn đã bị khóa. Lý do: ${finalBanReason}`,
+            'SYSTEM',
+            userId,
+            `user:${userId}:banned:${Date.now()}`
+          );
+        }
+      } else {
+        if (typeof notificationService?.createNotification === 'function') {
+          await notificationService.createNotification(
+            userId,
+            'Tài khoản đã được mở khóa',
+            'Tài khoản của bạn đã được quản trị viên mở khóa thành công. Bạn có thể tiếp tục sử dụng đầy đủ các tính năng.',
+            'SYSTEM',
+            userId,
+            `user:${userId}:unbanned:${Date.now()}`
+          );
+        }
+      }
+    } catch {
+      // Bỏ qua lỗi gửi thông báo để không gián đoạn luồng admin
     }
 
     // Audit ghi SAU khi transaction commit: lỗi ghi log không được rollback việc
